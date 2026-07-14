@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Marketing Performance Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
+
+  .header { background: #fff; border-bottom: 1px solid #eee; padding: 16px 28px 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon { background: #E8650A; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .brand-title { font-weight: 700; font-size: 17px; color: #1a1a1a; }
+  .brand-sub { font-size: 12px; color: #888; margin-top: 1px; }
+  .partial-badge { background: #FFF3EB; border: 1px solid #FFA559; border-radius: 20px; padding: 5px 14px; font-size: 12px; color: #7a3800; font-weight: 500; white-space: nowrap; }
+
+  .tabs { display: flex; gap: 0; overflow-x: auto; }
+  .tab-btn { padding: 10px 24px; border: none; border-bottom: 3px solid transparent; background: none; font-weight: 400; color: #666; font-size: 14px; cursor: pointer; white-space: nowrap; transition: color 0.15s, border-color 0.15s; }
+  .tab-btn.active { font-weight: 700; color: #E8650A; border-bottom-color: #E8650A; }
+  .tab-btn:hover:not(.active) { color: #333; }
+
+  .content { padding: 28px; max-width: 1400px; margin: 0 auto; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .note-box { background: #FFF3EB; border: 1px solid #FFA559; border-radius: 8px; padding: 10px 16px; font-size: 12px; color: #7a3800; margin-bottom: 24px; line-height: 1.6; }
+  .note-box strong { font-weight: 600; }
+
+  .section { margin-bottom: 36px; }
+  .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .section-bar { width: 4px; height: 22px; background: #E8650A; border-radius: 2px; flex-shrink: 0; }
+  .section-title { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .kpi-card { background: #fff; border: 0.5px solid #e5e5e5; border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .kpi-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+  .kpi-value { font-size: 19px; font-weight: 600; color: #1a1a1a; word-break: break-all; }
+  .kpi-change { font-size: 11px; margin-top: 5px; }
+  .badge-up      { color: #1a7a3c; background: #eafaf1; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+  .badge-down    { color: #c0392b; background: #fdecea; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+  .badge-neutral { color: #aaa; border-radius: 4px; padding: 1px 6px; font-weight: 500; }
+  .badge-amber   { color: #7a4f00; background: #fff4cc; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+  .badge-na      { color: #bbb; font-size: 11px; }
+
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 0.5px solid #e5e5e5; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+  thead tr { background: #E8650A; }
+  thead th { padding: 10px 13px; text-align: left; font-weight: 600; color: #fff; white-space: nowrap; }
+  thead th:not(:first-child) { text-align: right; }
+  tbody tr { border-bottom: 0.5px solid #eee; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody tr.current-row { background: #FFF3EB; }
+  tbody td { padding: 9px 13px; color: #333; white-space: nowrap; }
+  tbody td:not(:first-child) { text-align: right; }
+  tbody td.q-label { font-weight: 500; }
+  tbody tr.current-row td.q-label { color: #E8650A; font-weight: 700; }
+  .inline-badge { font-size: 10px; font-weight: 600; border-radius: 3px; padding: 1px 4px; margin-left: 4px; display: inline-block; }
+  .inline-up    { color: #1a7a3c; background: #eafaf1; }
+  .inline-down  { color: #c0392b; background: #fdecea; }
+  .inline-amber { color: #7a4f00; background: #fff4cc; }
+
+  .divider { border: none; border-top: 1.5px dashed #e0e0e0; margin: 8px 0 28px; }
+
+  .legend { background: #fff; border: 0.5px solid #e5e5e5; border-radius: 10px; padding: 14px 18px; font-size: 12px; color: #666; margin-top: 32px; }
+  .legend-title { font-weight: 600; color: #333; margin-bottom: 10px; font-size: 13px; }
+  .legend-items { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .legend-items span { display: inline-flex; align-items: center; gap: 4px; }
+
+  @media (max-width: 600px) {
+    .content { padding: 16px; }
+    .header { padding: 12px 16px 0; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .auth-gate { position: fixed; inset: 0; background: #f5f5f5; display: flex; align-items: center; justify-content: center; z-index: 1000; }
+  .auth-card { background: #fff; border-radius: 14px; padding: 40px 36px; max-width: 360px; width: 90%; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .auth-icon { font-size: 36px; margin-bottom: 12px; }
+  .auth-card h2 { font-size: 18px; margin-bottom: 8px; }
+  .auth-card p { font-size: 13px; color: #666; margin-bottom: 20px; line-height: 1.5; }
+  .auth-btn { background: #E8650A; color: #fff; border: none; border-radius: 8px; padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
+  .auth-btn:hover { background: #cf5808; }
+  .auth-btn:disabled { opacity: 0.6; cursor: default; }
+  .auth-error { color: #c0392b; font-size: 12px; margin-top: 14px; }
+  .auth-signout { position: fixed; top: 12px; right: 16px; font-size: 12px; color: #888; background: #fff; border: 1px solid #e5e5e5; border-radius: 20px; padding: 6px 14px; cursor: pointer; z-index: 999; display: none; }
+</style>
+</head>
+<body>
+
+<div id="auth-gate" class="auth-gate">
+  <div class="auth-card">
+    <div class="auth-icon">🔒</div>
+    <h2>Marketing Performance Dashboard</h2>
+    <p>Sign in with your authorized Google account to view this dashboard.</p>
+    <button id="auth-signin-btn" class="auth-btn" type="button">Sign in with Google</button>
+    <p id="auth-error" class="auth-error" style="display:none"></p>
+  </div>
+</div>
+<button id="auth-signout-btn" class="auth-signout" type="button">Sign out</button>
+
+<div id="dashboard-app" style="display:none">
+<div class="header">
+  <div class="header-top">
+    <div class="brand">
+      <div class="brand-icon">📊</div>
+      <div>
+        <div class="brand-title">Marketing Performance Dashboard</div>
+        <div class="brand-sub">Quarter on Quarter Review — FY 2025–26</div>
+      </div>
+    </div>
+    <div class="partial-badge" id="partial-badge-text">⚠️ Loading...</div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('newauto')">New Auto Classified</button>
+    <button class="tab-btn" onclick="showTab('enterprise')">Enterprise</button>
+    <button class="tab-btn" onclick="showTab('enterprise_models')">Enterprise - Models</button>
+    <button class="tab-btn" onclick="showTab('cps')">CPS</button>
+    <button class="tab-btn" onclick="showTab('ncbd')">NCBD</button>
+    <button class="tab-btn" onclick="showTab('cv')">CV</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ENTERPRISE TAB -->
+  <div id="tab-enterprise" class="tab-panel">
+    <div class="note-box"><strong>Note:</strong> * June 2026 data is current/partial — the month is not yet complete. Revenue & Margin for June will be updated once the month closes.</div>
+    <div id="section-combined"></div>
+    <hr class="divider">
+    <div id="section-cars"></div>
+    <hr class="divider">
+    <div id="section-bikes"></div>
+  </div>
+
+  <!-- CPS TAB -->
+  <div id="tab-cps" class="tab-panel">
+    <div class="note-box"><strong>Note:</strong> * <span class="dyn-current-month">current month</span> data is partial — the month is not yet complete. Revenue will be updated once the month closes.</div>
+    <div id="section-cps"></div>
+  </div>
+
+  <!-- NCBD TAB -->
+  <div id="tab-ncbd" class="tab-panel">
+    <div class="note-box"><strong>Note:</strong> * <span class="dyn-current-month">current month</span> data is partial — the month is not yet complete. Revenue will be updated once the month closes.</div>
+    <div id="section-ncbd"></div>
+  </div>
+
+  <!-- CV TAB -->
+  <div id="tab-cv" class="tab-panel">
+    <div class="note-box"><strong>Note:</strong> * <span class="dyn-current-month">current month</span> data is partial — the month is not yet complete. Revenue will be updated once the month closes.</div>
+    <div id="section-cv"></div>
+    <div id="section-cv-models"></div>
+  </div>
+
+  <!-- ENTERPRISE MODELS TAB -->
+  <div id="tab-enterprise_models" class="tab-panel">
+    <div class="note-box"><strong>Note:</strong> <span id="models-note-text">Loading...</span></div>
+    <div id="section-models"></div>
+  </div>
+
+  <!-- NEW AUTO CLASSIFIED TAB -->
+  <div id="tab-newauto" class="tab-panel active">
+    <div class="note-box"><strong>Note:</strong> * June 2026 data is current/partial — the month is not yet complete. Revenue & Margin for June will be updated once the month closes.</div>
+    <div id="section-newauto"></div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-title">Legend</div>
+    <div class="legend-items">
+      <span><strong>CPL</strong> — Cost Per Lead</span>
+      <span><strong>TCPL</strong> — Total Cost Per Lead</span>
+      <span><strong>T-Leads</strong> — Total Leads</span>
+      <span><strong>Margin %</strong> — Revenue Margin</span>
+      <span><span class="badge-up">▲/▼</span> Green = favourable change</span>
+      <span><span class="badge-down">▲/▼</span> Red = unfavourable change &gt;6%</span>
+      <span><span class="badge-neutral">▲/▼</span> Grey = unfavourable but ≤6% (within tolerance)</span>
+      <span style="font-size:11px;color:#888">Spends / CPL / TCPL: lower is better &nbsp;|&nbsp; Revenue / Leads / Margin: higher is better</span>
+      <span style="color:#E8650A; font-weight:600;">★ <span id="legend-current-label">current</span> rows = current partial month</span>
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "FIREBASE_API_KEY",
+  authDomain: "FIREBASE_AUTH_DOMAIN",
+  projectId: "FIREBASE_PROJECT_ID",
+  storageBucket: "FIREBASE_STORAGE_BUCKET",
+  messagingSenderId: "FIREBASE_MESSAGING_SENDER_ID",
+  appId: "FIREBASE_APP_ID"
+};
+
+const ALLOWED_EMAILS = ["deepanshi.ahuja@girnarsoft.com"];
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+const gate = document.getElementById('auth-gate');
+const dashboard = document.getElementById('dashboard-app');
+const signinBtn = document.getElementById('auth-signin-btn');
+const errorEl = document.getElementById('auth-error');
+const signoutBtn = document.getElementById('auth-signout-btn');
+
+signinBtn.addEventListener('click', () => {
+  errorEl.style.display = 'none';
+  signinBtn.disabled = true;
+  signinBtn.textContent = 'Signing in...';
+  signInWithPopup(auth, provider).catch((err) => {
+    errorEl.textContent = 'Sign-in failed: ' + err.message;
+    errorEl.style.display = 'block';
+    signinBtn.disabled = false;
+    signinBtn.textContent = 'Sign in with Google';
+  });
+});
+
+signoutBtn.addEventListener('click', () => signOut(auth));
+
+onAuthStateChanged(auth, (user) => {
+  if (user && ALLOWED_EMAILS.includes((user.email || '').toLowerCase())) {
+    gate.style.display = 'none';
+    dashboard.style.display = 'block';
+    signoutBtn.style.display = 'block';
+  } else if (user) {
+    dashboard.style.display = 'none';
+    gate.style.display = 'flex';
+    signoutBtn.style.display = 'none';
+    errorEl.textContent = 'Access denied for ' + user.email + '. This dashboard is restricted.';
+    errorEl.style.display = 'block';
+    signOut(auth);
+  } else {
+    dashboard.style.display = 'none';
+    gate.style.display = 'flex';
+    signoutBtn.style.display = 'none';
+    signinBtn.disabled = false;
+    signinBtn.textContent = 'Sign in with Google';
+  }
+});
+</script>
+<script>
+const ORANGE = '#E8650A';
+const CURRENT_PARTIAL_MONTH = "Jun'26";
+const DATA = {
+  newauto: {
+    title: "New Auto Classified — Quarter on Quarter Performance",
+    kpis: ["spends", "revenue", "margin"],
+    rows: [
+      { q:"Q1", spends:28697571, revenue:78856080, margin:0.6361, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Q2", spends:25982866, revenue:79436651, margin:0.6729, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Q3", spends:22446472, revenue:87578003, margin:0.7437, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Q4", spends:20981572, revenue:70292009, margin:0.7015, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Apr'26", spends:20494611, revenue:62670342, margin:0.673, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"May'26", spends:22716933, revenue:64088288, margin:0.6455, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Jun'26", spends:19698853, revenue:20670650, margin:0.047, leads:null, tleads:null, cpl:null, tcpl:null },
+    ]
+  },
+  enterprise_combined: {
+    title: "Enterprise — Combined (Cars + Bikes)",
+    kpis: ["spends", "revenue", "margin", "leads", "tleads", "cpl", "tcpl"],
+    rows: [
+      { q:"Q1", spends:11385625, revenue:29781142, margin:0.6177, leads:247528, tleads:159135, cpl:45.997, tcpl:71.547 },
+      { q:"Q2", spends:9950178, revenue:30661397, margin:0.6755, leads:287479, tleads:168120, cpl:34.612, tcpl:59.185 },
+      { q:"Q3", spends:8816923, revenue:27484150, margin:0.6792, leads:272961, tleads:142162, cpl:32.301, tcpl:62.02 },
+      { q:"Q4", spends:8548105, revenue:24414330, margin:0.6499, leads:236910, tleads:136378, cpl:36.082, tcpl:62.68 },
+      { q:"Apr'26", spends:7043335, revenue:20108993, margin:0.6497, leads:203982, tleads:121423, cpl:34.529, tcpl:58.007 },
+      { q:"May'26", spends:7345395, revenue:20039034, margin:0.6334, leads:214425, tleads:124417, cpl:34.256, tcpl:59.039 },
+      { q:"Jun'26", spends:6094299, revenue:16856556, margin:0.6385, leads:161488, tleads:95572, cpl:37.738, tcpl:63.767 },
+    ]
+  },
+  enterprise_cars: {
+    title: "Enterprise — Cars",
+    kpis: ["spends", "revenue", "margin", "leads", "tleads", "cpl", "tcpl"],
+    rows: [
+      { q:"Q1", spends:8048147, revenue:21606366, margin:0.6275, leads:116513, tleads:78355, cpl:69.075, tcpl:102.714 },
+      { q:"Q2", spends:6925009, revenue:20252592, margin:0.6581, leads:148945, tleads:82175, cpl:46.494, tcpl:84.271 },
+      { q:"Q3", spends:6734430, revenue:21002006, margin:0.6793, leads:162680, tleads:89325, cpl:41.397, tcpl:75.392 },
+      { q:"Q4", spends:6250954, revenue:17222806, margin:0.6371, leads:131378, tleads:72324, cpl:47.58, tcpl:86.43 },
+      { q:"Apr'26", spends:4708140, revenue:12928777, margin:0.6358, leads:102392, tleads:49916, cpl:45.982, tcpl:94.321 },
+      { q:"May'26", spends:5190567, revenue:13084044, margin:0.6033, leads:118891, tleads:61861, cpl:43.658, tcpl:83.907 },
+      { q:"Jun'26", spends:5000354, revenue:12347958, margin:0.595, leads:102595, tleads:61104, cpl:48.739, tcpl:81.833 },
+    ]
+  },
+  enterprise_bikes: {
+    title: "Enterprise — Bikes",
+    kpis: ["spends", "revenue", "margin", "leads", "tleads", "cpl", "tcpl"],
+    rows: [
+      { q:"Q1", spends:3337478, revenue:8174776, margin:0.5917, leads:131015, tleads:80780, cpl:25.474, tcpl:41.316 },
+      { q:"Q2", spends:3025169, revenue:10408805, margin:0.7094, leads:138534, tleads:85945, cpl:21.837, tcpl:35.199 },
+      { q:"Q3", spends:2082493, revenue:6482144, margin:0.6787, leads:110281, tleads:52837, cpl:18.884, tcpl:39.414 },
+      { q:"Q4", spends:2297150, revenue:7191524, margin:0.6806, leads:105532, tleads:64055, cpl:21.767, tcpl:35.862 },
+      { q:"Apr'26", spends:2335195, revenue:7180216, margin:0.6748, leads:101590, tleads:71507, cpl:22.986, tcpl:32.657 },
+      { q:"May'26", spends:2154828, revenue:6954990, margin:0.6902, leads:95534, tleads:62556, cpl:22.556, tcpl:34.446 },
+      { q:"Jun'26", spends:924003, revenue:3830831, margin:0.7588, leads:58893, tleads:34468, cpl:15.69, tcpl:26.808 },
+    ]
+  },
+  cps: {
+    title: "CPS — Quarter on Quarter Performance",
+    kpis: ["spends", "revenue", "margin", "leads", "tleads", "cpl", "tcpl"],
+    rows: [
+      { q:"Q1", spends:12503340, revenue:37899461, margin:0.6701, leads:307892, tleads:153946, cpl:40.609, tcpl:81.219 },
+      { q:"Q2", spends:12455728, revenue:37780821, margin:0.6703, leads:378168, tleads:189161, cpl:32.937, tcpl:65.847 },
+      { q:"Q3", spends:10463250, revenue:49571180, margin:0.7889, leads:361210, tleads:158494, cpl:28.967, tcpl:66.017 },
+      { q:"Q4", spends:9276290, revenue:34572876, margin:0.7317, leads:264672, tleads:162204, cpl:35.048, tcpl:57.189 },
+      { q:"Apr'26", spends:10507488, revenue:33467089, margin:0.686, leads:302793, tleads:183811, cpl:34.702, tcpl:57.165 },
+      { q:"May'26", spends:11521198, revenue:34170189, margin:0.6628, leads:355617, tleads:230542, cpl:32.398, tcpl:49.974 },
+      { q:"Jun'26", spends:10381414, revenue:null, margin:null, leads:308998, tleads:182714, cpl:33.597, tcpl:56.818 },
+    ]
+  },
+  ncbd: {
+    title: "NCBD — Quarter on Quarter Performance",
+    kpis: ["spends", "revenue", "margin"],
+    rows: [
+      { q:"Q1", spends:4166382, revenue:8563206, margin:0.5135, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Q2", spends:2830638, revenue:8672453, margin:0.6736, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Q3", spends:2278902, revenue:7208673, margin:0.6839, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Q4", spends:2355087, revenue:7819269, margin:0.6988, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Apr'26", spends:2063494, revenue:7116075, margin:0.71, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"May'26", spends:3099524, revenue:7872299, margin:0.6063, leads:null, tleads:null, cpl:null, tcpl:null },
+      { q:"Jun'26", spends:2500483, revenue:3814094, margin:0.3444, leads:null, tleads:null, cpl:null, tcpl:null },
+    ]
+  },
+  cv: {
+    title: "CV — Quarter on Quarter Performance",
+    kpis: ["spends", "revenue", "margin", "leads", "tleads", "cpl", "tcpl"],
+    rows: [
+      { q:"Q1", spends:642224, revenue:2612271, margin:0.7542, leads:21600, tleads:15650, cpl:29.733, tcpl:41.037 },
+      { q:"Q2", spends:746322, revenue:2321981, margin:0.6786, leads:19604, tleads:14003, cpl:38.07, tcpl:53.297 },
+      { q:"Q3", spends:887397, revenue:3314000, margin:0.7322, leads:27568, tleads:18306, cpl:32.189, tcpl:48.476 },
+      { q:"Q4", spends:802090, revenue:3485534, margin:0.7699, leads:24848, tleads:17539, cpl:32.28, tcpl:45.732 },
+      { q:"Apr'26", spends:880294, revenue:1978185, margin:0.555, leads:21514, tleads:19254, cpl:40.917, tcpl:45.72 },
+      { q:"May'26", spends:750816, revenue:2006766, margin:0.6259, leads:22011, tleads:20413, cpl:34.111, tcpl:36.781 },
+      { q:"Jun'26", spends:722657, revenue:null, margin:null, leads:20517, tleads:16843, cpl:35.222, tcpl:42.905 },
+    ]
+  },
+};
+
+const KPI_META = {
+  spends:  { label: "Spends (₹)",   fmt: fmtNum,  lowerBetter: true  },
+  revenue: { label: "Revenue (₹)",  fmt: fmtRev,  lowerBetter: false },
+  margin:  { label: "Margin %",     fmt: fmtPct,  lowerBetter: false },
+  leads:   { label: "Leads",        fmt: fmtNum,  lowerBetter: false },
+  tleads:  { label: "T-Leads",      fmt: fmtNum,  lowerBetter: false },
+  cpl:     { label: "CPL (₹)",      fmt: fmtDec,  lowerBetter: true  },
+  tcpl:    { label: "TCPL (₹)",     fmt: fmtDec,  lowerBetter: true  },
+};
+
+function fmtNum(v) {
+  if (v == null || v === "") return "—";
+  return Math.round(v).toLocaleString("en-IN");
+}
+function fmtRev(v) {
+  if (v == null || v === "") return "—*";
+  return Math.round(v).toLocaleString("en-IN");
+}
+function fmtPct(v) {
+  if (v == null || v === 0 || v === "") return "—";
+  return (v * 100).toFixed(1) + "%";
+}
+function fmtDec(v) {
+  if (v == null || v === "") return "—";
+  return Number(v).toFixed(2);
+}
+function pctChange(cur, prev) {
+  if (cur == null || prev == null || prev === 0 || cur === "" || prev === "") return null;
+  return ((cur - prev) / prev) * 100;
+}
+function badgeHtml(chg, lowerBetter) {
+  if (chg == null) return '<span class="badge-na">—</span>';
+  const arrow = chg >= 0 ? "▲" : "▼";
+  const abs = Math.abs(chg);
+  let cls;
+  if (lowerBetter) {
+    if (chg < 0)           cls = "inline-up";   // any decrease → green
+    else if (abs > 6)      cls = "inline-down"; // increase >6% → red
+    else                   cls = "";            // increase ≤6% → no highlight
+  } else {
+    if (chg >= 0)          cls = "inline-up";   // any increase → green
+    else if (abs > 6)      cls = "inline-down"; // decrease >6% → red
+    else                   cls = "";            // decrease ≤6% → no highlight
+  }
+  if (cls === "") return `<span style="font-size:10px;color:#aaa;margin-left:4px">${chg >= 0 ? "▲" : "▼"} ${abs.toFixed(1)}%</span>`;
+  return `<span class="inline-badge ${cls}">${arrow} ${abs.toFixed(1)}%</span>`;
+}
+
+function buildSection(containerId, dataKey) {
+  const ds = DATA[dataKey];
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Dynamically find the last COMPLETE month (skip the partial/current month)
+  // CURRENT_PARTIAL_MONTH is injected by generate_dashboard.py
+  const completeRows = ds.rows.filter(r => r.q !== CURRENT_PARTIAL_MONTH);
+  const lastRow = completeRows[completeRows.length - 1];  // e.g. May'26
+  const prevRow = completeRows[completeRows.length - 2];  // e.g. Apr'26
+  const lastLabel = lastRow ? lastRow.q : '';
+  const prevLabel = prevRow ? prevRow.q : '';
+
+  let cardsHtml = `<div class="kpi-grid">`;
+  ds.kpis.forEach(k => {
+    const meta = KPI_META[k];
+    const val = lastRow ? lastRow[k] : null;
+    const prev = prevRow ? prevRow[k] : null;
+    const chg = pctChange(
+      val != null && val !== "" ? Number(val) : null,
+      prev != null && prev !== "" ? Number(prev) : null
+    );
+    const abs = chg == null ? 0 : Math.abs(chg);
+    let badgeCls = "";
+    if (chg != null) {
+      if (meta.lowerBetter) {
+        if (chg < 0)          badgeCls = "badge-up";
+        else if (abs > 6)     badgeCls = "badge-down";
+        else                  badgeCls = "badge-neutral";
+      } else {
+        if (chg >= 0)         badgeCls = "badge-up";
+        else if (abs > 6)     badgeCls = "badge-down";
+        else                  badgeCls = "badge-neutral";
+      }
+    }
+    const arrow = chg == null ? "" : chg >= 0 ? "▲" : "▼";
+    cardsHtml += `
+      <div class="kpi-card">
+        <div class="kpi-label">${meta.label} <span style="font-size:9px;color:#bbb;font-weight:400">(${lastLabel})</span></div>
+        <div class="kpi-value">${meta.fmt(val)}</div>
+        <div class="kpi-change">
+          ${chg != null
+            ? `<span class="${badgeCls}">${arrow} ${Math.abs(chg).toFixed(1)}%</span> <span style="color:#bbb;font-size:11px">${lastLabel} vs ${prevLabel}</span>`
+            : '<span class="badge-na">no prev data</span>'
+          }
+        </div>
+      </div>`;
+  });
+  cardsHtml += '</div>';
+
+  // Table
+  let tableHtml = '<div class="table-wrap"><table><thead><tr>';
+  tableHtml += '<th>Quarter</th>';
+  ds.kpis.forEach(k => {
+    tableHtml += `<th>${KPI_META[k].label}</th>`;
+  });
+  tableHtml += '</tr></thead><tbody>';
+
+  ds.rows.forEach((row, i) => {
+    const prev = i > 0 ? ds.rows[i - 1] : null;
+    const isCurrent = row.q === CURRENT_PARTIAL_MONTH;
+    tableHtml += `<tr class="${isCurrent ? 'current-row' : ''}">`;
+    tableHtml += `<td class="q-label">${row.q}${isCurrent ? ' *' : ''}</td>`;
+    ds.kpis.forEach(k => {
+      const meta = KPI_META[k];
+      const val = row[k];
+      const pval = prev ? prev[k] : null;
+      const chg = pctChange(
+        val != null && val !== "" ? Number(val) : null,
+        pval != null && pval !== "" ? Number(pval) : null
+      );
+      tableHtml += `<td>${meta.fmt(val)}${chg != null ? badgeHtml(chg, meta.lowerBetter) : ""}</td>`;
+    });
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table></div>';
+
+  container.innerHTML = `
+    <div class="section">
+      <div class="section-header">
+        <div class="section-bar"></div>
+        <div class="section-title">${ds.title}</div>
+      </div>
+      ${cardsHtml}
+      ${tableHtml}
+    </div>`;
+}
+
+function showTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelector(`[onclick="showTab('${id}')"]`).classList.add('active');
+}
+
+// Populate dynamic labels from CURRENT_PARTIAL_MONTH
+(function() {
+  const el = document.getElementById('partial-badge-text');
+  if (el) el.textContent = '\u26a0\ufe0f ' + CURRENT_PARTIAL_MONTH + ' is current month (partial data)';
+  const mn = document.getElementById('models-note-text');
+  if (mn) {
+    const firstSection = Object.values(DATA)[0];
+    const complete = firstSection.rows.filter(r => r.q !== CURRENT_PARTIAL_MONTH);
+    const lastComplete = complete.length ? complete[complete.length-1].q : '';
+    const prevComplete = complete.length > 1 ? complete[complete.length-2].q : '';
+    mn.textContent = 'Showing ' + prevComplete + ' vs ' + lastComplete + ' model-level comparison. ' + CURRENT_PARTIAL_MONTH + ' data is not yet complete. Validation % shown at model level only.';
+  }
+  const lg = document.getElementById('legend-current-label');
+  if (lg) lg.textContent = CURRENT_PARTIAL_MONTH;
+  // Update all dynamic month spans in note boxes
+  document.querySelectorAll('.dyn-current-month').forEach(function(span) {
+    span.textContent = CURRENT_PARTIAL_MONTH;
+  });
+})();
+
+// Build all sections
+buildSection('section-combined', 'enterprise_combined');
+buildSection('section-cars',     'enterprise_cars');
+buildSection('section-bikes',    'enterprise_bikes');
+buildSection('section-cps',      'cps');
+buildSection('section-ncbd',     'ncbd');
+buildSection('section-cv',       'cv');
+buildSection('section-newauto',  'newauto');
+
+// ── Enterprise Models Tab ─────────────────────────────────────────────────────
+
+const MODEL_TREE = {"Bike": {"HMSI Bigwing": {"Honda CB350": {"apr": {"brand": "HMSI Bigwing", "model": "Honda CB350", "segment": "Bike", "spends": 162789, "leads": 3071, "tleads": 2190, "revenue": 328500, "gcpl": 53.01, "tcpl": 74.33, "margin": 0.5044, "validation": 1.0}, "may": {"brand": "HMSI Bigwing", "model": "Honda CB350", "segment": "Bike", "spends": 89073, "leads": 2174, "tleads": 1205, "revenue": 180750, "gcpl": 40.97, "tcpl": 73.92, "margin": 0.5072, "validation": 1.0}}, "Honda CB350RS": {"apr": {"brand": "HMSI Bigwing", "model": "Honda CB350RS", "segment": "Bike", "spends": 131772, "leads": 2636, "tleads": 1850, "revenue": 277500, "gcpl": 49.99, "tcpl": 71.23, "margin": 0.5251, "validation": 1.0}, "may": {"brand": "HMSI Bigwing", "model": "Honda CB350RS", "segment": "Bike", "spends": 71011, "leads": 1658, "tleads": 1105, "revenue": 165750, "gcpl": 42.83, "tcpl": 64.26, "margin": 0.5716, "validation": 1.0}}, "Honda Hness CB350": {"apr": {"brand": "HMSI Bigwing", "model": "Honda Hness CB350", "segment": "Bike", "spends": 152843, "leads": 3549, "tleads": 2799, "revenue": 419850, "gcpl": 43.07, "tcpl": 54.61, "margin": 0.636, "validation": 1.0}, "may": {"brand": "HMSI Bigwing", "model": "Honda Hness CB350", "segment": "Bike", "spends": 81391, "leads": 2085, "tleads": 1382, "revenue": 207300, "gcpl": 39.04, "tcpl": 58.89, "margin": 0.6074, "validation": 1.0}}}, "HMSI Redwing": {"Honda Activa 125": {"apr": null, "may": {"brand": "HMSI Redwing", "model": "Honda Activa 125", "segment": "Bike", "spends": 73608, "leads": 5296, "tleads": 2020, "revenue": 161600, "gcpl": 13.9, "tcpl": 36.44, "margin": 0.5445, "validation": 1.0}}, "Honda CB125 Hornet": {"apr": {"brand": "HMSI Redwing", "model": "Honda CB125 Hornet", "segment": "Bike", "spends": 29807, "leads": 1055, "tleads": 571, "revenue": 45680, "gcpl": 28.25, "tcpl": 52.2, "margin": 0.3475, "validation": 1.0}, "may": {"brand": "HMSI Redwing", "model": "Honda CB125 Hornet", "segment": "Bike", "spends": 35829, "leads": 939, "tleads": 620, "revenue": 49600, "gcpl": 38.16, "tcpl": 57.79, "margin": 0.2776, "validation": 1.0}}, "Honda Shine": {"apr": {"brand": "HMSI Redwing", "model": "Honda Shine", "segment": "Bike", "spends": 28471, "leads": 2171, "tleads": 901, "revenue": 72080, "gcpl": 13.11, "tcpl": 31.6, "margin": 0.605, "validation": 1.0}, "may": {"brand": "HMSI Redwing", "model": "Honda Shine", "segment": "Bike", "spends": 21990, "leads": 1348, "tleads": 813, "revenue": 65040, "gcpl": 16.31, "tcpl": 27.05, "margin": 0.6619, "validation": 1.0}}, "Honda Shine 100": {"apr": {"brand": "HMSI Redwing", "model": "Honda Shine 100", "segment": "Bike", "spends": 30711, "leads": 1667, "tleads": 1132, "revenue": 90560, "gcpl": 18.42, "tcpl": 27.13, "margin": 0.6609, "validation": 1.0}, "may": {"brand": "HMSI Redwing", "model": "Honda Shine 100", "segment": "Bike", "spends": 21710, "leads": 1220, "tleads": 826, "revenue": 66080, "gcpl": 17.8, "tcpl": 26.28, "margin": 0.6715, "validation": 1.0}}}, "Harley": {"Harley": {"apr": null, "may": {"brand": "Harley", "model": "Harley", "segment": "Bike", "spends": 342, "leads": 0, "tleads": 0, "revenue": 0, "gcpl": 0, "tcpl": 0, "margin": 0, "validation": 0.0}}, "Harley Davidson Fat Boy 114": {"apr": null, "may": {"brand": "Harley", "model": "Harley Davidson Fat Boy 114", "segment": "Bike", "spends": 16717, "leads": 391, "tleads": 89, "revenue": 42720, "gcpl": 42.75, "tcpl": 187.83, "margin": 0.6087, "validation": 1.0}}, "Harley Davidson Heritage Classic": {"apr": null, "may": {"brand": "Harley", "model": "Harley Davidson Heritage Classic", "segment": "Bike", "spends": 10250, "leads": 209, "tleads": 64, "revenue": 30720, "gcpl": 49.04, "tcpl": 160.16, "margin": 0.6663, "validation": 1.0}}, "Harley Davidson Pan America 1250": {"apr": null, "may": {"brand": "Harley", "model": "Harley Davidson Pan America 1250", "segment": "Bike", "spends": 7355, "leads": 192, "tleads": 68, "revenue": 32640, "gcpl": 38.31, "tcpl": 108.16, "margin": 0.7747, "validation": 1.0}}, "Harley Davidson Road Glide": {"apr": null, "may": {"brand": "Harley", "model": "Harley Davidson Road Glide", "segment": "Bike", "spends": 135, "leads": 0, "tleads": 0, "revenue": 0, "gcpl": 0, "tcpl": 0, "margin": 0, "validation": 1.0}}, "Harley Davidson Sportster": {"apr": null, "may": {"brand": "Harley", "model": "Harley Davidson Sportster", "segment": "Bike", "spends": 13099, "leads": 407, "tleads": 102, "revenue": 48960, "gcpl": 32.18, "tcpl": 128.42, "margin": 0.7325, "validation": 1.0}}, "Harley Davidson Street Bob": {"apr": null, "may": {"brand": "Harley", "model": "Harley Davidson Street Bob", "segment": "Bike", "spends": 448, "leads": 12, "tleads": 0, "revenue": 0, "gcpl": 37.33, "tcpl": 0, "margin": 0, "validation": 1.0}}, "Harley Davidson X440 T": {"apr": {"brand": "Harley", "model": "Harley Davidson X440 T", "segment": "Bike", "spends": 7027, "leads": 145, "tleads": 48, "revenue": 9600, "gcpl": 48.46, "tcpl": 146.4, "margin": 0.268, "validation": 1.0}, "may": {"brand": "Harley", "model": "Harley Davidson X440 T", "segment": "Bike", "spends": 180849, "leads": 5509, "tleads": 2533, "revenue": 506600, "gcpl": 32.83, "tcpl": 71.4, "margin": 0.643, "validation": 1.0}}}, "Ola": {"Ola": {"apr": {"brand": "Ola", "model": "Ola", "segment": "Bike", "spends": 96860, "leads": 5540, "tleads": 2341, "revenue": 365899, "gcpl": 17.48, "tcpl": 41.38, "margin": 0.7353, "validation": 1.0}, "may": {"brand": "Ola", "model": "Ola", "segment": "Bike", "spends": 88251, "leads": 7336, "tleads": 3280, "revenue": 506925, "gcpl": 12.03, "tcpl": 26.91, "margin": 0.8259, "validation": 1.0}}, "Ola Bangalore": {"apr": {"brand": "Ola", "model": "Ola Bangalore", "segment": "Bike", "spends": 141275, "leads": 2793, "tleads": 1964, "revenue": 473717, "gcpl": 50.58, "tcpl": 71.93, "margin": 0.7018, "validation": 1.0}, "may": {"brand": "Ola", "model": "Ola Bangalore", "segment": "Bike", "spends": 158530, "leads": 4373, "tleads": 2555, "revenue": 625540, "gcpl": 36.25, "tcpl": 62.05, "margin": 0.7466, "validation": 1.0}}, "Ola Electric": {"apr": {"brand": "Ola", "model": "Ola Electric", "segment": "Bike", "spends": 30347, "leads": 4183, "tleads": 1562, "revenue": 244141, "gcpl": 7.25, "tcpl": 19.43, "margin": 0.8757, "validation": 1.0}, "may": {"brand": "Ola", "model": "Ola Electric", "segment": "Bike", "spends": 102311, "leads": 8717, "tleads": 4939, "revenue": 731520, "gcpl": 11.74, "tcpl": 20.71, "margin": 0.8601, "validation": 1.0}}}, "Royal Enfield": {"Royal Enfield": {"apr": {"brand": "Royal Enfield", "model": "Royal Enfield", "segment": "Bike", "spends": 1502384, "leads": 74054, "tleads": 55664, "revenue": 4731440, "gcpl": 20.29, "tcpl": 26.99, "margin": 0.6825, "validation": 1.0}, "may": {"brand": "Royal Enfield", "model": "Royal Enfield", "segment": "Bike", "spends": 1147288, "leads": 53023, "tleads": 40613, "revenue": 3452105, "gcpl": 21.64, "tcpl": 28.25, "margin": 0.6677, "validation": 1.0}}, "Royal Enfield Flying Flea C6": {"apr": null, "may": {"brand": "Royal Enfield", "model": "Royal Enfield Flying Flea C6", "segment": "Bike", "spends": 32649, "leads": 533, "tleads": 309, "revenue": 77250, "gcpl": 61.26, "tcpl": 105.66, "margin": 0.5774, "validation": 1.0}}}, "Simple Energy": {"Simple One": {"apr": {"brand": "Simple Energy", "model": "Simple One", "segment": "Bike", "spends": 20913, "leads": 726, "tleads": 485, "revenue": 121250, "gcpl": 28.81, "tcpl": 43.12, "margin": 0.8275, "validation": 1.0}, "may": {"brand": "Simple Energy", "model": "Simple One", "segment": "Bike", "spends": 227, "leads": 7, "tleads": 5, "revenue": 1250, "gcpl": 32.43, "tcpl": 45.4, "margin": 0.8184, "validation": 1.0}}}}, "Car": {"Audi": {"Audi A4": {"apr": {"brand": "Audi", "model": "Audi A4", "segment": "Car", "spends": 2924, "leads": 9, "tleads": 6, "revenue": 5880, "gcpl": 324.89, "tcpl": 487.33, "margin": 0.5027, "validation": 0.98}, "may": {"brand": "Audi", "model": "Audi A4", "segment": "Car", "spends": 13544, "leads": 31, "tleads": 20, "revenue": 17052, "gcpl": 436.9, "tcpl": 677.2, "margin": 0.2057, "validation": 0.98}}, "Audi A6": {"apr": {"brand": "Audi", "model": "Audi A6", "segment": "Car", "spends": 20988, "leads": 127, "tleads": 84, "revenue": 82320, "gcpl": 165.26, "tcpl": 249.86, "margin": 0.745, "validation": 0.98}, "may": {"brand": "Audi", "model": "Audi A6", "segment": "Car", "spends": 17670, "leads": 130, "tleads": 92, "revenue": 78439, "gcpl": 135.92, "tcpl": 192.07, "margin": 0.7747, "validation": 0.98}}, "Audi Q3": {"apr": {"brand": "Audi", "model": "Audi Q3", "segment": "Car", "spends": 71759, "leads": 343, "tleads": 270, "revenue": 264600, "gcpl": 209.21, "tcpl": 265.77, "margin": 0.7288, "validation": 0.98}, "may": {"brand": "Audi", "model": "Audi Q3", "segment": "Car", "spends": 63078, "leads": 360, "tleads": 266, "revenue": 280946, "gcpl": 175.22, "tcpl": 237.14, "margin": 0.7755, "validation": 0.98}}, "Audi Q3 Sportsback": {"apr": {"brand": "Audi", "model": "Audi Q3 Sportsback", "segment": "Car", "spends": 20050, "leads": 128, "tleads": 53, "revenue": 64925, "gcpl": 156.64, "tcpl": 378.3, "margin": 0.6912, "validation": 0.98}, "may": {"brand": "Audi", "model": "Audi Q3 Sportsback", "segment": "Car", "spends": 24775, "leads": 127, "tleads": 52, "revenue": 63700, "gcpl": 195.08, "tcpl": 476.44, "margin": 0.6111, "validation": 0.98}}, "Audi Q5": {"apr": {"brand": "Audi", "model": "Audi Q5", "segment": "Car", "spends": 22927, "leads": 140, "tleads": 104, "revenue": 127400, "gcpl": 163.76, "tcpl": 220.45, "margin": 0.82, "validation": 0.98}, "may": {"brand": "Audi", "model": "Audi Q5", "segment": "Car", "spends": 25696, "leads": 154, "tleads": 120, "revenue": 127949, "gcpl": 166.86, "tcpl": 214.13, "margin": 0.7992, "validation": 0.98}}, "Audi Q7": {"apr": null, "may": {"brand": "Audi", "model": "Audi Q7", "segment": "Car", "spends": 18596, "leads": 95, "tleads": 58, "revenue": 54396, "gcpl": 195.75, "tcpl": 320.62, "margin": 0.6581, "validation": 0.98}}, "Audi Q8": {"apr": null, "may": {"brand": "Audi", "model": "Audi Q8", "segment": "Car", "spends": 9800, "leads": 79, "tleads": 46, "revenue": 49047, "gcpl": 124.05, "tcpl": 213.04, "margin": 0.8002, "validation": 0.99}}}, "BMW": {"BMW 2 Series": {"apr": {"brand": "BMW", "model": "BMW 2 Series", "segment": "Car", "spends": 3092, "leads": 26, "tleads": 4, "revenue": 298, "gcpl": 118.92, "tcpl": 773.0, "margin": -9.3758, "validation": 0.01}, "may": null}, "BMW 2 Series Gran Coupe": {"apr": {"brand": "BMW", "model": "BMW 2 Series Gran Coupe", "segment": "Car", "spends": 696, "leads": 6, "tleads": 6, "revenue": 1786, "gcpl": 116.0, "tcpl": 116.0, "margin": 0.6103, "validation": 0.04}, "may": null}, "BMW 3 Series": {"apr": {"brand": "BMW", "model": "BMW 3 Series", "segment": "Car", "spends": 26207, "leads": 173, "tleads": 153, "revenue": 45533, "gcpl": 151.49, "tcpl": 171.29, "margin": 0.4244, "validation": 0.04}, "may": {"brand": "BMW", "model": "BMW 3 Series", "segment": "Car", "spends": 16418, "leads": 124, "tleads": 94, "revenue": 41962, "gcpl": 132.4, "tcpl": 174.66, "margin": 0.6087, "validation": 0.06}}, "BMW 3 Series Long Wheelbase": {"apr": {"brand": "BMW", "model": "BMW 3 Series Long Wheelbase", "segment": "Car", "spends": 9098, "leads": 53, "tleads": 43, "revenue": 12797, "gcpl": 171.66, "tcpl": 211.58, "margin": 0.2891, "validation": 0.04}, "may": {"brand": "BMW", "model": "BMW 3 Series Long Wheelbase", "segment": "Car", "spends": 4537, "leads": 36, "tleads": 22, "revenue": 18005, "gcpl": 126.03, "tcpl": 206.23, "margin": 0.748, "validation": 0.11}}, "BMW 5 Series": {"apr": {"brand": "BMW", "model": "BMW 5 Series", "segment": "Car", "spends": 8995, "leads": 74, "tleads": 27, "revenue": 5160, "gcpl": 121.55, "tcpl": 333.15, "margin": -0.7432, "validation": 0.021}, "may": {"brand": "BMW", "model": "BMW 5 Series", "segment": "Car", "spends": 20923, "leads": 113, "tleads": 84, "revenue": 34986, "gcpl": 185.16, "tcpl": 249.08, "margin": 0.402, "validation": 0.07}}, "BMW X1": {"apr": {"brand": "BMW", "model": "BMW X1", "segment": "Car", "spends": 28220, "leads": 185, "tleads": 76, "revenue": 39581, "gcpl": 152.54, "tcpl": 371.32, "margin": 0.287, "validation": 0.07}, "may": {"brand": "BMW", "model": "BMW X1", "segment": "Car", "spends": 15264, "leads": 112, "tleads": 56, "revenue": 38763, "gcpl": 136.29, "tcpl": 272.57, "margin": 0.6062, "validation": 0.085}}, "BMW X3": {"apr": {"brand": "BMW", "model": "BMW X3", "segment": "Car", "spends": 15932, "leads": 103, "tleads": 34, "revenue": 30355, "gcpl": 154.68, "tcpl": 468.59, "margin": 0.4751, "validation": 0.12}, "may": {"brand": "BMW", "model": "BMW X3", "segment": "Car", "spends": 8296, "leads": 54, "tleads": 40, "revenue": 18749, "gcpl": 153.63, "tcpl": 207.4, "margin": 0.5575, "validation": 0.09}}, "BMW X5": {"apr": {"brand": "BMW", "model": "BMW X5", "segment": "Car", "spends": 14993, "leads": 108, "tleads": 29, "revenue": 10248, "gcpl": 138.82, "tcpl": 517.0, "margin": -0.463, "validation": 0.04}, "may": {"brand": "BMW", "model": "BMW X5", "segment": "Car", "spends": 18658, "leads": 107, "tleads": 64, "revenue": 20851, "gcpl": 174.37, "tcpl": 291.53, "margin": 0.1052, "validation": 0.11}}, "BMW X7": {"apr": {"brand": "BMW", "model": "BMW X7", "segment": "Car", "spends": 10411, "leads": 86, "tleads": 27, "revenue": 14312, "gcpl": 121.06, "tcpl": 385.59, "margin": 0.2726, "validation": 0.06}, "may": {"brand": "BMW", "model": "BMW X7", "segment": "Car", "spends": 16915, "leads": 107, "tleads": 79, "revenue": 34898, "gcpl": 158.08, "tcpl": 214.11, "margin": 0.5153, "validation": 0.05}}, "BMW iX1": {"apr": {"brand": "BMW", "model": "BMW iX1", "segment": "Car", "spends": 11000, "leads": 76, "tleads": 38, "revenue": 22617, "gcpl": 144.74, "tcpl": 289.47, "margin": 0.5136, "validation": 0.08}, "may": {"brand": "BMW", "model": "BMW iX1", "segment": "Car", "spends": 5305, "leads": 24, "tleads": 13, "revenue": 0, "gcpl": 221.04, "tcpl": 408.08, "margin": 0, "validation": 0.07}}}, "Citroen": {"Citroen C3": {"apr": {"brand": "Citroen", "model": "Citroen C3", "segment": "Car", "spends": 9524, "leads": 157, "tleads": 98, "revenue": 7956, "gcpl": 60.66, "tcpl": 97.18, "margin": -0.1971, "validation": 0.059}, "may": null}}, "Honda": {"Honda Amaze": {"apr": null, "may": {"brand": "Honda", "model": "Honda Amaze", "segment": "Car", "spends": 133786, "leads": 2647, "tleads": 2462, "revenue": 236169, "gcpl": 50.54, "tcpl": 54.34, "margin": 0.4335, "validation": 0.256}}, "Honda City": {"apr": null, "may": {"brand": "Honda", "model": "Honda City", "segment": "Car", "spends": 40147, "leads": 701, "tleads": 725, "revenue": 70071, "gcpl": 57.27, "tcpl": 55.38, "margin": 0.4271, "validation": 0.26}}, "Honda Elevate": {"apr": {"brand": "Honda", "model": "Honda Elevate", "segment": "Car", "spends": 29780, "leads": 638, "tleads": 1124, "revenue": 88765, "gcpl": 46.68, "tcpl": 26.49, "margin": 0.6645, "validation": 0.1807}, "may": {"brand": "Honda", "model": "Honda Elevate", "segment": "Car", "spends": 177196, "leads": 4948, "tleads": 4629, "revenue": 363441, "gcpl": 35.81, "tcpl": 38.28, "margin": 0.5124, "validation": 0.234}}}, "JLR": {"Land Rover Defender": {"apr": {"brand": "JLR", "model": "Land Rover Defender", "segment": "Car", "spends": 137604, "leads": 2216, "tleads": 2042, "revenue": 416373, "gcpl": 62.1, "tcpl": 67.39, "margin": 0.6695, "validation": 0.0295}, "may": {"brand": "JLR", "model": "Land Rover Defender", "segment": "Car", "spends": 300443, "leads": 4694, "tleads": 3145, "revenue": 593155, "gcpl": 64.01, "tcpl": 95.53, "margin": 0.4935, "validation": 0.026}}, "Land Rover Discovery Sport": {"apr": null, "may": {"brand": "JLR", "model": "Land Rover Discovery Sport", "segment": "Car", "spends": 44847, "leads": 329, "tleads": 206, "revenue": 67522, "gcpl": 136.31, "tcpl": 217.7, "margin": 0.3358, "validation": 0.0455}}, "Land Rover Range Rover": {"apr": {"brand": "JLR", "model": "Land Rover Range Rover", "segment": "Car", "spends": 79658, "leads": 1375, "tleads": 502, "revenue": 67216, "gcpl": 57.93, "tcpl": 158.68, "margin": -0.1851, "validation": 0.013}, "may": {"brand": "JLR", "model": "Land Rover Range Rover", "segment": "Car", "spends": 83322, "leads": 1803, "tleads": 567, "revenue": 79692, "gcpl": 46.21, "tcpl": 146.95, "margin": -0.0456, "validation": 0.015}}, "Land Rover Range Rover Sport": {"apr": {"brand": "JLR", "model": "Land Rover Range Rover Sport", "segment": "Car", "spends": 156439, "leads": 1903, "tleads": 1146, "revenue": 131248, "gcpl": 82.21, "tcpl": 136.51, "margin": -0.1919, "validation": 0.02}, "may": {"brand": "JLR", "model": "Land Rover Range Rover Sport", "segment": "Car", "spends": 171191, "leads": 2761, "tleads": 1343, "revenue": 192029, "gcpl": 62.0, "tcpl": 127.47, "margin": 0.1085, "validation": 0.0195}}, "Land Rover Range Rover Velar": {"apr": {"brand": "JLR", "model": "Land Rover Range Rover Velar", "segment": "Car", "spends": 188277, "leads": 2197, "tleads": 2152, "revenue": 441098, "gcpl": 85.7, "tcpl": 87.49, "margin": 0.5732, "validation": 0.0335}, "may": {"brand": "JLR", "model": "Land Rover Range Rover Velar", "segment": "Car", "spends": 338657, "leads": 4277, "tleads": 2909, "revenue": 479885, "gcpl": 79.18, "tcpl": 116.42, "margin": 0.2943, "validation": 0.0295}}}, "Lexus": {"Lexus RX": {"apr": {"brand": "Lexus", "model": "Lexus RX", "segment": "Car", "spends": 9188, "leads": 84, "tleads": 16, "revenue": 21600, "gcpl": 109.38, "tcpl": 574.25, "margin": 0.5746, "validation": 1.0}, "may": null}}, "MG Motor": {"MG Hector": {"apr": null, "may": {"brand": "MG Motor", "model": "MG Hector", "segment": "Car", "spends": 71284, "leads": 1207, "tleads": 1092, "revenue": 299645, "gcpl": 59.06, "tcpl": 65.28, "margin": 0.7621, "validation": 0.98}}, "MG Windsor EV": {"apr": {"brand": "MG Motor", "model": "MG Windsor EV", "segment": "Car", "spends": 188352, "leads": 6740, "tleads": 2063, "revenue": 566087, "gcpl": 27.95, "tcpl": 91.3, "margin": 0.6673, "validation": 0.98}, "may": {"brand": "MG Motor", "model": "MG Windsor EV", "segment": "Car", "spends": 102965, "leads": 4024, "tleads": 1037, "revenue": 284553, "gcpl": 25.59, "tcpl": 99.29, "margin": 0.6382, "validation": 0.98}}, "MG ZS EV": {"apr": null, "may": {"brand": "MG Motor", "model": "MG ZS EV", "segment": "Car", "spends": 67006, "leads": 1293, "tleads": 1154, "revenue": 316657, "gcpl": 51.82, "tcpl": 58.06, "margin": 0.7884, "validation": 0.98}}, "Mg Hector": {"apr": null, "may": {"brand": "MG Motor", "model": "Mg Hector", "segment": "Car", "spends": 18121, "leads": 1123, "tleads": 777, "revenue": 213209, "gcpl": 16.14, "tcpl": 23.32, "margin": 0.915, "validation": 0.98}}}, "Mahindra PV": {"Mahindra BE 6": {"apr": {"brand": "Mahindra PV", "model": "Mahindra BE 6", "segment": "Car", "spends": 68976, "leads": 1630, "tleads": 802, "revenue": 84745, "gcpl": 42.32, "tcpl": 86.0, "margin": 0.1861, "validation": 0.1895}, "may": {"brand": "Mahindra PV", "model": "Mahindra BE 6", "segment": "Car", "spends": 35673, "leads": 993, "tleads": 440, "revenue": 38161, "gcpl": 35.92, "tcpl": 81.08, "margin": 0.0652, "validation": 0.163}}, "Mahindra Bolero Neo": {"apr": {"brand": "Mahindra PV", "model": "Mahindra Bolero Neo", "segment": "Car", "spends": 6602, "leads": 330, "tleads": 146, "revenue": 10965, "gcpl": 20.01, "tcpl": 45.22, "margin": 0.3979, "validation": 0.17}, "may": {"brand": "Mahindra PV", "model": "Mahindra Bolero Neo", "segment": "Car", "spends": 72008, "leads": 1832, "tleads": 1056, "revenue": 57528, "gcpl": 39.31, "tcpl": 68.19, "margin": -0.2517, "validation": 0.1556}}, "Mahindra Thar": {"apr": null, "may": {"brand": "Mahindra PV", "model": "Mahindra Thar", "segment": "Car", "spends": 5311, "leads": 108, "tleads": 53, "revenue": 3883, "gcpl": 49.18, "tcpl": 100.21, "margin": -0.3678, "validation": 0.16}}, "Mahindra Thar ROXX": {"apr": null, "may": {"brand": "Mahindra PV", "model": "Mahindra Thar ROXX", "segment": "Car", "spends": 138557, "leads": 4292, "tleads": 2144, "revenue": 161059, "gcpl": 32.28, "tcpl": 64.63, "margin": 0.1397, "validation": 0.1782}}, "Mahindra XEV 9e": {"apr": {"brand": "Mahindra PV", "model": "Mahindra XEV 9e", "segment": "Car", "spends": 38556, "leads": 800, "tleads": 489, "revenue": 46387, "gcpl": 48.2, "tcpl": 78.85, "margin": 0.1688, "validation": 0.17}, "may": {"brand": "Mahindra PV", "model": "Mahindra XEV 9e", "segment": "Car", "spends": 61537, "leads": 1996, "tleads": 1135, "revenue": 76192, "gcpl": 30.83, "tcpl": 54.22, "margin": 0.1923, "validation": 0.1445}}, "Mahindra XEV 9s": {"apr": null, "may": {"brand": "Mahindra PV", "model": "Mahindra XEV 9s", "segment": "Car", "spends": 49840, "leads": 2366, "tleads": 842, "revenue": 51212, "gcpl": 21.07, "tcpl": 59.19, "margin": 0.0268, "validation": 0.109}}, "Mahindra XUV 3XO": {"apr": null, "may": {"brand": "Mahindra PV", "model": "Mahindra XUV 3XO", "segment": "Car", "spends": 53820, "leads": 2954, "tleads": 1369, "revenue": 133952, "gcpl": 18.22, "tcpl": 39.31, "margin": 0.5982, "validation": 0.2688}}, "Mahindra XUV 7XO": {"apr": null, "may": {"brand": "Mahindra PV", "model": "Mahindra XUV 7XO", "segment": "Car", "spends": 107959, "leads": 4655, "tleads": 2531, "revenue": 250215, "gcpl": 23.19, "tcpl": 42.65, "margin": 0.5685, "validation": 0.2291}}, "XEV 9S": {"apr": null, "may": {"brand": "Mahindra PV", "model": "XEV 9S", "segment": "Car", "spends": 2845, "leads": 25, "tleads": 17, "revenue": 1423, "gcpl": 113.8, "tcpl": 167.35, "margin": -0.9993, "validation": 0.15}}}, "Mercedes": {"Mercedes-Benz C-Class": {"apr": {"brand": "Mercedes", "model": "Mercedes-Benz C-Class", "segment": "Car", "spends": 1, "leads": 0, "tleads": 0, "revenue": 0, "gcpl": 0, "tcpl": 0, "margin": 0, "validation": 1.0}, "may": {"brand": "Mercedes", "model": "Mercedes-Benz C-Class", "segment": "Car", "spends": 1094, "leads": 13, "tleads": 2, "revenue": 1764, "gcpl": 84.15, "tcpl": 547.0, "margin": 0.3798, "validation": 0.98}}, "Mercedes-Benz GLA": {"apr": {"brand": "Mercedes", "model": "Mercedes-Benz GLA", "segment": "Car", "spends": 2582, "leads": 11, "tleads": 8, "revenue": 7200, "gcpl": 234.73, "tcpl": 322.75, "margin": 0.6414, "validation": 1.0}, "may": {"brand": "Mercedes", "model": "Mercedes-Benz GLA", "segment": "Car", "spends": 188, "leads": 0, "tleads": 0, "revenue": 0, "gcpl": 0, "tcpl": 0, "margin": 0, "validation": 0.98}}, "Mercedes-Benz GLC": {"apr": {"brand": "Mercedes", "model": "Mercedes-Benz GLC", "segment": "Car", "spends": 2677, "leads": 14, "tleads": 8, "revenue": 7440, "gcpl": 191.21, "tcpl": 334.62, "margin": 0.6402, "validation": 1.0}, "may": {"brand": "Mercedes", "model": "Mercedes-Benz GLC", "segment": "Car", "spends": 2591, "leads": 16, "tleads": 15, "revenue": 13671, "gcpl": 161.94, "tcpl": 172.73, "margin": 0.8105, "validation": 0.98}}, "Mercedes-Benz GLE": {"apr": {"brand": "Mercedes", "model": "Mercedes-Benz GLE", "segment": "Car", "spends": 5327, "leads": 26, "tleads": 12, "revenue": 12012, "gcpl": 204.88, "tcpl": 443.92, "margin": 0.5565, "validation": 1.0}, "may": {"brand": "Mercedes", "model": "Mercedes-Benz GLE", "segment": "Car", "spends": 3720, "leads": 27, "tleads": 19, "revenue": 18620, "gcpl": 137.78, "tcpl": 195.79, "margin": 0.8002, "validation": 0.98}}}, "Nissan": {"Nissan Magnite": {"apr": {"brand": "Nissan", "model": "Nissan Magnite", "segment": "Car", "spends": 41758, "leads": 903, "tleads": 521, "revenue": 60452, "gcpl": 46.24, "tcpl": 80.15, "margin": 0.3092, "validation": 0.119}, "may": {"brand": "Nissan", "model": "Nissan Magnite", "segment": "Car", "spends": 47239, "leads": 671, "tleads": 559, "revenue": 65403, "gcpl": 70.4, "tcpl": 84.51, "margin": 0.2777, "validation": 0.12}}}, "Porsche": {"Porsche Cayenne": {"apr": {"brand": "Porsche", "model": "Porsche Cayenne", "segment": "Car", "spends": 5226, "leads": 33, "tleads": 26, "revenue": 75166, "gcpl": 158.36, "tcpl": 201.0, "margin": 0.9305, "validation": 0.98}, "may": null}, "Porsche Macan": {"apr": {"brand": "Porsche", "model": "Porsche Macan", "segment": "Car", "spends": 3361, "leads": 20, "tleads": 17, "revenue": 49147, "gcpl": 168.05, "tcpl": 197.71, "margin": 0.9316, "validation": 0.98}, "may": null}}, "Skoda": {"Skoda Kodiaq": {"apr": {"brand": "Skoda", "model": "Skoda Kodiaq", "segment": "Car", "spends": 15475, "leads": 208, "tleads": 121, "revenue": 59290, "gcpl": 74.4, "tcpl": 127.89, "margin": 0.739, "validation": 0.98}, "may": {"brand": "Skoda", "model": "Skoda Kodiaq", "segment": "Car", "spends": 704, "leads": 14, "tleads": 14, "revenue": 6860, "gcpl": 50.29, "tcpl": 50.29, "margin": 0.8974, "validation": 0.98}}, "Skoda Kushaq": {"apr": {"brand": "Skoda", "model": "Skoda Kushaq", "segment": "Car", "spends": 62970, "leads": 1135, "tleads": 405, "revenue": 178605, "gcpl": 55.48, "tcpl": 155.48, "margin": 0.6474, "validation": 0.98}, "may": {"brand": "Skoda", "model": "Skoda Kushaq", "segment": "Car", "spends": 3061, "leads": 60, "tleads": 68, "revenue": 29988, "gcpl": 51.02, "tcpl": 45.01, "margin": 0.8979, "validation": 0.98}}, "Skoda Kylaq": {"apr": {"brand": "Skoda", "model": "Skoda Kylaq", "segment": "Car", "spends": 119146, "leads": 2461, "tleads": 1144, "revenue": 510921, "gcpl": 48.41, "tcpl": 104.15, "margin": 0.7668, "validation": 0.99}, "may": {"brand": "Skoda", "model": "Skoda Kylaq", "segment": "Car", "spends": 66032, "leads": 1230, "tleads": 966, "revenue": 426006, "gcpl": 53.68, "tcpl": 68.36, "margin": 0.845, "validation": 0.98}}, "Skoda Slavia": {"apr": {"brand": "Skoda", "model": "Skoda Slavia", "segment": "Car", "spends": 24962, "leads": 575, "tleads": 207, "revenue": 91908, "gcpl": 43.41, "tcpl": 120.59, "margin": 0.7284, "validation": 0.99}, "may": {"brand": "Skoda", "model": "Skoda Slavia", "segment": "Car", "spends": 32115, "leads": 605, "tleads": 364, "revenue": 160524, "gcpl": 53.08, "tcpl": 88.23, "margin": 0.7999, "validation": 0.98}}}, "Tata EV": {"Tata Curvv EV": {"apr": {"brand": "Tata EV", "model": "Tata Curvv EV", "segment": "Car", "spends": 115913, "leads": 2701, "tleads": 973, "revenue": 89565, "gcpl": 42.91, "tcpl": 119.13, "margin": -0.2942, "validation": 0.165}, "may": {"brand": "Tata EV", "model": "Tata Curvv EV", "segment": "Car", "spends": 90947, "leads": 2343, "tleads": 1422, "revenue": 54405, "gcpl": 38.82, "tcpl": 63.96, "margin": -0.6717, "validation": 0.074}}, "Tata Harrier EV": {"apr": {"brand": "Tata EV", "model": "Tata Harrier EV", "segment": "Car", "spends": 239029, "leads": 6250, "tleads": 3199, "revenue": 207355, "gcpl": 38.24, "tcpl": 74.72, "margin": -0.1528, "validation": 0.085}, "may": {"brand": "Tata EV", "model": "Tata Harrier EV", "segment": "Car", "spends": 229704, "leads": 6097, "tleads": 3093, "revenue": 158745, "gcpl": 37.67, "tcpl": 74.27, "margin": -0.447, "validation": 0.073}}, "Tata Nexon EV": {"apr": {"brand": "Tata EV", "model": "Tata Nexon EV", "segment": "Car", "spends": 229488, "leads": 5197, "tleads": 2279, "revenue": 200396, "gcpl": 44.16, "tcpl": 100.7, "margin": -0.1452, "validation": 0.175}, "may": {"brand": "Tata EV", "model": "Tata Nexon EV", "segment": "Car", "spends": 150636, "leads": 5337, "tleads": 2359, "revenue": 205066, "gcpl": 28.22, "tcpl": 63.86, "margin": 0.2654, "validation": 0.1865}}, "Tata Punch EV": {"apr": {"brand": "Tata EV", "model": "Tata Punch EV", "segment": "Car", "spends": 136268, "leads": 3102, "tleads": 1604, "revenue": 134699, "gcpl": 43.93, "tcpl": 84.96, "margin": -0.0116, "validation": 0.175}, "may": {"brand": "Tata EV", "model": "Tata Punch EV", "segment": "Car", "spends": 31773, "leads": 1047, "tleads": 430, "revenue": 33735, "gcpl": 30.35, "tcpl": 73.89, "margin": 0.0582, "validation": 0.1735}}, "Tata Tiago EV": {"apr": {"brand": "Tata EV", "model": "Tata Tiago EV", "segment": "Car", "spends": 130469, "leads": 2977, "tleads": 1516, "revenue": 105791, "gcpl": 43.83, "tcpl": 86.06, "margin": -0.2333, "validation": 0.105}, "may": {"brand": "Tata EV", "model": "Tata Tiago EV", "segment": "Car", "spends": 80799, "leads": 3043, "tleads": 1399, "revenue": 118763, "gcpl": 26.55, "tcpl": 57.75, "margin": 0.3197, "validation": 0.0875}}}, "Tata PV": {"Tata Altroz": {"apr": {"brand": "Tata PV", "model": "Tata Altroz", "segment": "Car", "spends": 161894, "leads": 4716, "tleads": 2576, "revenue": 178629, "gcpl": 34.33, "tcpl": 62.85, "margin": 0.0937, "validation": 0.1815}, "may": {"brand": "Tata PV", "model": "Tata Altroz", "segment": "Car", "spends": 35760, "leads": 1123, "tleads": 728, "revenue": 34178, "gcpl": 31.84, "tcpl": 49.12, "margin": -0.0463, "validation": 0.1275}}, "Tata Curvv": {"apr": {"brand": "Tata PV", "model": "Tata Curvv", "segment": "Car", "spends": 1756, "leads": 7, "tleads": 7, "revenue": 0, "gcpl": 250.86, "tcpl": 250.86, "margin": 0, "validation": 0.0}, "may": null}, "Tata Harrier": {"apr": {"brand": "Tata PV", "model": "Tata Harrier", "segment": "Car", "spends": 123016, "leads": 2941, "tleads": 1093, "revenue": 115862, "gcpl": 41.83, "tcpl": 112.55, "margin": -0.0617, "validation": 0.158}, "may": {"brand": "Tata PV", "model": "Tata Harrier", "segment": "Car", "spends": 37209, "leads": 829, "tleads": 609, "revenue": 35264, "gcpl": 44.88, "tcpl": 61.1, "margin": -0.0552, "validation": 0.0865}}, "Tata Nexon": {"apr": {"brand": "Tata PV", "model": "Tata Nexon", "segment": "Car", "spends": 220213, "leads": 7529, "tleads": 3529, "revenue": 315365, "gcpl": 29.25, "tcpl": 62.4, "margin": 0.3017, "validation": 0.148}, "may": {"brand": "Tata PV", "model": "Tata Nexon", "segment": "Car", "spends": 186513, "leads": 5197, "tleads": 2077, "revenue": 120669, "gcpl": 35.89, "tcpl": 89.8, "margin": -0.5457, "validation": 0.1115}}, "Tata Punch": {"apr": {"brand": "Tata PV", "model": "Tata Punch", "segment": "Car", "spends": 223491, "leads": 8364, "tleads": 4258, "revenue": 423890, "gcpl": 26.72, "tcpl": 52.49, "margin": 0.4728, "validation": 0.2765}, "may": {"brand": "Tata PV", "model": "Tata Punch", "segment": "Car", "spends": 203400, "leads": 8267, "tleads": 3790, "revenue": 312017, "gcpl": 24.6, "tcpl": 53.67, "margin": 0.3481, "validation": 0.2375}}, "Tata Safari": {"apr": {"brand": "Tata PV", "model": "Tata Safari", "segment": "Car", "spends": 59598, "leads": 1313, "tleads": 700, "revenue": 96370, "gcpl": 45.39, "tcpl": 85.14, "margin": 0.3816, "validation": 0.1785}, "may": {"brand": "Tata PV", "model": "Tata Safari", "segment": "Car", "spends": 33854, "leads": 756, "tleads": 410, "revenue": 31350, "gcpl": 44.78, "tcpl": 82.57, "margin": -0.0799, "validation": 0.098}}, "Tata Sierra": {"apr": null, "may": {"brand": "Tata PV", "model": "Tata Sierra", "segment": "Car", "spends": 47258, "leads": 3935, "tleads": 1274, "revenue": 150039, "gcpl": 12.01, "tcpl": 37.09, "margin": 0.685, "validation": 0.21}}, "Tata Tiago": {"apr": {"brand": "Tata PV", "model": "Tata Tiago", "segment": "Car", "spends": 102378, "leads": 2838, "tleads": 1502, "revenue": 145174, "gcpl": 36.07, "tcpl": 68.16, "margin": 0.2948, "validation": 0.252}, "may": {"brand": "Tata PV", "model": "Tata Tiago", "segment": "Car", "spends": 34235, "leads": 1248, "tleads": 868, "revenue": 49796, "gcpl": 27.43, "tcpl": 39.44, "margin": 0.3125, "validation": 0.1515}}}, "Toyota": {"Toyota Camry": {"apr": {"brand": "Toyota", "model": "Toyota Camry", "segment": "Car", "spends": 140711, "leads": 2047, "tleads": 975, "revenue": 882717, "gcpl": 68.74, "tcpl": 144.32, "margin": 0.8406, "validation": 0.95}, "may": {"brand": "Toyota", "model": "Toyota Camry", "segment": "Car", "spends": 184880, "leads": 3303, "tleads": 1042, "revenue": 973165, "gcpl": 55.97, "tcpl": 177.43, "margin": 0.81, "validation": 0.98}}, "Toyota Fortuner Legender": {"apr": {"brand": "Toyota", "model": "Toyota Fortuner Legender", "segment": "Car", "spends": 2241, "leads": 54, "tleads": 0, "revenue": 0, "gcpl": 41.5, "tcpl": 0, "margin": 0, "validation": 0.98}, "may": null}, "Toyota Hilux": {"apr": {"brand": "Toyota", "model": "Toyota Hilux", "segment": "Car", "spends": 86024, "leads": 1657, "tleads": 649, "revenue": 365002, "gcpl": 51.92, "tcpl": 132.55, "margin": 0.7643, "validation": 0.98}, "may": {"brand": "Toyota", "model": "Toyota Hilux", "segment": "Car", "spends": 81959, "leads": 1453, "tleads": 647, "revenue": 363870, "gcpl": 56.41, "tcpl": 126.68, "margin": 0.7748, "validation": 0.98}}, "Toyota Hyryder": {"apr": {"brand": "Toyota", "model": "Toyota Hyryder", "segment": "Car", "spends": 752469, "leads": 14961, "tleads": 7495, "revenue": 3378746, "gcpl": 50.3, "tcpl": 100.4, "margin": 0.7773, "validation": 0.98}, "may": {"brand": "Toyota", "model": "Toyota Hyryder", "segment": "Car", "spends": 956356, "leads": 16685, "tleads": 7674, "revenue": 3459440, "gcpl": 57.32, "tcpl": 124.62, "margin": 0.7236, "validation": 0.98}}, "Toyota Land Cruiser 300": {"apr": {"brand": "Toyota", "model": "Toyota Land Cruiser 300", "segment": "Car", "spends": 38953, "leads": 1167, "tleads": 189, "revenue": 493763, "gcpl": 33.38, "tcpl": 206.1, "margin": 0.9211, "validation": 0.95}, "may": {"brand": "Toyota", "model": "Toyota Land Cruiser 300", "segment": "Car", "spends": 20252, "leads": 438, "tleads": 52, "revenue": 140140, "gcpl": 46.24, "tcpl": 389.46, "margin": 0.8555, "validation": 0.98}}, "Toyota Legender": {"apr": {"brand": "Toyota", "model": "Toyota Legender", "segment": "Car", "spends": 393, "leads": 6, "tleads": 0, "revenue": 0, "gcpl": 65.5, "tcpl": 0, "margin": 0, "validation": 0.98}, "may": null}, "Toyota Rumion": {"apr": {"brand": "Toyota", "model": "Toyota Rumion", "segment": "Car", "spends": 7772, "leads": 57, "tleads": 22, "revenue": 10780, "gcpl": 136.35, "tcpl": 353.27, "margin": 0.279, "validation": 0.98}, "may": {"brand": "Toyota", "model": "Toyota Rumion", "segment": "Car", "spends": 1853, "leads": 18, "tleads": 9, "revenue": 4410, "gcpl": 102.94, "tcpl": 205.89, "margin": 0.5798, "validation": 0.98}}, "Toyota Vellfire": {"apr": {"brand": "Toyota", "model": "Toyota Vellfire", "segment": "Car", "spends": 47374, "leads": 1814, "tleads": 236, "revenue": 403560, "gcpl": 26.12, "tcpl": 200.74, "margin": 0.8826, "validation": 0.95}, "may": {"brand": "Toyota", "model": "Toyota Vellfire", "segment": "Car", "spends": 42016, "leads": 991, "tleads": 145, "revenue": 255780, "gcpl": 42.4, "tcpl": 289.77, "margin": 0.8357, "validation": 0.98}}}, "Volkswagen": {"Volkswagen Taigun": {"apr": {"brand": "Volkswagen", "model": "Volkswagen Taigun", "segment": "Car", "spends": 107757, "leads": 2174, "tleads": 955, "revenue": 439873, "gcpl": 49.57, "tcpl": 112.83, "margin": 0.755, "validation": 0.98}, "may": {"brand": "Volkswagen", "model": "Volkswagen Taigun", "segment": "Car", "spends": 79596, "leads": 1588, "tleads": 568, "revenue": 261620, "gcpl": 50.12, "tcpl": 140.13, "margin": 0.6958, "validation": 0.98}}, "Volkswagen Tayron": {"apr": {"brand": "Volkswagen", "model": "Volkswagen Tayron", "segment": "Car", "spends": 11281, "leads": 147, "tleads": 77, "revenue": 54331, "gcpl": 76.74, "tcpl": 146.51, "margin": 0.7924, "validation": 0.98}, "may": {"brand": "Volkswagen", "model": "Volkswagen Tayron", "segment": "Car", "spends": 11006, "leads": 333, "tleads": 111, "revenue": 78322, "gcpl": 33.05, "tcpl": 99.15, "margin": 0.8595, "validation": 0.98}}, "Volkswagen Tayron R-Line": {"apr": null, "may": {"brand": "Volkswagen", "model": "Volkswagen Tayron R-Line", "segment": "Car", "spends": 26768, "leads": 226, "tleads": 172, "revenue": 121363, "gcpl": 118.44, "tcpl": 155.63, "margin": 0.7794, "validation": 0.98}}, "Volkswagen Tiguan": {"apr": {"brand": "Volkswagen", "model": "Volkswagen Tiguan", "segment": "Car", "spends": 1288, "leads": 24, "tleads": 15, "revenue": 10584, "gcpl": 53.67, "tcpl": 85.87, "margin": 0.8783, "validation": 0.98}, "may": {"brand": "Volkswagen", "model": "Volkswagen Tiguan", "segment": "Car", "spends": 5130, "leads": 188, "tleads": 77, "revenue": 54331, "gcpl": 27.29, "tcpl": 66.62, "margin": 0.9056, "validation": 0.98}}, "Volkswagen Tiguan R-Line": {"apr": null, "may": {"brand": "Volkswagen", "model": "Volkswagen Tiguan R-Line", "segment": "Car", "spends": 2178, "leads": 20, "tleads": 8, "revenue": 5645, "gcpl": 108.9, "tcpl": 272.25, "margin": 0.6142, "validation": 0.98}}, "Volkswagen Virtus": {"apr": {"brand": "Volkswagen", "model": "Volkswagen Virtus", "segment": "Car", "spends": 164094, "leads": 3748, "tleads": 1479, "revenue": 681228, "gcpl": 43.78, "tcpl": 110.95, "margin": 0.7591, "validation": 0.98}, "may": {"brand": "Volkswagen", "model": "Volkswagen Virtus", "segment": "Car", "spends": 46481, "leads": 851, "tleads": 395, "revenue": 181937, "gcpl": 54.62, "tcpl": 117.67, "margin": 0.7445, "validation": 0.98}}}, "Volvo": {"Volvo XC 60": {"apr": {"brand": "Volvo", "model": "Volvo XC 60", "segment": "Car", "spends": 32311, "leads": 188, "tleads": 113, "revenue": 151935, "gcpl": 171.87, "tcpl": 285.94, "margin": 0.7873, "validation": 0.98}, "may": {"brand": "Volvo", "model": "Volvo XC 60", "segment": "Car", "spends": 28704, "leads": 148, "tleads": 114, "revenue": 153280, "gcpl": 193.95, "tcpl": 251.79, "margin": 0.8127, "validation": 0.98}}, "Volvo XC 90": {"apr": {"brand": "Volvo", "model": "Volvo XC 90", "segment": "Car", "spends": 25633, "leads": 106, "tleads": 84, "revenue": 118706, "gcpl": 241.82, "tcpl": 305.15, "margin": 0.7841, "validation": 0.98}, "may": {"brand": "Volvo", "model": "Volvo XC 90", "segment": "Car", "spends": 28565, "leads": 109, "tleads": 96, "revenue": 135664, "gcpl": 262.06, "tcpl": 297.55, "margin": 0.7894, "validation": 0.98}}}, "citroen": {"Citroen Aircross": {"apr": {"brand": "citroen", "model": "Citroen Aircross", "segment": "Car", "spends": 20824, "leads": 389, "tleads": 285, "revenue": 52330, "gcpl": 53.53, "tcpl": 73.07, "margin": 0.6021, "validation": 0.1215}, "may": null}, "Citroen Basalt": {"apr": {"brand": "citroen", "model": "Citroen Basalt", "segment": "Car", "spends": 22825, "leads": 323, "tleads": 171, "revenue": 33807, "gcpl": 70.67, "tcpl": 133.48, "margin": 0.3248, "validation": 0.1505}, "may": null}, "Citroen C3": {"apr": {"brand": "citroen", "model": "Citroen C3", "segment": "Car", "spends": 8214, "leads": 296, "tleads": 270, "revenue": 64296, "gcpl": 27.75, "tcpl": 30.42, "margin": 0.8722, "validation": 0.21}, "may": null}}}};
+
+const CV_TREE = {"Trucks": {"MS-Tractor_Farmtrac-100326": {"apr": {"spends": 43411.0, "leads": 5525.0, "tleads": 19.0, "margin": 386.0, "validation": 19.0}, "may": {"spends": 20722.0, "leads": 1621.0, "tleads": 35.0, "margin": 68.0, "validation": 14.0}}, "MS-Tractor_Powertrac-160326": {"apr": {"spends": 14494.0, "leads": 6133.0, "tleads": 25.0, "margin": 356.0, "validation": 21.0}, "may": {"spends": 21329.0, "leads": 600.0, "tleads": 41.0, "margin": 28.0, "validation": 17.0}}}, "Eicher": {"Eicher LMD": {"apr": {"spends": 1378.0, "leads": 0.0, "tleads": 0.0, "margin": 0.0, "validation": 0.0}, "may": null}}, "Mahindra CV (IA)": {"Mahindra supro": {"apr": {"spends": 15321.0, "leads": 2992.0, "tleads": 34.0, "margin": 24.0, "validation": 136.0}, "may": {"spends": 41087.0, "leads": 649.0, "tleads": 22.0, "margin": 36.0, "validation": 125.0}}}, "Mahindra CV (MRC)": {"Mahindra A301 (UDO)": {"apr": {"spends": 22455.0, "leads": 6922.0, "tleads": 23.0, "margin": 113.0, "validation": 49.0}, "may": {"spends": 50846.0, "leads": 1423.0, "tleads": 17.0, "margin": 49.0, "validation": 61.0}}, "Mahindra Bolero PikUp": {"apr": null, "may": null}, "Mahindra E-Alfa Super": {"apr": {"spends": 15060.0, "leads": 7034.0, "tleads": 27.0, "margin": 110.0, "validation": 0.0}, "may": {"spends": 7152.0, "leads": 694.0, "tleads": 0.0, "margin": 22.0, "validation": 64.0}}, "Mahindra Jeeto": {"apr": {"spends": 77962.0, "leads": 12490.0, "tleads": 57.0, "margin": 136.0, "validation": 67.0}, "may": {"spends": 35980.0, "leads": 1054.0, "tleads": 57.0, "margin": 77.0, "validation": 92.0}}, "Mahindra supro": {"apr": {"spends": 15321.0, "leads": 2992.0, "tleads": 34.0, "margin": 24.0, "validation": 136.0}, "may": {"spends": 41087.0, "leads": 649.0, "tleads": 22.0, "margin": 36.0, "validation": 125.0}}, "Mahindra Treo": {"apr": {"spends": 191187.0, "leads": 21313.0, "tleads": 53.0, "margin": 358.0, "validation": 87.0}, "may": {"spends": 84821.0, "leads": 2637.0, "tleads": 51.0, "margin": 96.0, "validation": 60.0}}, "Mahindra Treo Plus": {"apr": {"spends": 43018.0, "leads": 0.0, "tleads": 30.0, "margin": 0.0, "validation": 49.0}, "may": {"spends": 80045.0, "leads": 1982.0, "tleads": 26.0, "margin": 44.0, "validation": 0.0}}, "Mahindra Zeo": {"apr": {"spends": 7131.0, "leads": 13271.0, "tleads": 30.0, "margin": 121.0, "validation": 0.0}, "may": {"spends": 12059.0, "leads": 315.0, "tleads": 0.0, "margin": 88.0, "validation": 110.0}}, "Mahindra Zor Grand": {"apr": {"spends": 40646.0, "leads": 6824.0, "tleads": 93.0, "margin": 21.0, "validation": 83.0}, "may": {"spends": 13720.0, "leads": 337.0, "tleads": 76.0, "margin": 131.0, "validation": 325.0}}, "Mahindra-CV-DSA-All-Models": {"apr": {"spends": 126889.0, "leads": 0.0, "tleads": 88.0, "margin": 0.0, "validation": 145.0}, "may": {"spends": 171095.0, "leads": 1723.0, "tleads": 84.0, "margin": 95.0, "validation": 0.0}}}, "Tata CV": {"Tata Intra": {"apr": null, "may": {"spends": 4914.0, "leads": 0.0, "tleads": 74.0, "margin": 0.0, "validation": 0.0}}, "Tata Magic": {"apr": {"spends": 756.0, "leads": 0.0, "tleads": 0.0, "margin": 0.0, "validation": 0.0}, "may": null}, "Tata-Start-Bus-Maxi-Cab": {"apr": null, "may": null}}, "Tata CV-Havas": {"Tata Ace EV": {"apr": null, "may": {"spends": 236.0, "leads": 0.0, "tleads": 0.0, "margin": 0.0, "validation": 0.0}}, "Tata Ace Pro": {"apr": null, "may": null}, "Tata Ace Pro EV": {"apr": null, "may": {"spends": 20365.0, "leads": 0.0, "tleads": 43.0, "margin": 0.0, "validation": 0.0}}}};
+
+const MODEL_KPIS = [
+  { key: 'spends',     label: 'Spends (₹)',    fmt: v => v==null?'—':Math.round(v).toLocaleString('en-IN'), lowerBetter: true },
+  { key: 'leads',      label: 'Leads',         fmt: v => v==null?'—':Math.round(v).toLocaleString('en-IN'), lowerBetter: false },
+  { key: 'tleads',     label: 'T-Leads',       fmt: v => v==null?'—':Math.round(v).toLocaleString('en-IN'), lowerBetter: false },
+  { key: 'gcpl',       label: 'GCPL (₹)',      fmt: v => v==null||v===0?'—':v.toFixed(2), lowerBetter: true },
+  { key: 'tcpl',       label: 'TCPL (₹)',      fmt: v => v==null||v===0?'—':v.toFixed(2), lowerBetter: true },
+  { key: 'margin',     label: 'Margin %',      fmt: v => v==null?'—':(v*100).toFixed(1)+'%', lowerBetter: false },
+];
+const MODEL_KPI_VAL = { key: 'validation', label: 'Validation %', fmt: v => v==null?'—':(v*100).toFixed(1)+'%' };
+
+function modelBadge(apr, may, key, lowerBetter) {
+  if (!apr || !may) return '';
+  let aVal, mVal;
+  if (key === 'gcpl') {
+    aVal = (apr.spends && apr.leads)  ? apr.spends / apr.leads  : null;
+    mVal = (may.spends && may.leads)  ? may.spends / may.leads  : null;
+  } else if (key === 'tcpl') {
+    aVal = (apr.spends && apr.tleads) ? apr.spends / apr.tleads : null;
+    mVal = (may.spends && may.tleads) ? may.spends / may.tleads : null;
+  } else {
+    aVal = apr[key]; mVal = may[key];
+  }
+  if (aVal == null || mVal == null || aVal === 0) return '';
+  const chg = ((mVal - aVal) / Math.abs(aVal)) * 100;
+  const abs = Math.abs(chg);
+  const arrow = chg >= 0 ? '▲' : '▼';
+  let cls;
+  if (lowerBetter) { cls = chg < 0 ? 'inline-up' : abs > 6 ? 'inline-down' : ''; }
+  else             { cls = chg >= 0 ? 'inline-up' : abs > 6 ? 'inline-down' : ''; }
+  if (cls === '') return `<span style="font-size:10px;color:#bbb;margin-left:3px">${arrow}${abs.toFixed(1)}%</span>`;
+  return `<span class="inline-badge ${cls}" style="margin-left:3px">${arrow}${abs.toFixed(1)}%</span>`;
+}
+
+function kpiVal(d, key, fmt) {
+  if (!d) return '<span style="color:#ddd">—</span>';
+  let v = d[key];
+  // Compute gcpl/tcpl live from spends/leads to ensure accuracy
+  if (key === 'gcpl') v = (d.spends && d.leads) ? d.spends / d.leads : null;
+  if (key === 'tcpl') v = (d.spends && d.tleads) ? d.spends / d.tleads : null;
+  return fmt(v);
+}
+
+function buildModelCard(brand, modelsObj) {
+  const modelNames = Object.keys(modelsObj);
+  let as=0,al=0,at2=0,ar=0, ms=0,ml=0,mt=0,mr=0;
+  modelNames.forEach(m => {
+    const d = modelsObj[m];
+    if (d.apr){as+=d.apr.spends||0;al+=d.apr.leads||0;at2+=d.apr.tleads||0;ar+=d.apr.revenue||0;}
+    if (d.may){ms+=d.may.spends||0;ml+=d.may.leads||0;mt+=d.may.tleads||0;mr+=d.may.revenue||0;}
+  });
+  const aprB = al ? {spends:as,leads:al,tleads:at2,revenue:ar,gcpl:as/al,tcpl:at2?as/at2:0,margin:ar?1-as/ar:0} : null;
+  const mayB = ml ? {spends:ms,leads:ml,tleads:mt,revenue:mr,gcpl:ms/ml,tcpl:mt?ms/mt:0,margin:mr?1-ms/mr:0} : null;
+  const cardId = 'brand-' + brand.replace(/[^a-z0-9]/gi,'_');
+
+  const summaryKpis = [
+    { key:'spends', label:'Spends',  fmt: v => v==null?'—':'₹'+Math.round(v).toLocaleString('en-IN'), lowerBetter:true },
+    { key:'leads',  label:'Leads',   fmt: v => v==null?'—':Math.round(v).toLocaleString('en-IN'),      lowerBetter:false },
+    { key:'tleads', label:'T-Leads', fmt: v => v==null?'—':Math.round(v).toLocaleString('en-IN'),      lowerBetter:false },
+    { key:'gcpl',   label:'GCPL',    fmt: v => v==null||v===0?'—':'₹'+v.toFixed(1),                   lowerBetter:true },
+    { key:'tcpl',   label:'TCPL',    fmt: v => v==null||v===0?'—':'₹'+v.toFixed(1),                   lowerBetter:true },
+    { key:'margin', label:'Margin',  fmt: v => v==null?'—':(v*100).toFixed(1)+'%',                    lowerBetter:false },
+  ];
+
+  const summaryRows = summaryKpis.map(k => {
+    const av = aprB ? k.fmt(aprB[k.key]) : '—';
+    const mv = mayB ? k.fmt(mayB[k.key]) : '—';
+    const badge = modelBadge(aprB, mayB, k.key, k.lowerBetter);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid #f5ede5">
+      <span style="font-size:10px;color:#999;width:46px;flex-shrink:0">${k.label}</span>
+      <span style="font-size:11px;color:#aaa;width:90px;text-align:right;flex-shrink:0">${av}</span>
+      <span style="font-size:11px;font-weight:600;color:#333;flex:1;padding-left:10px">${mv}${badge}</span>
+    </div>`;
+  }).join('');
+
+  let modelRows = '';
+  modelNames.forEach(model => {
+    const d = modelsObj[model];
+    const hasBoth = d.apr && d.may;
+    modelRows += `
+    <div style="border:1.5px solid #d0d0d0;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
+      <div style="background:#f2f2f2;padding:9px 14px;font-size:12px;font-weight:600;color:#333;border-bottom:1.5px solid #d0d0d0">${model}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr">
+        <div style="padding:10px 14px;border-right:1.5px solid #d8d8d8">
+          <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Apr\'26</div>
+          ${MODEL_KPIS.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f5f5f5">
+            <span style="font-size:11px;color:#999">${k.label}</span>
+            <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.apr, k.key, k.fmt)}</span></div>`).join('')}
+          <div style="display:flex;justify-content:space-between;padding:4px 6px;margin-top:4px;background:#f5f5f5;border-radius:4px">
+            <span style="font-size:11px;color:#666;font-weight:600">Validation %</span>
+            <span style="font-size:12px;font-weight:600;color:#555">${d.apr ? MODEL_KPI_VAL.fmt(d.apr.validation) : '—'}</span>
+          </div>
+        </div>
+        <div style="padding:10px 14px;background:${d.may ? '#fffaf7' : '#fafafa'}">
+          <div style="font-size:10px;font-weight:700;color:#E8650A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">May\'26</div>
+          ${MODEL_KPIS.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f5f5f5">
+            <span style="font-size:11px;color:#999">${k.label}</span>
+            <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.may, k.key, k.fmt)}${hasBoth ? modelBadge(d.apr, d.may, k.key, k.lowerBetter) : ''}</span></div>`).join('')}
+          <div style="display:flex;justify-content:space-between;padding:4px 6px;margin-top:4px;background:#fff8f3;border-radius:4px">
+            <span style="font-size:11px;color:#E8650A;font-weight:600">Validation %</span>
+            <span style="font-size:12px;font-weight:600;color:#E8650A">${d.may ? MODEL_KPI_VAL.fmt(d.may.validation) : (d.apr ? MODEL_KPI_VAL.fmt(d.apr.validation) : '—')}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  return `
+  <div style="border:2px solid #c8a882;border-radius:12px;margin-bottom:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <div onclick="toggleBrand('${cardId}')" style="background:#fff;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:16px;user-select:none">
+      <div style="background:#E8650A;color:#fff;font-weight:700;font-size:13px;border-radius:6px;padding:5px 12px;white-space:nowrap;flex-shrink:0">${brand}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:4px;font-size:9px;color:#bbb;margin-bottom:2px;padding-left:2px">
+          <span style="width:46px;flex-shrink:0">KPI</span>
+          <span style="width:90px;text-align:right;flex-shrink:0">Apr\'26</span>
+          <span style="padding-left:10px">May\'26</span>
+        </div>
+        ${summaryRows}
+      </div>
+      <span id="${cardId}-arrow" style="font-size:16px;color:#aaa;flex-shrink:0">▼</span>
+    </div>
+    <div id="${cardId}" style="display:none;padding:14px 16px;background:#fafafa;border-top:2px solid #c8a882">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px">${modelRows}</div>
+    </div>
+  </div>`;
+}
+
+function buildSegmentSection(segName, brandsObj) {
+  const brandNames = Object.keys(brandsObj);
+  let html = `<div class="section-header" style="margin-top:${segName==='Bikes'?'0':'32px'}">
+    <div class="section-bar"></div><div class="section-title">${segName}</div></div>`;
+  brandNames.forEach(brand => { html += buildModelCard(brand, brandsObj[brand]); });
+  return html;
+}
+
+function toggleBrand(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▼' : '▲';
+}
+
+function buildModels() {
+  const container = document.getElementById('section-models');
+  if (!container) return;
+  let html = '';
+  ['Bike', 'Car'].forEach(seg => {
+    if (MODEL_TREE[seg]) html += buildSegmentSection(seg + 's', MODEL_TREE[seg]);
+  });
+  container.innerHTML = html;
+}
+
+buildModels();
+
+function buildCVModels() {
+  const container = document.getElementById('section-cv-models');
+  if (!container) return;
+  let html = '<div style="margin-top:32px"><div class="section-header"><div class="section-bar"></div><div class="section-title">CV — Brand &amp; Model Comparison (Apr…26 vs May…26)</div></div>';
+  Object.keys(CV_TREE).forEach(function(brand) {
+    html += buildModelCard(brand, CV_TREE[brand]);
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+buildCVModels();
+
+</script>
+</body>
+</html>
