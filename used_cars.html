@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Used Cars — City & Campaign Performance</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:#F0F2F5; --surface:#fff; --surface2:#F7F8FA;
+  --border:#E4E7EC; --border2:#D0D5DD;
+  --text:#101828; --text2:#475467; --text3:#98A2B3;
+  --navy:#1D2939; --navy2:#344054;
+  --ahm:#7C3AED; --ahm-light:#F5F3FF; --ahm-border:#C4B5FD;
+  --chd:#0369A1; --chd-light:#EFF6FF; --chd-border:#BAE6FD;
+  --nas:#047857; --nas-light:#ECFDF5; --nas-border:#6EE7B7;
+  --google:#EA4335; --google-light:#FEF2F2; --google-border:#FCA5A5;
+  --meta:#1877F2; --meta-light:#EFF6FF; --meta-border:#93C5FD;
+  --cat:#D97706; --cat-light:#FFFBEB;
+  --lead:#0891B2; --lead-light:#ECFEFF;
+  --search:#7C3AED; --search-light:#F5F3FF;
+  --demand:#059669; --demand-light:#ECFDF5;
+  --r:10px; --rl:14px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+.page{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+
+/* ── Auth Gate ── */
+.auth-gate{position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:2000}
+.auth-card{background:#fff;border-radius:16px;padding:44px 40px;max-width:400px;width:92%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.18)}
+.auth-logo{width:56px;height:56px;background:var(--navy);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:26px}
+.auth-card h2{font-size:19px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.auth-card p{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:24px}
+.auth-btn{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-size:14px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .15s}
+.auth-btn:hover{background:#2d3f55}
+.auth-btn:disabled{opacity:0.55;cursor:default}
+.auth-btn svg{flex-shrink:0}
+.auth-error{color:#c0392b;font-size:12px;margin-top:14px;line-height:1.5}
+.auth-info-box{background:#F0F2F5;border-radius:8px;padding:12px 16px;margin-top:16px;font-size:12px;color:var(--text2);line-height:1.6;text-align:left}
+.auth-info-box strong{color:var(--text)}
+.auth-signout-top{position:fixed;top:14px;right:18px;font-size:12px;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:20px;padding:6px 16px;cursor:pointer;z-index:1999;display:none;font-family:inherit}
+.auth-signout-top:hover{background:var(--bg)}
+
+/* ── Admin request panel ── */
+.req-panel{position:fixed;bottom:20px;right:20px;width:370px;background:#fff;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,0.15);z-index:1900;display:none;overflow:hidden}
+.req-panel-hdr{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.req-panel-title{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.req-badge{background:#fff;color:var(--navy);border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700}
+.req-body{max-height:320px;overflow-y:auto}
+.req-item{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.req-item:last-child{border-bottom:none}
+.req-avatar{width:36px;height:36px;border-radius:50%;background:var(--bg);flex-shrink:0;object-fit:cover}
+.req-info{flex:1;min-width:0}
+.req-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-email{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-time{font-size:10px;color:var(--text3)}
+.req-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-approve{background:#047857;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-approve:hover{background:#035c43}
+.btn-reject{background:#fdecea;color:#c0392b;border:1px solid #f5c6c6;border-radius:6px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-reject:hover{background:#f5c6c6}
+.req-empty{padding:22px;text-align:center;color:var(--text3);font-size:13px}
+
+/* ── Header ── */
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.logo{width:44px;height:44px;background:var(--navy);border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo svg{width:24px;height:24px;fill:#fff}
+.title-block h1{font-size:20px;font-weight:700;color:var(--navy)}
+.title-block p{font-size:12px;color:var(--text2);margin-top:2px}
+.period-badge{margin-left:auto;background:var(--navy);color:#fff;font-size:11px;font-weight:600;padding:5px 13px;border-radius:20px;white-space:nowrap;letter-spacing:.04em}
+
+/* ── Date filter bar ── */
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.filter-bar label{font-size:12px;font-weight:600;color:var(--text2);white-space:nowrap}
+.date-input{font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;cursor:pointer}
+.date-input:focus{outline:2px solid var(--navy);outline-offset:1px}
+.filter-sep{color:var(--text3);font-size:13px}
+.filter-reset{margin-left:auto;font-size:12px;color:var(--text2);background:none;border:1px solid var(--border2);border-radius:7px;padding:5px 12px;cursor:pointer;font-family:inherit}
+.filter-reset:hover{background:var(--bg)}
+.filter-active-badge{font-size:11px;font-weight:600;color:#0369A1;background:#EFF6FF;border:1px solid #BAE6FD;border-radius:20px;padding:3px 10px;white-space:nowrap}
+.no-data-msg{text-align:center;padding:40px 20px;color:var(--text3);font-size:13px}
+.no-data-msg strong{display:block;font-size:16px;color:var(--text2);margin-bottom:6px}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:26px}
+.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--text2);background:none;border:none;border-bottom:2.5px solid transparent;cursor:pointer;font-family:inherit;margin-bottom:-2px;transition:color .15s;white-space:nowrap}
+.tab.active{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
+.tab:hover:not(.active){color:var(--text)}
+
+/* ── Summary strip ── */
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.sum-label{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.sum-val{font-size:22px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace}
+.sum-sub{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* ── City cards ── */
+.city-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:860px){.city-grid{grid-template-columns:1fr}}
+.city-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden}
+.city-hdr{padding:14px 18px;display:flex;align-items:center;gap:10px}
+.city-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.city-hdr-name{font-size:15px;font-weight:700}
+.city-hdr-total{margin-left:auto;font-size:12px;font-family:'DM Mono',monospace;font-weight:600}
+.city-body{padding:14px 18px 18px}
+.kpi-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.kpi-pill{padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600}
+.plat-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.plat-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
+.divider{height:1px;background:var(--border);margin:10px 0}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.metric{background:var(--surface2);border-radius:7px;padding:9px 11px;border:1px solid var(--border)}
+.metric-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.metric-val{font-size:16px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace}
+.metric-sub{font-size:10px;color:var(--text2);margin-top:1px}
+
+/* ── Table ── */
+.tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:20px}
+.tbl-toolbar{padding:13px 18px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tbl-title{font-size:14px;font-weight:700;color:var(--navy)}
+.tbl-sub{font-size:11px;color:var(--text2)}
+.filters{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.fsel{font-size:12px;padding:5px 9px;border:1px solid var(--border2);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;cursor:pointer}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:separate;border-spacing:0}
+thead tr{background:var(--surface2)}
+th{padding:9px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;text-align:right;white-space:nowrap;border-bottom:2px solid var(--border2);background:var(--surface2)}
+th.left{text-align:left}
+th.center{text-align:center}
+th.sticky{position:sticky;z-index:3;background:var(--surface2);box-shadow:2px 0 4px rgba(0,0,0,.06)}
+td{padding:9px 12px;font-size:12px;border-bottom:1px solid #F2F4F7;text-align:right;white-space:nowrap;font-family:'DM Mono',monospace;color:var(--text);background:inherit}
+td.left{text-align:left;font-family:'Inter',system-ui;font-size:12px}
+td.center{text-align:center;font-family:'Inter',system-ui}
+td.sticky{position:sticky;z-index:2;background:var(--surface);box-shadow:2px 0 4px rgba(0,0,0,.05)}
+tbody tr:hover td{background:#FAFAFA}
+tbody tr:hover td.sticky{background:#FAFAFA}
+tr:last-child td{border-bottom:none}
+tfoot td{font-weight:700;background:var(--navy);color:#fff;border-top:2px solid var(--navy2);font-size:12px}
+tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
+.city-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;font-family:'Inter',system-ui}
+.plat-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;font-family:'Inter',system-ui}
+.type-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;font-family:'Inter',system-ui}
+.status-ongoing{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;font-family:'Inter',system-ui;background:#ECFDF5;color:#047857;border:1px solid #6EE7B7;white-space:nowrap}
+.status-exp-ongoing{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;font-family:'Inter',system-ui;background:#FEF9C3;color:#854D0E;border:1px solid #FDE047;white-space:nowrap}
+.status-exp-paused{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;font-family:'Inter',system-ui;background:#F1F5F9;color:#64748B;border:1px solid #CBD5E1;white-space:nowrap}
+
+/* ── Campaign type comparison ── */
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:740px){.type-grid{grid-template-columns:1fr}}
+.type-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden}
+.type-hdr{padding:12px 16px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--border)}
+.type-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.type-hdr-name{font-size:13px;font-weight:700}
+.type-hdr-plat{font-size:10px;font-weight:600;margin-top:1px}
+.type-body{padding:14px 16px}
+.type-city-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border)}
+.type-city-row:last-child{margin-bottom:0}
+.tcr-name{font-size:12px;font-weight:700;width:90px;flex-shrink:0}
+.tcr-bar-wrap{flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+.tcr-bar{height:100%;border-radius:3px;transition:width .3s}
+.tcr-vals{display:flex;gap:8px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text2);white-space:nowrap}
+.tcr-val strong{color:var(--text);font-weight:700}
+.empty{padding:36px;text-align:center;color:var(--text3);font-size:13px}
+.pane{display:none}
+.pane.active{display:block}
+</style>
+</head>
+<body>
+
+<!-- ── AUTH GATE ── -->
+<div id="auth-gate" class="auth-gate">
+  <div class="auth-card">
+    <div class="auth-logo" id="auth-icon">🚗</div>
+    <h2 id="auth-title">Used Cars Dashboard</h2>
+    <p id="auth-desc">Sign in with your <strong>@girnarsoft.com</strong> Google account to access this dashboard.</p>
+    <button id="auth-signin-btn" class="auth-btn" type="button">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
+    <p id="auth-error" class="auth-error" style="display:none"></p>
+    <div id="auth-info-box" class="auth-info-box" style="display:none"></div>
+  </div>
+</div>
+
+<button id="auth-signout-btn" class="auth-signout-top" type="button">Sign out</button>
+
+<!-- ── ADMIN REQUESTS PANEL ── -->
+<div id="req-panel" class="req-panel">
+  <div class="req-panel-hdr" id="req-panel-hdr">
+    <span class="req-panel-title">Access Requests <span class="req-badge" id="req-badge">0</span></span>
+    <span id="req-chevron" style="font-size:16px">▲</span>
+  </div>
+  <div class="req-body" id="req-body">
+    <div class="req-empty">No pending requests</div>
+  </div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="dashboard-app" style="display:none">
+<div class="page">
+
+<div class="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m-4 12H9a2 2 0 01-2-2v-5a2 2 0 012-2h11a2 2 0 012 2v5a2 2 0 01-2 2h-2m-5-4l2 2 4-4"/></svg>
+  </div>
+  <div class="title-block">
+    <h1>Used Cars — Performance Dashboard</h1>
+    <p>Ahmedabad &nbsp;·&nbsp; Chandigarh &nbsp;·&nbsp; Nashik &nbsp;·&nbsp; Google + Meta</p>
+  </div>
+  <div class="period-badge" id="period-badge">Jul 1–13, 2026</div>
+</div>
+
+<!-- ── DATE FILTER ── -->
+<div class="filter-bar">
+  <label for="date-start">📅 Date Range</label>
+  <input type="date" id="date-start" class="date-input" value="2026-07-01" min="2026-04-06" max="2026-07-13">
+  <span class="filter-sep">→</span>
+  <input type="date" id="date-end" class="date-input" value="2026-07-13" min="2026-04-06" max="2026-07-13">
+  <span id="filter-active-badge" class="filter-active-badge" style="display:none">Filtered</span>
+  <button class="filter-reset" id="filter-reset-btn" onclick="resetDateFilter()">Reset</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('overview')">Overview</button>
+  <button class="tab" onclick="switchTab('city')">City Comparison</button>
+  <button class="tab" onclick="switchTab('campaigns')">Campaign Detail</button>
+  <button class="tab" onclick="switchTab('types')">Campaign Type Analysis</button>
+</div>
+
+<div id="pane-overview" class="pane active"></div>
+<div id="pane-city"     class="pane"></div>
+<div id="pane-campaigns" class="pane"></div>
+<div id="pane-types"   class="pane"></div>
+
+</div><!-- /.page -->
+</div><!-- /#dashboard-app -->
+
+<!-- ── FIREBASE AUTH ── -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAch2mNDt8dygEX3WiYRMj82b619nA2pYE",
+  authDomain: "marketing-dashboard-3e114.firebaseapp.com",
+  projectId: "marketing-dashboard-3e114",
+  storageBucket: "marketing-dashboard-3e114.firebasestorage.app",
+  messagingSenderId: "31546376163",
+  appId: "1:31546376163:web:9140538022a940a106ead6"
+};
+
+const ADMINS = ["deepanshi.ahuja@girnarsoft.com", "neeraj.khichi@girnarsoft.com"];
+const ALLOWED_DOMAIN = "girnarsoft.com";
+
+const app = initializeApp(FIREBASE_CONFIG);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+const gate       = document.getElementById('auth-gate');
+const dashboard  = document.getElementById('dashboard-app');
+const signinBtn  = document.getElementById('auth-signin-btn');
+const errorEl    = document.getElementById('auth-error');
+const infoBox    = document.getElementById('auth-info-box');
+const signoutBtn = document.getElementById('auth-signout-btn');
+const authIcon   = document.getElementById('auth-icon');
+const authTitle  = document.getElementById('auth-title');
+const authDesc   = document.getElementById('auth-desc');
+const reqPanel   = document.getElementById('req-panel');
+const reqBody    = document.getElementById('req-body');
+const reqBadge   = document.getElementById('req-badge');
+const reqPanelHdr = document.getElementById('req-panel-hdr');
+const reqChevron  = document.getElementById('req-chevron');
+
+let reqOpen = true;
+reqPanelHdr.addEventListener('click', () => {
+  reqOpen = !reqOpen;
+  reqBody.style.display = reqOpen ? 'block' : 'none';
+  reqChevron.textContent = reqOpen ? '▲' : '▼';
+});
+
+let reqUnsub = null;
+let pendingReqs = [];
+
+signinBtn.addEventListener('click', () => {
+  errorEl.style.display = 'none';
+  signinBtn.disabled = true;
+  signinBtn.childNodes[1].textContent = ' Signing in…';
+  signInWithPopup(auth, provider).catch(err => {
+    errorEl.textContent = 'Sign-in failed: ' + err.message;
+    errorEl.style.display = 'block';
+    signinBtn.disabled = false;
+    signinBtn.childNodes[1].textContent = ' Sign in with Google';
+  });
+});
+
+signoutBtn.addEventListener('click', () => signOut(auth));
+
+function showSignIn(msg) {
+  gate.style.display = 'flex';
+  dashboard.style.display = 'none';
+  authIcon.textContent = '🚗';
+  authTitle.textContent = 'Used Cars Dashboard';
+  authDesc.innerHTML = 'Sign in with your <strong>@girnarsoft.com</strong> Google account to access this dashboard.';
+  signinBtn.style.display = 'flex';
+  signinBtn.disabled = false;
+  signinBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg> Sign in with Google`;
+  errorEl.style.display = 'none';
+  infoBox.style.display = 'none';
+  signoutBtn.style.display = 'none';
+  if (msg) { infoBox.innerHTML = msg; infoBox.style.display = 'block'; }
+}
+
+function showPending(user) {
+  gate.style.display = 'flex';
+  dashboard.style.display = 'none';
+  authIcon.textContent = '⏳';
+  authTitle.textContent = 'Access Requested';
+  authDesc.textContent = 'Your request has been sent to the admins for approval.';
+  signinBtn.style.display = 'none';
+  errorEl.style.display = 'none';
+  infoBox.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>You will gain access once an admin approves your request.`;
+  infoBox.style.display = 'block';
+  signoutBtn.style.display = 'block';
+}
+
+function showDenied(user) {
+  gate.style.display = 'flex';
+  dashboard.style.display = 'none';
+  authIcon.textContent = '🚫';
+  authTitle.textContent = 'Access Denied';
+  authDesc.textContent = 'Your access request was not approved.';
+  signinBtn.style.display = 'none';
+  errorEl.style.display = 'none';
+  infoBox.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>Contact an admin if you believe this is a mistake.`;
+  infoBox.style.display = 'block';
+  signoutBtn.style.display = 'block';
+}
+
+function startAdminListener() {
+  if (reqUnsub) return;
+  const q = query(collection(db, 'access_requests_uc'), where('status', '==', 'pending'));
+  reqUnsub = onSnapshot(q, snap => {
+    pendingReqs = [];
+    snap.forEach(d => pendingReqs.push({ id: d.id, ...d.data() }));
+    pendingReqs.sort((a, b) => (a.requestedAt?.seconds || 0) - (b.requestedAt?.seconds || 0));
+    reqBadge.textContent = pendingReqs.length;
+    reqPanel.style.display = 'block';
+    if (!pendingReqs.length) {
+      reqBody.innerHTML = '<div class="req-empty">No pending requests</div>';
+    } else {
+      reqBody.innerHTML = pendingReqs.map((r, i) => {
+        const time = r.requestedAt ? new Date(r.requestedAt.seconds * 1000).toLocaleString('en-IN') : '';
+        return `<div class="req-item" data-idx="${i}">
+          <img class="req-avatar" src="${r.photoURL || ''}" onerror="this.style.display='none'" alt="">
+          <div class="req-info">
+            <div class="req-name">${r.name || 'Unknown'}</div>
+            <div class="req-email">${r.email}</div>
+            <div class="req-time">${time}</div>
+          </div>
+          <div class="req-actions">
+            <button class="btn-approve" onclick="approveReq(${i})">Approve</button>
+            <button class="btn-reject" onclick="rejectReq(${i})">Reject</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  });
+}
+
+window.approveReq = async (idx) => {
+  const r = pendingReqs[idx];
+  if (!r) return;
+  const item = document.querySelector(`.req-item[data-idx="${idx}"]`);
+  if (item) item.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  await setDoc(doc(db, 'approved_emails_uc', r.id), {
+    email: r.email, approvedAt: serverTimestamp(), approvedBy: auth.currentUser?.email || ''
+  });
+  await updateDoc(doc(db, 'access_requests_uc', r.id), { status: 'approved' });
+};
+
+window.rejectReq = async (idx) => {
+  const r = pendingReqs[idx];
+  if (!r) return;
+  const item = document.querySelector(`.req-item[data-idx="${idx}"]`);
+  if (item) item.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  await updateDoc(doc(db, 'access_requests_uc', r.id), { status: 'rejected' });
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    if (reqUnsub) { reqUnsub(); reqUnsub = null; }
+    reqPanel.style.display = 'none';
+    showSignIn();
+    return;
+  }
+
+  const email = (user.email || '').toLowerCase();
+  const domain = email.split('@')[1] || '';
+
+  // Block non-girnarsoft accounts entirely — cannot even request access
+  if (domain !== ALLOWED_DOMAIN) {
+    gate.style.display = 'flex';
+    dashboard.style.display = 'none';
+    authIcon.textContent = '🔒';
+    authTitle.textContent = 'Access Restricted';
+    authDesc.innerHTML = 'This dashboard is only accessible to <strong>@girnarsoft.com</strong> accounts.';
+    signinBtn.style.display = 'none';
+    infoBox.innerHTML = `You signed in as <strong>${user.email}</strong>, which is not authorised to request access to this dashboard.`;
+    infoBox.style.display = 'block';
+    errorEl.style.display = 'none';
+    signoutBtn.style.display = 'block';
+    return;
+  }
+
+  // Admins get direct access
+  if (ADMINS.includes(email)) {
+    gate.style.display = 'none';
+    dashboard.style.display = 'block';
+    signoutBtn.style.display = 'block';
+    startAdminListener();
+    initDashboard();
+    return;
+  }
+
+  // Check if already approved
+  const approvedSnap = await getDoc(doc(db, 'approved_emails_uc', email));
+  if (approvedSnap.exists()) {
+    gate.style.display = 'none';
+    dashboard.style.display = 'block';
+    signoutBtn.style.display = 'block';
+    initDashboard();
+    return;
+  }
+
+  // Check if rejected
+  const reqSnap = await getDoc(doc(db, 'access_requests_uc', email));
+  if (reqSnap.exists() && reqSnap.data().status === 'rejected') {
+    showDenied(user);
+    return;
+  }
+
+  // Submit / re-show pending request
+  await setDoc(doc(db, 'access_requests_uc', email), {
+    email: user.email,
+    name: user.displayName || '',
+    photoURL: user.photoURL || '',
+    requestedAt: serverTimestamp(),
+    status: 'pending'
+  }, { merge: true });
+  showPending(user);
+});
+</script>
+
+<!-- ── DASHBOARD LOGIC ── -->
+<script>
+var DATA_RAW = [
+  {Campaign:"AHM-Search-Buy-Used-Car-8april",   Spends:20527.24,  Impressions:34862,  Clicks:7831,  Conversions:614.13, Platform:"Google", City:"Ahmedabad",  Type:"Search",              Triggered_Leads:413, Dealer_Triggers:217, Status:"Ongoing",              StartDate:"2026-04-08", EndDate:null},
+  {Campaign:"CHD-Buyer-Acquisition-6April",       Spends:17513.63,  Impressions:26311,  Clicks:6120,  Conversions:358.28, Platform:"Google", City:"Chandigarh", Type:"Search",              Triggered_Leads:232, Dealer_Triggers:142, Status:"Ongoing",              StartDate:"2026-04-06", EndDate:null},
+  {Campaign:"Demand-Gen-CHD-1july-UC",            Spends:1373.62,   Impressions:5471,   Clicks:88,    Conversions:0.0,    Platform:"Google", City:"Chandigarh", Type:"Demand Gen",          Triggered_Leads:0,   Dealer_Triggers:0,   Status:"Experiment · Ongoing", StartDate:"2026-07-01", EndDate:null},
+  {Campaign:"Demand-Gen-Nashik-1july-UC",         Spends:9326.38,   Impressions:49496,  Clicks:890,   Conversions:22.9,   Platform:"Google", City:"Nashik",     Type:"Demand Gen",          Triggered_Leads:20,  Dealer_Triggers:14,  Status:"Experiment · Ongoing", StartDate:"2026-07-01", EndDate:null},
+  {Campaign:"Nashik-Search-Buy-UsedCar-8april",   Spends:16186.81,  Impressions:15677,  Clicks:3964,  Conversions:326.28, Platform:"Google", City:"Nashik",     Type:"Search",              Triggered_Leads:217, Dealer_Triggers:157, Status:"Ongoing",              StartDate:"2026-04-08", EndDate:null},
+  {Campaign:"Nashik-pmax-Used-car-16june",        Spends:1250.48,   Impressions:4042,   Clicks:356,   Conversions:12.54,  Platform:"Google", City:"Nashik",     Type:"Performance Max",     Triggered_Leads:8,   Dealer_Triggers:5,   Status:"Experiment · Paused",  StartDate:"2026-06-16", EndDate:"2026-07-10"},
+  {Campaign:"AHM-UCR-Catalogue-Ads",             Spends:25611.52,  Impressions:781721, Clicks:53770, Conversions:620.0,  Platform:"Meta",   City:"Ahmedabad",  Type:"Catalogue",           Triggered_Leads:554, Dealer_Triggers:348, Status:"Ongoing",              StartDate:"2026-04-08", EndDate:null},
+  {Campaign:"Ahmedabad-UCD-8april-Leadform",      Spends:1956.18,   Impressions:17631,  Clicks:131,   Conversions:10.0,   Platform:"Meta",   City:"Ahmedabad",  Type:"LeadForm",            Triggered_Leads:0,   Dealer_Triggers:1,   Status:"Experiment · Paused",  StartDate:"2026-04-08", EndDate:"2026-07-05"},
+  {Campaign:"Chandigarh-UCD-8april-Leadform",     Spends:23964.5,   Impressions:457657, Clicks:5272,  Conversions:586.0,  Platform:"Meta",   City:"Chandigarh", Type:"LeadForm",            Triggered_Leads:0,   Dealer_Triggers:54,  Status:"Experiment · Paused",  StartDate:"2026-04-08", EndDate:"2026-07-10"},
+  {Campaign:"Chandigarh-UCR-Catalogue-Ads",       Spends:16458.63,  Impressions:498549, Clicks:24553, Conversions:183.0,  Platform:"Meta",   City:"Chandigarh", Type:"Catalogue",           Triggered_Leads:142, Dealer_Triggers:94,  Status:"Ongoing",              StartDate:"2026-04-08", EndDate:null},
+  {Campaign:"Nashik-UCD-8april-Lead-Form",        Spends:25631.24,  Impressions:543711, Clicks:4808,  Conversions:383.0,  Platform:"Meta",   City:"Nashik",     Type:"LeadForm",            Triggered_Leads:0,   Dealer_Triggers:69,  Status:"Experiment · Paused",  StartDate:"2026-04-08", EndDate:"2026-07-10"},
+  {Campaign:"Nashik-UCR-Catalogue-Ads",           Spends:28154.79,  Impressions:766187, Clicks:28240, Conversions:300.0,  Platform:"Meta",   City:"Nashik",     Type:"Catalogue",           Triggered_Leads:234, Dealer_Triggers:196, Status:"Ongoing",              StartDate:"2026-04-08", EndDate:null},
+  {Campaign:"Nashik-UCR-Static-Website",          Spends:4156.62,   Impressions:32356,  Clicks:365,   Conversions:12.0,   Platform:"Meta",   City:"Nashik",     Type:"Website Conversion",  Triggered_Leads:9,   Dealer_Triggers:7,   Status:"Experiment · Paused",  StartDate:"2026-04-08", EndDate:"2026-07-08"},
+  {Campaign:"Nashik-Whatsup-Leads",              Spends:506.1,     Impressions:11110,  Clicks:95,    Conversions:7.0,    Platform:"Meta",   City:"Nashik",     Type:"WhatsApp",            Triggered_Leads:0,   Dealer_Triggers:3,   Status:"Experiment · Ongoing", StartDate:"2026-07-01", EndDate:null}
+];
+
+// Active filtered dataset
+var DATA = DATA_RAW.slice();
+
+var CITY_COLOR  = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857'};
+var CITY_LIGHT  = {Ahmedabad:'#F5F3FF', Chandigarh:'#EFF6FF', Nashik:'#ECFDF5'};
+var CITY_BORDER = {Ahmedabad:'#C4B5FD', Chandigarh:'#BAE6FD', Nashik:'#6EE7B7'};
+var PLAT_COLOR  = {Google:'#EA4335', Meta:'#1877F2'};
+var PLAT_LIGHT  = {Google:'#FEF2F2', Meta:'#EFF6FF'};
+var PLAT_BDR    = {Google:'#FCA5A5', Meta:'#93C5FD'};
+var TYPE_COLOR  = {Search:'#7C3AED', Catalogue:'#D97706', LeadForm:'#0891B2', 'Demand Gen':'#059669', 'Performance Max':'#9333EA', 'Website Conversion':'#0369A1', WhatsApp:'#25D366', Other:'#64748B'};
+var TYPE_LIGHT  = {Search:'#F5F3FF', Catalogue:'#FFFBEB', LeadForm:'#ECFEFF', 'Demand Gen':'#ECFDF5', 'Performance Max':'#FAF5FF', 'Website Conversion':'#EFF6FF', WhatsApp:'#F0FDF4', Other:'#F8FAFC'};
+
+var DEFAULT_START = '2026-07-01';
+var DEFAULT_END   = '2026-07-13';
+
+// ── DATE FILTER ──────────────────────────────────────────────────────────────
+function applyDateFilter() {
+  var s = document.getElementById('date-start').value;
+  var e = document.getElementById('date-end').value;
+  if (!s || !e || s > e) return;
+
+  var badge = document.getElementById('filter-active-badge');
+  var periodBadge = document.getElementById('period-badge');
+  var isDefault = (s === DEFAULT_START && e === DEFAULT_END);
+
+  badge.style.display = isDefault ? 'none' : 'inline-block';
+  periodBadge.textContent = formatDateRange(s, e);
+
+  DATA = DATA_RAW.filter(function(r) {
+    var campaignStart = r.StartDate || '2026-04-06';
+    var campaignEnd   = r.EndDate   || '2026-07-13';
+    // Campaign is active in selected range if it started before filter end AND ended after filter start
+    return campaignStart <= e && campaignEnd >= s;
+  });
+
+  // Invalidate rendered panes so they re-render
+  ['overview','city','campaigns','types'].forEach(function(id) {
+    var el = document.getElementById('pane-' + id);
+    if (el) { el.dataset.done = ''; el.innerHTML = ''; }
+  });
+
+  // Re-render active pane
+  var activeTab = document.querySelector('.tab.active');
+  if (activeTab) {
+    var ids = ['overview','city','campaigns','types'];
+    document.querySelectorAll('.tab').forEach(function(t, i) {
+      if (t.classList.contains('active')) switchTab(ids[i]);
+    });
+  } else {
+    renderOverview();
+  }
+}
+
+function resetDateFilter() {
+  document.getElementById('date-start').value = DEFAULT_START;
+  document.getElementById('date-end').value   = DEFAULT_END;
+  applyDateFilter();
+}
+
+function formatDateRange(s, e) {
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmt(d) {
+    var p = d.split('-');
+    return p[2].replace(/^0/,'') + ' ' + months[parseInt(p[1],10)-1] + ' ' + p[0];
+  }
+  return fmt(s) + ' – ' + fmt(e);
+}
+
+document.getElementById('date-start').addEventListener('change', applyDateFilter);
+document.getElementById('date-end').addEventListener('change', applyDateFilter);
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function INR(v)  { return '₹'+Number(v).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function NUM(v)  { return Number(v).toLocaleString('en-IN'); }
+function PCT(v)  { return (v*100).toFixed(1)+'%'; }
+function agg(rows) {
+  return rows.reduce(function(a,r) {
+    a.sp+=r.Spends; a.imp+=r.Impressions; a.cl+=r.Clicks;
+    a.cv+=r.Conversions; a.gl+=r.Triggered_Leads; a.dt+=r.Dealer_Triggers;
+    return a;
+  },{sp:0,imp:0,cl:0,cv:0,gl:0,dt:0});
+}
+function cpl(sp,gl)   { return gl>0?sp/gl:null; }
+function cpm(sp,imp)  { return imp>0?sp/imp*1000:null; }
+function ctr(cl,imp)  { return imp>0?cl/imp:null; }
+function fmt(v,dec)   { return v==null?'—':'₹'+v.toFixed(dec||0).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function fmtN(v)      { return v==null?'—':v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+
+function cityBadge(city) {
+  return '<span class="city-badge" style="background:'+CITY_LIGHT[city]+';color:'+CITY_COLOR[city]+';border:1px solid '+CITY_BORDER[city]+'">'+city+'</span>';
+}
+function platBadge(p) {
+  return '<span class="plat-badge" style="background:'+PLAT_LIGHT[p]+';color:'+PLAT_COLOR[p]+';border:1px solid '+PLAT_BDR[p]+'">'+p+'</span>';
+}
+function statusBadge(s) {
+  if(!s) return '';
+  if(s==='Ongoing') return '<span class="status-ongoing"><span style="width:5px;height:5px;border-radius:50%;background:#047857;display:inline-block"></span>Ongoing</span>';
+  if(s==='Experiment · Ongoing') return '<span class="status-exp-ongoing"><span style="width:5px;height:5px;border-radius:50%;background:#CA8A04;display:inline-block"></span>Exp · Active</span>';
+  if(s==='Experiment · Paused')  return '<span class="status-exp-paused"><span style="width:5px;height:5px;border-radius:50%;background:#94A3B8;display:inline-block"></span>Exp · Paused</span>';
+  return '<span class="status-exp-paused">'+s+'</span>';
+}
+function typeBadge(t) {
+  var c=TYPE_COLOR[t]||'#64748B', l=TYPE_LIGHT[t]||'#F8FAFC';
+  return '<span class="type-badge" style="background:'+l+';color:'+c+'">'+t+'</span>';
+}
+
+function noDataMsg() {
+  return '<div class="no-data-msg"><strong>No campaigns in this date range</strong>Adjust the date filter to see data.</div>';
+}
+
+// ── TAB SWITCH ───────────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(function(t,i) {
+    var ids=['overview','city','campaigns','types'];
+    t.classList.toggle('active', ids[i]===id);
+  });
+  document.querySelectorAll('.pane').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('pane-'+id).classList.add('active');
+  if(id==='overview')  renderOverview();
+  if(id==='city')      renderCity();
+  if(id==='campaigns') renderCampaigns();
+  if(id==='types')     renderTypes();
+}
+window.switchTab = switchTab;
+
+// ── OVERVIEW ─────────────────────────────────────────────────────────────────
+function renderOverview() {
+  var el=document.getElementById('pane-overview');
+  if(el.dataset.done) return;
+
+  if(!DATA.length) { el.innerHTML=noDataMsg(); el.dataset.done=1; return; }
+
+  var tot=agg(DATA);
+  var pcpl=cpl(tot.sp,tot.cv), gcpl_v=cpl(tot.sp,tot.gl), dcpl_v=cpl(tot.sp,tot.dt);
+  var pctr=ctr(tot.cl,tot.imp), pcpm=cpm(tot.sp,tot.imp);
+
+  var html='<div class="summary">';
+  [['Total Spends',INR(tot.sp),'All cities combined'],
+   ['Impressions',NUM(tot.imp),''],
+   ['Clicks',NUM(tot.cl),'CTR: '+PCT(pctr)],
+   ['Panel Conversions',fmtN(tot.cv),'Panel CPL: '+fmt(pcpl,0)],
+   ['Triggered Leads',NUM(tot.gl),'Gen CPL: '+fmt(gcpl_v,0)],
+   ['Dealer Triggers',NUM(tot.dt),'Dealer CPL: '+fmt(dcpl_v,0)],
+   ['CPM (₹)',fmtN(pcpm),'Cost per 1000 impressions']
+  ].forEach(function(c) {
+    html+='<div class="sum-card"><div class="sum-label">'+c[0]+'</div><div class="sum-val">'+c[1]+'</div><div class="sum-sub">'+c[2]+'</div></div>';
+  });
+  html+='</div>';
+
+  html+='<div class="city-grid">';
+  ['Ahmedabad','Chandigarh','Nashik'].forEach(function(city) {
+    var rows=DATA.filter(function(r){return r.City===city;});
+    if(!rows.length) return;
+    var t=agg(rows); var cc=CITY_COLOR[city]; var cl_v=CITY_LIGHT[city];
+    var gcpl_c=cpl(t.sp,t.gl), dcpl_c=cpl(t.sp,t.dt), pcpl_c=cpl(t.sp,t.cv);
+    var pct_sp=tot.sp>0?t.sp/tot.sp*100:0;
+    html+='<div class="city-card">';
+    html+='<div class="city-hdr" style="background:'+cl_v+';border-bottom:2px solid '+cc+'">';
+    html+='<div class="city-dot" style="background:'+cc+'"></div>';
+    html+='<div class="city-hdr-name" style="color:'+cc+'">'+city+'</div>';
+    html+='<div class="city-hdr-total" style="color:'+cc+'">'+INR(t.sp)+'</div>';
+    html+='</div><div class="city-body">';
+    html+='<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:5px">SPEND SHARE</div>';
+    html+='<div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+pct_sp.toFixed(1)+'%;height:100%;background:'+cc+';border-radius:3px"></div></div>';
+    html+='<div style="font-size:11px;color:var(--text2);margin-top:3px">'+pct_sp.toFixed(1)+'% of total</div></div>';
+    html+='<div class="metric-grid">';
+    [['Impressions',NUM(t.imp),''],
+     ['Clicks',NUM(t.cl),'CTR '+PCT(ctr(t.cl,t.imp))],
+     ['Panel Conv.',fmtN(t.cv),'CPL '+fmt(pcpl_c,0)],
+     ['Triggered Leads',NUM(t.gl),'CPL '+fmt(gcpl_c,0)],
+     ['Dealer Triggers',NUM(t.dt),'CPL '+fmt(dcpl_c,0)],
+     ['CPM',fmt(cpm(t.sp,t.imp),1),'Per 1k impr.']
+    ].forEach(function(m) {
+      html+='<div class="metric"><div class="metric-label">'+m[0]+'</div><div class="metric-val">'+m[1]+'</div><div class="metric-sub">'+m[2]+'</div></div>';
+    });
+    html+='</div></div></div>';
+  });
+  html+='</div>';
+
+  html+='<div class="tbl-card"><div class="tbl-toolbar"><span class="tbl-title">Platform Split — All Cities</span></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+='<th class="left sticky" style="left:0">Platform</th>';
+  ['Spends','Impressions','Clicks','CTR','Panel Conv.','Triggered Leads','Dealer Triggers','Trigger %','Panel CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
+  html+='</tr></thead><tbody>';
+  ['Google','Meta'].forEach(function(plat) {
+    var rows=DATA.filter(function(r){return r.Platform===plat;});
+    if(!rows.length) return;
+    var t=agg(rows); var tpct=t.gl>0?t.dt/t.gl:null;
+    html+='<tr><td class="left sticky" style="left:0">'+platBadge(plat)+'</td>';
+    html+='<td>'+INR(t.sp)+'</td><td>'+NUM(t.imp)+'</td><td>'+NUM(t.cl)+'</td>';
+    html+='<td>'+PCT(ctr(t.cl,t.imp))+'</td><td>'+fmtN(t.cv)+'</td>';
+    html+='<td>'+NUM(t.gl)+'</td><td>'+NUM(t.dt)+'</td>';
+    html+='<td>'+(tpct!=null?PCT(tpct):'—')+'</td>';
+    html+='<td>'+fmt(cpl(t.sp,t.cv),0)+'</td><td>'+fmt(cpl(t.sp,t.gl),0)+'</td><td>'+fmt(cpl(t.sp,t.dt),0)+'</td></tr>';
+  });
+  var tt=agg(DATA); var ttpct=tt.gl>0?tt.dt/tt.gl:null;
+  html+='</tbody><tfoot><tr><td class="left sticky" style="left:0">TOTAL</td>';
+  html+='<td>'+INR(tt.sp)+'</td><td>'+NUM(tt.imp)+'</td><td>'+NUM(tt.cl)+'</td>';
+  html+='<td>'+PCT(ctr(tt.cl,tt.imp))+'</td><td>'+fmtN(tt.cv)+'</td>';
+  html+='<td>'+NUM(tt.gl)+'</td><td>'+NUM(tt.dt)+'</td>';
+  html+='<td>'+(ttpct!=null?PCT(ttpct):'—')+'</td>';
+  html+='<td>'+fmt(cpl(tt.sp,tt.cv),0)+'</td><td>'+fmt(cpl(tt.sp,tt.gl),0)+'</td><td>'+fmt(cpl(tt.sp,tt.dt),0)+'</td>';
+  html+='</tr></tfoot></table></div></div>';
+
+  el.innerHTML=html;
+  el.dataset.done=1;
+}
+
+// ── CITY COMPARISON ───────────────────────────────────────────────────────────
+function renderCity() {
+  var el=document.getElementById('pane-city');
+  if(!DATA.length) { el.innerHTML=noDataMsg(); return; }
+  var html='';
+
+  html+='<div class="tbl-card"><div class="tbl-toolbar"><span class="tbl-title">City-wise Summary</span><span class="tbl-sub">All platforms combined</span></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+='<th class="left sticky" style="left:0">City</th>';
+  ['Spends','Impressions','Clicks','CTR','Panel Conv.','Triggered Leads','Dealer Triggers','Trigger %','Panel CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
+  html+='</tr></thead><tbody>';
+  ['Ahmedabad','Chandigarh','Nashik'].forEach(function(city) {
+    var rows=DATA.filter(function(r){return r.City===city;});
+    if(!rows.length) return;
+    var t=agg(rows); var tpct=t.gl>0?t.dt/t.gl:null;
+    html+='<tr><td class="left sticky" style="left:0">'+cityBadge(city)+'</td>';
+    html+='<td>'+INR(t.sp)+'</td><td>'+NUM(t.imp)+'</td><td>'+NUM(t.cl)+'</td>';
+    html+='<td>'+PCT(ctr(t.cl,t.imp))+'</td><td>'+fmtN(t.cv)+'</td>';
+    html+='<td>'+NUM(t.gl)+'</td><td>'+NUM(t.dt)+'</td>';
+    html+='<td>'+(tpct!=null?PCT(tpct):'—')+'</td>';
+    html+='<td>'+fmt(cpl(t.sp,t.cv),0)+'</td><td>'+fmt(cpl(t.sp,t.gl),0)+'</td><td>'+fmt(cpl(t.sp,t.dt),0)+'</td></tr>';
+  });
+  var tt=agg(DATA); var ttpct=tt.gl>0?tt.dt/tt.gl:null;
+  html+='</tbody><tfoot><tr><td class="left sticky" style="left:0">TOTAL</td>';
+  html+='<td>'+INR(tt.sp)+'</td><td>'+NUM(tt.imp)+'</td><td>'+NUM(tt.cl)+'</td>';
+  html+='<td>'+PCT(ctr(tt.cl,tt.imp))+'</td><td>'+fmtN(tt.cv)+'</td>';
+  html+='<td>'+NUM(tt.gl)+'</td><td>'+NUM(tt.dt)+'</td>';
+  html+='<td>'+(ttpct!=null?PCT(ttpct):'—')+'</td>';
+  html+='<td>'+fmt(cpl(tt.sp,tt.cv),0)+'</td><td>'+fmt(cpl(tt.sp,tt.gl),0)+'</td><td>'+fmt(cpl(tt.sp,tt.dt),0)+'</td>';
+  html+='</tr></tfoot></table></div></div>';
+
+  html+='<div class="tbl-card" style="margin-top:16px"><div class="tbl-toolbar"><span class="tbl-title">Platform Split per City</span></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+='<th class="left sticky" style="left:0;min-width:100px">City</th>';
+  html+='<th class="left sticky" style="left:100px;min-width:80px">Platform</th>';
+  ['Spends','Impressions','Clicks','CTR','Panel Conv.','Triggered Leads','Dealer Triggers','Trigger %','Panel CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
+  html+='</tr></thead><tbody>';
+  ['Ahmedabad','Chandigarh','Nashik'].forEach(function(city) {
+    ['Google','Meta'].forEach(function(plat) {
+      var rows=DATA.filter(function(r){return r.City===city&&r.Platform===plat;});
+      if(!rows.length) return;
+      var t=agg(rows); var tpct=t.gl>0?t.dt/t.gl:null;
+      html+='<tr><td class="left sticky" style="left:0;min-width:100px">'+cityBadge(city)+'</td>';
+      html+='<td class="left sticky" style="left:100px;min-width:80px">'+platBadge(plat)+'</td>';
+      html+='<td>'+INR(t.sp)+'</td><td>'+NUM(t.imp)+'</td><td>'+NUM(t.cl)+'</td>';
+      html+='<td>'+PCT(ctr(t.cl,t.imp))+'</td><td>'+fmtN(t.cv)+'</td>';
+      html+='<td>'+NUM(t.gl)+'</td><td>'+NUM(t.dt)+'</td>';
+      html+='<td>'+(tpct!=null?PCT(tpct):'—')+'</td>';
+      html+='<td>'+fmt(cpl(t.sp,t.cv),0)+'</td><td>'+fmt(cpl(t.sp,t.gl),0)+'</td><td>'+fmt(cpl(t.sp,t.dt),0)+'</td></tr>';
+    });
+  });
+  html+='</tbody></table></div></div>';
+
+  el.innerHTML=html;
+}
+
+// ── CAMPAIGN DETAIL ───────────────────────────────────────────────────────────
+function renderCampaigns() {
+  var el=document.getElementById('pane-campaigns');
+  var cityF=document.getElementById('f-city')? document.getElementById('f-city').value : 'All';
+  var platF=document.getElementById('f-plat')? document.getElementById('f-plat').value : 'All';
+  var typeF=document.getElementById('f-type')? document.getElementById('f-type').value : 'All';
+
+  var rows=DATA.filter(function(r) {
+    return (cityF==='All'||r.City===cityF)&&(platF==='All'||r.Platform===platF)&&(typeF==='All'||r.Type===typeF);
+  });
+
+  var html='<div class="tbl-card"><div class="tbl-toolbar"><span class="tbl-title">All Campaigns</span>';
+  html+='<div class="filters">';
+  html+='<select id="f-city" class="fsel" onchange="renderCampaigns()"><option value="All">All Cities</option>';
+  ['Ahmedabad','Chandigarh','Nashik'].forEach(function(c){html+='<option'+(c===cityF?' selected':'')+'>'+c+'</option>';});
+  html+='</select>';
+  html+='<select id="f-plat" class="fsel" onchange="renderCampaigns()"><option value="All">All Platforms</option>';
+  ['Google','Meta'].forEach(function(p){html+='<option'+(p===platF?' selected':'')+'>'+p+'</option>';});
+  html+='</select>';
+  html+='<select id="f-type" class="fsel" onchange="renderCampaigns()"><option value="All">All Types</option>';
+  var types=[...new Set(DATA.map(function(r){return r.Type;}))].sort();
+  types.forEach(function(t){html+='<option'+(t===typeF?' selected':'')+'>'+t+'</option>';});
+  html+='</select></div></div>';
+
+  if(!rows.length) {
+    html+=noDataMsg()+'</div>';
+    el.innerHTML=html;
+    return;
+  }
+
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+='<th class="left sticky" style="left:0;min-width:90px">City</th>';
+  html+='<th class="left sticky" style="left:90px;min-width:78px">Platform</th>';
+  html+='<th class="left sticky" style="left:168px;min-width:110px">Type</th>';
+  html+='<th class="left" style="min-width:110px">Stage</th>';
+  html+='<th class="left" style="min-width:180px">Campaign</th>';
+  ['Spends','Impressions','Clicks','CTR','Panel Conv.','Triggered Leads','Dealer Triggers','Trigger %','Panel CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
+  html+='</tr></thead><tbody>';
+
+  rows.forEach(function(r) {
+    var pcpl_r=cpl(r.Spends,r.Conversions), gcpl_r=cpl(r.Spends,r.Triggered_Leads), dcpl_r=cpl(r.Spends,r.Dealer_Triggers);
+    var pctr_r=ctr(r.Clicks,r.Impressions); var tpct_r=r.Triggered_Leads>0?r.Dealer_Triggers/r.Triggered_Leads:null;
+    html+='<tr>';
+    html+='<td class="left sticky" style="left:0;min-width:90px">'+cityBadge(r.City)+'</td>';
+    html+='<td class="left sticky" style="left:90px;min-width:78px">'+platBadge(r.Platform)+'</td>';
+    html+='<td class="left sticky" style="left:168px;min-width:110px">'+typeBadge(r.Type)+'</td>';
+    html+='<td class="left" style="min-width:110px">'+statusBadge(r.Status||'')+'</td>';
+    html+='<td class="left" style="min-width:180px;max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--text2)" title="'+r.Campaign+'">'+r.Campaign+'</td>';
+    html+='<td>'+INR(r.Spends)+'</td><td>'+NUM(r.Impressions)+'</td><td>'+NUM(r.Clicks)+'</td>';
+    html+='<td>'+PCT(pctr_r)+'</td><td>'+fmtN(r.Conversions)+'</td>';
+    html+='<td>'+(r.Type==='LeadForm'?'—':NUM(r.Triggered_Leads))+'</td>';
+    html+='<td>'+NUM(r.Dealer_Triggers)+'</td>';
+    html+='<td>'+(tpct_r!=null?PCT(tpct_r):'—')+'</td>';
+    html+='<td>'+fmt(pcpl_r,0)+'</td>';
+    html+='<td>'+(r.Type==='LeadForm'?'—':fmt(gcpl_r,0))+'</td>';
+    html+='<td>'+fmt(dcpl_r,0)+'</td></tr>';
+  });
+
+  var t=agg(rows); var ftpct=t.gl>0?t.dt/t.gl:null;
+  html+='</tbody><tfoot><tr><td class="left sticky" style="left:0;min-width:90px" colspan="3">TOTAL</td><td></td><td class="left">('+rows.length+' campaigns)</td>';
+  html+='<td>'+INR(t.sp)+'</td><td>'+NUM(t.imp)+'</td><td>'+NUM(t.cl)+'</td>';
+  html+='<td>'+PCT(ctr(t.cl,t.imp))+'</td><td>'+fmtN(t.cv)+'</td>';
+  html+='<td>'+NUM(t.gl)+'</td><td>'+NUM(t.dt)+'</td>';
+  html+='<td>'+(ftpct!=null?PCT(ftpct):'—')+'</td>';
+  html+='<td>'+fmt(cpl(t.sp,t.cv),0)+'</td><td>'+fmt(cpl(t.sp,t.gl),0)+'</td><td>'+fmt(cpl(t.sp,t.dt),0)+'</td>';
+  html+='</tr></tfoot></table></div></div>';
+
+  el.innerHTML=html;
+}
+window.renderCampaigns = renderCampaigns;
+
+// ── CAMPAIGN TYPE ANALYSIS ────────────────────────────────────────────────────
+function renderTypes() {
+  var el=document.getElementById('pane-types');
+  if(!DATA.length) { el.innerHTML=noDataMsg(); return; }
+
+  var types=[...new Set(DATA.map(function(r){return r.Type;}))].sort();
+  var cities=['Ahmedabad','Chandigarh','Nashik'];
+  var html='';
+
+  html+='<div class="tbl-card"><div class="tbl-toolbar"><span class="tbl-title">Campaign Type Summary</span><span class="tbl-sub">All cities combined by type</span></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+='<th class="left sticky" style="left:0;min-width:130px">Type</th>';
+  html+='<th class="left sticky" style="left:130px;min-width:100px">Platform</th>';
+  html+='<th class="left" style="min-width:110px">Stage</th>';
+  ['Spends','Impressions','Clicks','CTR','Panel Conv.','Triggered Leads','Dealer Triggers','Trigger %','Panel CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
+  html+='</tr></thead><tbody>';
+  types.forEach(function(type) {
+    var rows=DATA.filter(function(r){return r.Type===type;});
+    var t=agg(rows); var tpct=t.gl>0?t.dt/t.gl:null;
+    var plats=[...new Set(rows.map(function(r){return r.Platform;}))];
+    var statuses=[...new Set(rows.map(function(r){return r.Status||'';}).filter(Boolean))];
+    html+='<tr>';
+    html+='<td class="left sticky" style="left:0;min-width:130px">'+typeBadge(type)+'</td>';
+    html+='<td class="left sticky" style="left:130px;min-width:100px">'+plats.map(platBadge).join(' ')+'</td>';
+    html+='<td class="left" style="min-width:110px">'+statuses.map(statusBadge).join(' ')+'</td>';
+    html+='<td>'+INR(t.sp)+'</td><td>'+NUM(t.imp)+'</td><td>'+NUM(t.cl)+'</td>';
+    html+='<td>'+PCT(ctr(t.cl,t.imp))+'</td><td>'+fmtN(t.cv)+'</td>';
+    html+='<td>'+(t.gl>0?NUM(t.gl):'—')+'</td><td>'+NUM(t.dt)+'</td>';
+    html+='<td>'+(tpct!=null?PCT(tpct):'—')+'</td>';
+    html+='<td>'+fmt(cpl(t.sp,t.cv),0)+'</td>';
+    html+='<td>'+(t.gl>0?fmt(cpl(t.sp,t.gl),0):'—')+'</td>';
+    html+='<td>'+fmt(cpl(t.sp,t.dt),0)+'</td></tr>';
+  });
+  var tt=agg(DATA); var ttpct2=tt.gl>0?tt.dt/tt.gl:null;
+  html+='</tbody><tfoot><tr><td class="left sticky" style="left:0" colspan="2">TOTAL</td><td></td>';
+  html+='<td>'+INR(tt.sp)+'</td><td>'+NUM(tt.imp)+'</td><td>'+NUM(tt.cl)+'</td>';
+  html+='<td>'+PCT(ctr(tt.cl,tt.imp))+'</td><td>'+fmtN(tt.cv)+'</td>';
+  html+='<td>'+NUM(tt.gl)+'</td><td>'+NUM(tt.dt)+'</td>';
+  html+='<td>'+(ttpct2!=null?PCT(ttpct2):'—')+'</td>';
+  html+='<td>'+fmt(cpl(tt.sp,tt.cv),0)+'</td><td>'+fmt(cpl(tt.sp,tt.gl),0)+'</td><td>'+fmt(cpl(tt.sp,tt.dt),0)+'</td>';
+  html+='</tr></tfoot></table></div></div>';
+
+  html+='<div style="margin-top:20px;font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px">City comparison within each campaign type</div>';
+  html+='<div class="type-grid">';
+  types.forEach(function(type) {
+    var typeRows=DATA.filter(function(r){return r.Type===type;});
+    var cityTots={}; cities.forEach(function(city){ var cr=typeRows.filter(function(r){return r.City===city;}); cityTots[city]=agg(cr); });
+    var plats=[...new Set(typeRows.map(function(r){return r.Platform;}))];
+    var maxSp=Math.max.apply(null, cities.map(function(c){return cityTots[c].sp;}));
+    html+='<div class="type-card"><div class="type-hdr"><div class="type-icon" style="background:'+TYPE_LIGHT[type]+'">';
+    html+=type==='Search'?'🔍':type==='Catalogue'?'📋':type==='LeadForm'?'📝':type==='Demand Gen'?'📣':type==='Performance Max'?'⚡':type==='Website Conversion'?'🌐':'💬';
+    html+='</div><div><div class="type-hdr-name">'+type+'</div>';
+    html+='<div class="type-hdr-plat" style="color:var(--text2)">'+plats.map(function(p){return '<span style="color:'+PLAT_COLOR[p]+'">'+p+'</span>';}).join(' · ')+'</div></div></div>';
+    html+='<div class="type-body">';
+    cities.forEach(function(city) {
+      var t=cityTots[city]; if(!t.sp&&!t.gl&&!t.cv) return;
+      var pct=maxSp>0?t.sp/maxSp*100:0; var cc=CITY_COLOR[city];
+      html+='<div class="type-city-row" style="border-color:'+CITY_BORDER[city]+';background:'+CITY_LIGHT[city]+'10">';
+      html+='<div class="tcr-name" style="color:'+cc+'">'+city+'</div>';
+      html+='<div class="tcr-bar-wrap"><div class="tcr-bar" style="width:'+pct+'%;background:'+cc+'"></div></div>';
+      html+='<div class="tcr-vals"><span>Sp: <strong>'+INR(t.sp)+'</strong></span>';
+      if(t.gl>0) html+='<span>GL: <strong>'+t.gl+'</strong></span>';
+      if(t.cv>0) html+='<span>Conv: <strong>'+fmtN(t.cv)+'</strong></span>';
+      html+='</div></div>';
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';
+
+  html+='<div class="tbl-card" style="margin-top:16px"><div class="tbl-toolbar"><span class="tbl-title">CPL by Type × City</span><span class="tbl-sub">Spends ÷ Gen Leads (— where no leads)</span></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr><th class="left">Campaign Type</th>';
+  cities.forEach(function(c){html+='<th>'+c+'</th>';});
+  html+='<th>Combined</th></tr></thead><tbody>';
+  types.forEach(function(type) {
+    html+='<tr><td class="left">'+typeBadge(type)+'</td>';
+    var allRows=DATA.filter(function(r){return r.Type===type;}); var tot2=agg(allRows);
+    cities.forEach(function(city) {
+      var cr=DATA.filter(function(r){return r.Type===type&&r.City===city;}); var t=agg(cr);
+      html+='<td>'+fmt(cpl(t.sp,t.gl),0)+'</td>';
+    });
+    html+='<td style="font-weight:700">'+fmt(cpl(tot2.sp,tot2.gl),0)+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  el.innerHTML=html;
+}
+
+function initDashboard() {
+  if(document.getElementById('pane-overview').dataset.done) return;
+  renderOverview();
+}
+window.initDashboard = initDashboard;
+window.resetDateFilter = resetDateFilter;
+</script>
+</body>
+</html>
