@@ -44,23 +44,28 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .auth-signout-top:hover{background:var(--bg)}
 
 /* ── Admin request panel ── */
-.req-panel{position:fixed;bottom:20px;right:20px;width:370px;background:#fff;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,0.15);z-index:1900;display:none;overflow:hidden}
+.req-panel{position:fixed;bottom:20px;right:20px;width:390px;background:#fff;border-radius:14px;box-shadow:0 6px 30px rgba(0,0,0,0.18);z-index:1900;display:none;overflow:hidden}
 .req-panel-hdr{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
 .req-panel-title{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
-.req-badge{background:#fff;color:var(--navy);border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700}
+.req-badge{background:#E8650A;color:#fff;border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700}
+.req-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface2)}
+.req-tab{flex:1;padding:8px;font-size:12px;font-weight:600;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;transition:color .15s}
+.req-tab.active{color:var(--navy);border-bottom-color:var(--navy)}
 .req-body{max-height:320px;overflow-y:auto}
-.req-item{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.req-item{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
 .req-item:last-child{border-bottom:none}
-.req-avatar{width:36px;height:36px;border-radius:50%;background:var(--bg);flex-shrink:0;object-fit:cover}
+.req-avatar{width:34px;height:34px;border-radius:50%;background:var(--bg);flex-shrink:0;object-fit:cover}
 .req-info{flex:1;min-width:0}
-.req-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .req-email{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .req-time{font-size:10px;color:var(--text3)}
-.req-actions{display:flex;gap:6px;flex-shrink:0}
-.btn-approve{background:#047857;color:#fff;border:none;border-radius:6px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.req-actions{display:flex;gap:5px;flex-shrink:0}
+.btn-approve{background:#047857;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
 .btn-approve:hover{background:#035c43}
-.btn-reject{background:#fdecea;color:#c0392b;border:1px solid #f5c6c6;border-radius:6px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-reject{background:#fdecea;color:#c0392b;border:1px solid #f5c6c6;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
 .btn-reject:hover{background:#f5c6c6}
+.btn-revoke{background:#fff3eb;color:#b45309;border:1px solid #fbbf24;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-revoke:hover{background:#fde68a}
 .req-empty{padding:22px;text-align:center;color:var(--text3);font-size:13px}
 
 /* ── Header ── */
@@ -189,8 +194,12 @@ tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
 <!-- ── ADMIN REQUESTS PANEL ── -->
 <div id="req-panel" class="req-panel">
   <div class="req-panel-hdr" id="req-panel-hdr">
-    <span class="req-panel-title">Access Requests <span class="req-badge" id="req-badge">0</span></span>
+    <span class="req-panel-title">Access Manager <span class="req-badge" id="req-badge">0</span></span>
     <span id="req-chevron" style="font-size:16px">▲</span>
+  </div>
+  <div class="req-tabs" id="req-tabs" style="display:none">
+    <button class="req-tab active" id="tab-pending-btn" onclick="switchReqTab('pending')">Pending</button>
+    <button class="req-tab" id="tab-approved-btn" onclick="switchReqTab('approved')">Approved Users</button>
   </div>
   <div class="req-body" id="req-body">
     <div class="req-empty">No pending requests</div>
@@ -241,7 +250,7 @@ tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyAch2mNDt8dygEX3WiYRMj82b619nA2pYE",
@@ -252,62 +261,76 @@ const FIREBASE_CONFIG = {
   appId: "1:31546376163:web:9140538022a940a106ead6"
 };
 
-const ADMINS = ["deepanshi.ahuja@girnarsoft.com", "neeraj.khichi@girnarsoft.com"];
+const ADMINS        = ["deepanshi.ahuja@girnarsoft.com", "neeraj.khichi@girnarsoft.com"];
 const ALLOWED_DOMAIN = "girnarsoft.com";
+// Uses the same Firestore collections as the main marketing dashboard (rules already allow access)
+const COL_REQUESTS  = 'access_requests';
+const COL_APPROVED  = 'approved_emails';
 
-const app = initializeApp(FIREBASE_CONFIG);
-const auth = getAuth(app);
-const db   = getFirestore(app);
+const app      = initializeApp(FIREBASE_CONFIG);
+const auth     = getAuth(app);
+const db       = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-const gate       = document.getElementById('auth-gate');
-const dashboard  = document.getElementById('dashboard-app');
-const signinBtn  = document.getElementById('auth-signin-btn');
-const errorEl    = document.getElementById('auth-error');
-const infoBox    = document.getElementById('auth-info-box');
-const signoutBtn = document.getElementById('auth-signout-btn');
-const authIcon   = document.getElementById('auth-icon');
-const authTitle  = document.getElementById('auth-title');
-const authDesc   = document.getElementById('auth-desc');
-const reqPanel   = document.getElementById('req-panel');
-const reqBody    = document.getElementById('req-body');
-const reqBadge   = document.getElementById('req-badge');
+const gate        = document.getElementById('auth-gate');
+const dashboard   = document.getElementById('dashboard-app');
+const signinBtn   = document.getElementById('auth-signin-btn');
+const errorEl     = document.getElementById('auth-error');
+const infoBox     = document.getElementById('auth-info-box');
+const signoutBtn  = document.getElementById('auth-signout-btn');
+const authIcon    = document.getElementById('auth-icon');
+const authTitle   = document.getElementById('auth-title');
+const authDesc    = document.getElementById('auth-desc');
+const reqPanel    = document.getElementById('req-panel');
+const reqBody     = document.getElementById('req-body');
+const reqBadge    = document.getElementById('req-badge');
 const reqPanelHdr = document.getElementById('req-panel-hdr');
 const reqChevron  = document.getElementById('req-chevron');
+const reqTabsEl   = document.getElementById('req-tabs');
 
-let reqOpen = true;
+const GOOGLE_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" style="flex-shrink:0"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>`;
+
+let reqOpen    = true;
+let reqUnsub   = null;
+let pendingReqs = [];
+let activeReqTab = 'pending';
+
+// ── Panel collapse/expand ──
 reqPanelHdr.addEventListener('click', () => {
   reqOpen = !reqOpen;
-  reqBody.style.display = reqOpen ? 'block' : 'none';
-  reqChevron.textContent = reqOpen ? '▲' : '▼';
+  reqBody.style.display    = reqOpen ? 'block' : 'none';
+  reqTabsEl.style.display  = reqOpen ? 'flex'  : 'none';
+  reqChevron.textContent   = reqOpen ? '▲' : '▼';
 });
 
-let reqUnsub = null;
-let pendingReqs = [];
-
+// ── Sign-in button ──
 signinBtn.addEventListener('click', () => {
   errorEl.style.display = 'none';
   signinBtn.disabled = true;
-  signinBtn.childNodes[1].textContent = ' Signing in…';
+  signinBtn.innerHTML = GOOGLE_SVG + ' Signing in…';
   signInWithPopup(auth, provider).catch(err => {
-    errorEl.textContent = 'Sign-in failed: ' + err.message;
+    let msg = 'Sign-in failed. Please try again.';
+    if (err.code === 'auth/popup-blocked')    msg = 'Pop-up was blocked. Please allow pop-ups for this site.';
+    if (err.code === 'auth/popup-closed-by-user') msg = 'Sign-in cancelled.';
+    errorEl.textContent = msg;
     errorEl.style.display = 'block';
     signinBtn.disabled = false;
-    signinBtn.childNodes[1].textContent = ' Sign in with Google';
+    signinBtn.innerHTML = GOOGLE_SVG + ' Sign in with Google';
   });
 });
 
 signoutBtn.addEventListener('click', () => signOut(auth));
 
+// ── Auth screens ──
 function showSignIn(msg) {
-  gate.style.display = 'flex';
+  gate.style.display  = 'flex';
   dashboard.style.display = 'none';
   authIcon.textContent = '🚗';
   authTitle.textContent = 'Used Cars Dashboard';
   authDesc.innerHTML = 'Sign in with your <strong>@girnarsoft.com</strong> Google account to access this dashboard.';
   signinBtn.style.display = 'flex';
   signinBtn.disabled = false;
-  signinBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg> Sign in with Google`;
+  signinBtn.innerHTML = GOOGLE_SVG + ' Sign in with Google';
   errorEl.style.display = 'none';
   infoBox.style.display = 'none';
   signoutBtn.style.display = 'none';
@@ -315,20 +338,33 @@ function showSignIn(msg) {
 }
 
 function showPending(user) {
-  gate.style.display = 'flex';
+  gate.style.display  = 'flex';
   dashboard.style.display = 'none';
   authIcon.textContent = '⏳';
   authTitle.textContent = 'Access Requested';
   authDesc.textContent = 'Your request has been sent to the admins for approval.';
   signinBtn.style.display = 'none';
   errorEl.style.display = 'none';
-  infoBox.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>You will gain access once an admin approves your request.`;
+  infoBox.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>You'll gain access once an admin approves your request.`;
+  infoBox.style.display = 'block';
+  signoutBtn.style.display = 'block';
+}
+
+function showRevoked(user) {
+  gate.style.display  = 'flex';
+  dashboard.style.display = 'none';
+  authIcon.textContent = '🔒';
+  authTitle.textContent = 'Access Revoked';
+  authDesc.textContent = 'Your access to this dashboard has been removed by an admin.';
+  signinBtn.style.display = 'none';
+  errorEl.style.display = 'none';
+  infoBox.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>Contact an admin if you believe this is a mistake.`;
   infoBox.style.display = 'block';
   signoutBtn.style.display = 'block';
 }
 
 function showDenied(user) {
-  gate.style.display = 'flex';
+  gate.style.display  = 'flex';
   dashboard.style.display = 'none';
   authIcon.textContent = '🚫';
   authTitle.textContent = 'Access Denied';
@@ -340,56 +376,135 @@ function showDenied(user) {
   signoutBtn.style.display = 'block';
 }
 
+// ── Admin panel tab switch ──
+window.switchReqTab = (tab) => {
+  activeReqTab = tab;
+  document.getElementById('tab-pending-btn').classList.toggle('active', tab === 'pending');
+  document.getElementById('tab-approved-btn').classList.toggle('active', tab === 'approved');
+  if (tab === 'pending') renderPendingTab();
+  else renderApprovedTab();
+};
+
+function renderPendingTab() {
+  if (!pendingReqs.length) {
+    reqBody.innerHTML = '<div class="req-empty">No pending requests</div>';
+    return;
+  }
+  reqBody.innerHTML = pendingReqs.map((r, i) => {
+    const time = r.requestedAt ? new Date(r.requestedAt.seconds * 1000).toLocaleString('en-IN') : '';
+    return `<div class="req-item" data-idx="${i}">
+      <img class="req-avatar" src="${r.photoURL || ''}" onerror="this.style.display='none'" alt="">
+      <div class="req-info">
+        <div class="req-name">${r.name || 'Unknown'}</div>
+        <div class="req-email" title="${r.email}">${r.email}</div>
+        <div class="req-time">${time}</div>
+      </div>
+      <div class="req-actions">
+        <button class="btn-approve" onclick="approveReq(${i})">Approve</button>
+        <button class="btn-reject"  onclick="rejectReq(${i})">Reject</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function renderApprovedTab() {
+  reqBody.innerHTML = '<div class="req-empty">Loading…</div>';
+  try {
+    const snap = await getDocs(collection(db, COL_APPROVED));
+    const users = [];
+    snap.forEach(d => users.push({ id: d.id, ...d.data() }));
+    users.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+    if (!users.length) {
+      reqBody.innerHTML = '<div class="req-empty">No approved users yet</div>';
+      return;
+    }
+    reqBody.innerHTML = users.map((u, i) => {
+      const time = u.approvedAt ? new Date(u.approvedAt.seconds * 1000).toLocaleDateString('en-IN') : '';
+      return `<div class="req-item" data-approved-idx="${i}">
+        <div class="req-info">
+          <div class="req-name">${u.email}</div>
+          <div class="req-time">Approved ${time}${u.approvedBy ? ' by ' + u.approvedBy : ''}</div>
+        </div>
+        <div class="req-actions">
+          <button class="btn-revoke" onclick="revokeAccess('${u.email}', '${u.id}')">Revoke</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    reqBody.innerHTML = '<div class="req-empty">Error loading users</div>';
+  }
+}
+
+// ── Admin listener (pending requests real-time) ──
 function startAdminListener() {
   if (reqUnsub) return;
-  const q = query(collection(db, 'access_requests_uc'), where('status', '==', 'pending'));
+  const q = query(collection(db, COL_REQUESTS), where('status', '==', 'pending'));
   reqUnsub = onSnapshot(q, snap => {
     pendingReqs = [];
     snap.forEach(d => pendingReqs.push({ id: d.id, ...d.data() }));
     pendingReqs.sort((a, b) => (a.requestedAt?.seconds || 0) - (b.requestedAt?.seconds || 0));
     reqBadge.textContent = pendingReqs.length;
+    reqBadge.style.display = pendingReqs.length ? 'inline' : 'none';
     reqPanel.style.display = 'block';
-    if (!pendingReqs.length) {
-      reqBody.innerHTML = '<div class="req-empty">No pending requests</div>';
-    } else {
-      reqBody.innerHTML = pendingReqs.map((r, i) => {
-        const time = r.requestedAt ? new Date(r.requestedAt.seconds * 1000).toLocaleString('en-IN') : '';
-        return `<div class="req-item" data-idx="${i}">
-          <img class="req-avatar" src="${r.photoURL || ''}" onerror="this.style.display='none'" alt="">
-          <div class="req-info">
-            <div class="req-name">${r.name || 'Unknown'}</div>
-            <div class="req-email">${r.email}</div>
-            <div class="req-time">${time}</div>
-          </div>
-          <div class="req-actions">
-            <button class="btn-approve" onclick="approveReq(${i})">Approve</button>
-            <button class="btn-reject" onclick="rejectReq(${i})">Reject</button>
-          </div>
-        </div>`;
-      }).join('');
-    }
+    reqTabsEl.style.display = reqOpen ? 'flex' : 'none';
+    if (activeReqTab === 'pending') renderPendingTab();
+  }, err => {
+    console.error('Firestore listener error:', err);
   });
 }
 
+// ── Approve ──
 window.approveReq = async (idx) => {
   const r = pendingReqs[idx];
   if (!r) return;
   const item = document.querySelector(`.req-item[data-idx="${idx}"]`);
-  if (item) item.querySelectorAll('button').forEach(b => { b.disabled = true; });
-  await setDoc(doc(db, 'approved_emails_uc', r.id), {
-    email: r.email, approvedAt: serverTimestamp(), approvedBy: auth.currentUser?.email || ''
-  });
-  await updateDoc(doc(db, 'access_requests_uc', r.id), { status: 'approved' });
+  if (item) item.querySelectorAll('button').forEach(b => { b.disabled = true; b.textContent = '…'; });
+  try {
+    await setDoc(doc(db, COL_APPROVED, r.id), {
+      email: r.email, approvedAt: serverTimestamp(), approvedBy: auth.currentUser?.email || ''
+    });
+    await updateDoc(doc(db, COL_REQUESTS, r.id), { status: 'approved' });
+  } catch(e) {
+    if (item) item.querySelectorAll('button').forEach(b => { b.disabled = false; });
+    alert('Error approving: ' + e.message);
+  }
 };
 
+// ── Reject ──
 window.rejectReq = async (idx) => {
   const r = pendingReqs[idx];
   if (!r) return;
   const item = document.querySelector(`.req-item[data-idx="${idx}"]`);
-  if (item) item.querySelectorAll('button').forEach(b => { b.disabled = true; });
-  await updateDoc(doc(db, 'access_requests_uc', r.id), { status: 'rejected' });
+  if (item) item.querySelectorAll('button').forEach(b => { b.disabled = true; b.textContent = '…'; });
+  try {
+    await updateDoc(doc(db, COL_REQUESTS, r.id), { status: 'rejected' });
+  } catch(e) {
+    if (item) item.querySelectorAll('button').forEach(b => { b.disabled = false; });
+    alert('Error rejecting: ' + e.message);
+  }
 };
 
+// ── Revoke access ──
+window.revokeAccess = async (email, docId) => {
+  if (!confirm(`Revoke access for ${email}?`)) return;
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    // Remove from approved list
+    await deleteDoc(doc(db, COL_APPROVED, docId));
+    // Mark their request as revoked so they see the right screen on next visit
+    await setDoc(doc(db, COL_REQUESTS, docId), {
+      email, status: 'revoked', revokedAt: serverTimestamp(), revokedBy: auth.currentUser?.email || ''
+    }, { merge: true });
+    // Refresh the approved tab
+    renderApprovedTab();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Revoke';
+    alert('Error revoking: ' + e.message);
+  }
+};
+
+// ── Auth state ──
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     if (reqUnsub) { reqUnsub(); reqUnsub = null; }
@@ -398,27 +513,27 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  const email = (user.email || '').toLowerCase();
+  const email  = (user.email || '').toLowerCase();
   const domain = email.split('@')[1] || '';
 
-  // Block non-girnarsoft accounts entirely — cannot even request access
+  // Hard block for non-girnarsoft accounts
   if (domain !== ALLOWED_DOMAIN) {
-    gate.style.display = 'flex';
+    gate.style.display  = 'flex';
     dashboard.style.display = 'none';
     authIcon.textContent = '🔒';
     authTitle.textContent = 'Access Restricted';
     authDesc.innerHTML = 'This dashboard is only accessible to <strong>@girnarsoft.com</strong> accounts.';
     signinBtn.style.display = 'none';
-    infoBox.innerHTML = `You signed in as <strong>${user.email}</strong>, which is not authorised to request access to this dashboard.`;
+    infoBox.innerHTML = `You signed in as <strong>${user.email}</strong>.<br>Only @girnarsoft.com accounts can request access.`;
     infoBox.style.display = 'block';
     errorEl.style.display = 'none';
     signoutBtn.style.display = 'block';
     return;
   }
 
-  // Admins get direct access
+  // Admins bypass all checks
   if (ADMINS.includes(email)) {
-    gate.style.display = 'none';
+    gate.style.display  = 'none';
     dashboard.style.display = 'block';
     signoutBtn.style.display = 'block';
     startAdminListener();
@@ -426,32 +541,48 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // Check if already approved
-  const approvedSnap = await getDoc(doc(db, 'approved_emails_uc', email));
-  if (approvedSnap.exists()) {
-    gate.style.display = 'none';
-    dashboard.style.display = 'block';
+  try {
+    // Check if already approved
+    const approvedSnap = await getDoc(doc(db, COL_APPROVED, email));
+    if (approvedSnap.exists()) {
+      gate.style.display  = 'none';
+      dashboard.style.display = 'block';
+      signoutBtn.style.display = 'block';
+      initDashboard();
+      return;
+    }
+
+    // Check existing request status
+    const reqSnap = await getDoc(doc(db, COL_REQUESTS, email));
+    if (reqSnap.exists()) {
+      const status = reqSnap.data().status;
+      if (status === 'rejected') { showDenied(user); return; }
+      if (status === 'revoked')  { showRevoked(user); return; }
+      if (status === 'pending')  { showPending(user); return; }
+    }
+
+    // Submit fresh access request
+    await setDoc(doc(db, COL_REQUESTS, email), {
+      email: user.email,
+      name: user.displayName || '',
+      photoURL: user.photoURL || '',
+      requestedAt: serverTimestamp(),
+      status: 'pending'
+    }, { merge: true });
+    showPending(user);
+
+  } catch(e) {
+    // Show the error so the user knows what happened
+    gate.style.display  = 'flex';
+    dashboard.style.display = 'none';
+    authIcon.textContent = '⚠️';
+    authTitle.textContent = 'Something went wrong';
+    authDesc.textContent = 'There was a problem submitting your access request.';
+    errorEl.textContent = 'Error: ' + e.message;
+    errorEl.style.display = 'block';
+    signinBtn.style.display = 'none';
     signoutBtn.style.display = 'block';
-    initDashboard();
-    return;
   }
-
-  // Check if rejected
-  const reqSnap = await getDoc(doc(db, 'access_requests_uc', email));
-  if (reqSnap.exists() && reqSnap.data().status === 'rejected') {
-    showDenied(user);
-    return;
-  }
-
-  // Submit / re-show pending request
-  await setDoc(doc(db, 'access_requests_uc', email), {
-    email: user.email,
-    name: user.displayName || '',
-    photoURL: user.photoURL || '',
-    requestedAt: serverTimestamp(),
-    status: 'pending'
-  }, { merge: true });
-  showPending(user);
 });
 </script>
 
