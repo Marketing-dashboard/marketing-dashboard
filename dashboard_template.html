@@ -303,21 +303,23 @@ function showSignInScreen() {
   pendingInfo.style.display = 'none';
 }
 
+let pendingRequests = [];
+
 function startAdminRequestListener() {
   if (reqUnsubscribe) return;
   const q = query(collection(db, 'access_requests'), where('status', '==', 'pending'));
   reqUnsubscribe = onSnapshot(q, (snapshot) => {
-    const requests = [];
-    snapshot.forEach(d => requests.push({ id: d.id, ...d.data() }));
-    requests.sort((a, b) => (a.requestedAt?.seconds || 0) - (b.requestedAt?.seconds || 0));
-    reqBadge.textContent = requests.length;
+    pendingRequests = [];
+    snapshot.forEach(d => pendingRequests.push({ id: d.id, ...d.data() }));
+    pendingRequests.sort((a, b) => (a.requestedAt?.seconds || 0) - (b.requestedAt?.seconds || 0));
+    reqBadge.textContent = pendingRequests.length;
     reqPanel.style.display = 'block';
-    if (requests.length === 0) {
+    if (pendingRequests.length === 0) {
       reqPanelBody.innerHTML = '<div class="req-empty">No pending requests</div>';
     } else {
-      reqPanelBody.innerHTML = requests.map(r => {
+      reqPanelBody.innerHTML = pendingRequests.map((r, i) => {
         const time = r.requestedAt ? new Date(r.requestedAt.seconds * 1000).toLocaleString('en-IN') : '';
-        return `<div class="req-item" id="req-${r.id}">
+        return `<div class="req-item" data-idx="${i}">
           <img class="req-avatar" src="${r.photoURL || ''}" onerror="this.src=''" alt="">
           <div class="req-info">
             <div class="req-name">${r.name || 'Unknown'}</div>
@@ -325,8 +327,8 @@ function startAdminRequestListener() {
             <div class="req-time">${time}</div>
           </div>
           <div class="req-actions">
-            <button class="req-approve" onclick="approveRequest('${r.id}','${r.email}')">Approve</button>
-            <button class="req-reject" onclick="rejectRequest('${r.id}')">Reject</button>
+            <button class="req-approve" onclick="approveRequest(${i})">Approve</button>
+            <button class="req-reject" onclick="rejectRequest(${i})">Reject</button>
           </div>
         </div>`;
       }).join('');
@@ -334,21 +336,25 @@ function startAdminRequestListener() {
   });
 }
 
-window.approveRequest = async (email, displayEmail) => {
-  const btn = document.querySelector(`#req-${email} .req-approve`);
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
-  await setDoc(doc(db, 'approved_emails', email), {
-    email: displayEmail || email,
+window.approveRequest = async (idx) => {
+  const r = pendingRequests[idx];
+  if (!r) return;
+  const item = document.querySelector(`.req-item[data-idx="${idx}"]`);
+  if (item) { item.querySelectorAll('button').forEach(b => { b.disabled = true; }); item.querySelector('.req-approve').textContent = '...'; }
+  await setDoc(doc(db, 'approved_emails', r.id), {
+    email: r.email,
     approvedAt: serverTimestamp(),
     approvedBy: auth.currentUser?.email || ''
   });
-  await updateDoc(doc(db, 'access_requests', email), { status: 'approved' });
+  await updateDoc(doc(db, 'access_requests', r.id), { status: 'approved' });
 };
 
-window.rejectRequest = async (email) => {
-  const btn = document.querySelector(`#req-${email} .req-reject`);
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
-  await updateDoc(doc(db, 'access_requests', email), { status: 'rejected' });
+window.rejectRequest = async (idx) => {
+  const r = pendingRequests[idx];
+  if (!r) return;
+  const item = document.querySelector(`.req-item[data-idx="${idx}"]`);
+  if (item) { item.querySelectorAll('button').forEach(b => { b.disabled = true; }); item.querySelector('.req-reject').textContent = '...'; }
+  await updateDoc(doc(db, 'access_requests', r.id), { status: 'rejected' });
 };
 
 onAuthStateChanged(auth, async (user) => {
