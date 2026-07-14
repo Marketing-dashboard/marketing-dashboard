@@ -605,6 +605,16 @@ var DATA_RAW = [
   {Campaign:"Nashik-Whatsup-Leads",              Spends:506.1,     Impressions:11110,  Clicks:95,    Conversions:7.0,    Platform:"Meta",   City:"Nashik",     Type:"WhatsApp",            Triggered_Leads:0,   Dealer_Triggers:3,   Status:"Experiment · Ongoing", StartDate:"2026-07-01", EndDate:null}
 ];
 
+// Load manually-set dealer triggers for WhatsApp campaigns from localStorage
+(function() {
+  DATA_RAW.forEach(function(r) {
+    if (r.Type === 'WhatsApp') {
+      var stored = localStorage.getItem('wa_dt_' + r.Campaign);
+      if (stored !== null) r.Dealer_Triggers = parseInt(stored) || 0;
+    }
+  });
+})();
+
 // Active filtered dataset
 var DATA = DATA_RAW.slice();
 
@@ -714,6 +724,15 @@ function typeBadge(t) {
 function noDataMsg() {
   return '<div class="no-data-msg"><strong>No campaigns in this date range</strong>Adjust the date filter to see data.</div>';
 }
+
+function updateWaDt(input, campaign) {
+  var val = parseInt(input.value) || 0;
+  localStorage.setItem('wa_dt_' + campaign, val);
+  DATA_RAW.forEach(function(r) { if (r.Campaign === campaign) r.Dealer_Triggers = val; });
+  DATA.forEach(function(r)     { if (r.Campaign === campaign) r.Dealer_Triggers = val; });
+  renderCampaigns();
+}
+window.updateWaDt = updateWaDt;
 
 // ── TAB SWITCH ───────────────────────────────────────────────────────────────
 function switchTab(id) {
@@ -920,7 +939,13 @@ function renderCampaigns() {
     html+='<td>'+INR(r.Spends)+'</td><td>'+NUM(r.Impressions)+'</td><td>'+NUM(r.Clicks)+'</td>';
     html+='<td>'+PCT(pctr_r)+'</td><td>'+fmtN(r.Conversions)+'</td>';
     html+='<td>'+(r.Type==='LeadForm'?'—':NUM(r.Triggered_Leads))+'</td>';
-    html+='<td>'+NUM(r.Dealer_Triggers)+'</td>';
+    if (r.Type === 'WhatsApp') {
+      var _cid = r.Campaign.replace(/[^a-zA-Z0-9]/g, '_');
+      var _esc = r.Campaign.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      html+='<td><input type="number" id="wa_dt_'+_cid+'" value="'+r.Dealer_Triggers+'" min="0" title="Editable — enter dealer trigger count" style="width:62px;border:1.5px solid #CBD5E1;border-radius:4px;padding:2px 5px;font-size:12px;text-align:right;background:var(--card);color:var(--text1)" onchange="updateWaDt(this,\''+_esc+'\')" /></td>';
+    } else {
+      html+='<td>'+NUM(r.Dealer_Triggers)+'</td>';
+    }
     html+='<td>'+(tpct_r!=null?PCT(tpct_r):'—')+'</td>';
     html+='<td>'+fmt(pcpl_r,0)+'</td>';
     html+='<td>'+(r.Type==='LeadForm'?'—':fmt(gcpl_r,0))+'</td>';
