@@ -76,7 +76,7 @@
   }
 
   .auth-gate { position: fixed; inset: 0; background: #f5f5f5; display: flex; align-items: center; justify-content: center; z-index: 1000; }
-  .auth-card { background: #fff; border-radius: 14px; padding: 40px 36px; max-width: 360px; width: 90%; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .auth-card { background: #fff; border-radius: 14px; padding: 40px 36px; max-width: 380px; width: 90%; text-align: center; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
   .auth-icon { font-size: 36px; margin-bottom: 12px; }
   .auth-card h2 { font-size: 18px; margin-bottom: 8px; }
   .auth-card p { font-size: 13px; color: #666; margin-bottom: 20px; line-height: 1.5; }
@@ -85,20 +85,52 @@
   .auth-btn:disabled { opacity: 0.6; cursor: default; }
   .auth-error { color: #c0392b; font-size: 12px; margin-top: 14px; }
   .auth-signout { position: fixed; top: 12px; right: 16px; font-size: 12px; color: #888; background: #fff; border: 1px solid #e5e5e5; border-radius: 20px; padding: 6px 14px; cursor: pointer; z-index: 999; display: none; }
+  .auth-pending-info { background: #FFF8F0; border: 1px solid #FFA559; border-radius: 8px; padding: 12px 16px; margin-top: 16px; font-size: 12px; color: #7a3800; line-height: 1.6; text-align: left; display: none; }
+  /* Admin requests panel */
+  .req-panel { position: fixed; bottom: 20px; right: 20px; width: 360px; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.15); z-index: 998; display: none; overflow: hidden; }
+  .req-panel-header { background: #E8650A; color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+  .req-panel-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .req-badge { background: #fff; color: #E8650A; border-radius: 20px; padding: 1px 8px; font-size: 12px; font-weight: 700; }
+  .req-panel-body { max-height: 300px; overflow-y: auto; }
+  .req-item { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+  .req-item:last-child { border-bottom: none; }
+  .req-avatar { width: 36px; height: 36px; border-radius: 50%; background: #f5f5f5; flex-shrink: 0; object-fit: cover; }
+  .req-info { flex: 1; min-width: 0; }
+  .req-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .req-email { font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .req-time { font-size: 10px; color: #bbb; }
+  .req-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .req-approve { background: #1a7a3c; color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .req-approve:hover { background: #145f30; }
+  .req-reject { background: #fdecea; color: #c0392b; border: 1px solid #f5c6c6; border-radius: 6px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .req-reject:hover { background: #f5c6c6; }
+  .req-empty { padding: 20px; text-align: center; color: #bbb; font-size: 13px; }
 </style>
 </head>
 <body>
 
 <div id="auth-gate" class="auth-gate">
   <div class="auth-card">
-    <div class="auth-icon">🔒</div>
-    <h2>Marketing Performance Dashboard</h2>
-    <p>Sign in with your authorized Google account to view this dashboard.</p>
+    <div class="auth-icon" id="auth-icon">🔒</div>
+    <h2 id="auth-title">Marketing Performance Dashboard</h2>
+    <p id="auth-desc">Sign in with your authorized Google account to view this dashboard.</p>
     <button id="auth-signin-btn" class="auth-btn" type="button">Sign in with Google</button>
     <p id="auth-error" class="auth-error" style="display:none"></p>
+    <div id="auth-pending-info" class="auth-pending-info"></div>
   </div>
 </div>
 <button id="auth-signout-btn" class="auth-signout" type="button">Sign out</button>
+
+<!-- Admin requests panel -->
+<div id="req-panel" class="req-panel">
+  <div class="req-panel-header" id="req-panel-header">
+    <span class="req-panel-title">Access Requests <span class="req-badge" id="req-badge">0</span></span>
+    <span style="font-size:18px" id="req-panel-chevron">▲</span>
+  </div>
+  <div class="req-panel-body" id="req-panel-body">
+    <div class="req-empty">No pending requests</div>
+  </div>
+</div>
 
 <div id="dashboard-app" style="display:none">
 <div class="header">
@@ -187,6 +219,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAch2mNDt8dygEX3WiYRMj82b619nA2pYE",
@@ -197,10 +230,11 @@ const firebaseConfig = {
   appId: "1:31546376163:web:9140538022a940a106ead6"
 };
 
-const ALLOWED_EMAILS = ["deepanshi.ahuja@girnarsoft.com"];
+const ADMINS = ["deepanshi.ahuja@girnarsoft.com", "neeraj.khichi@girnarsoft.com"];
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 const gate = document.getElementById('auth-gate');
@@ -208,9 +242,28 @@ const dashboard = document.getElementById('dashboard-app');
 const signinBtn = document.getElementById('auth-signin-btn');
 const errorEl = document.getElementById('auth-error');
 const signoutBtn = document.getElementById('auth-signout-btn');
+const pendingInfo = document.getElementById('auth-pending-info');
+const authIcon = document.getElementById('auth-icon');
+const authTitle = document.getElementById('auth-title');
+const authDesc = document.getElementById('auth-desc');
+const reqPanel = document.getElementById('req-panel');
+const reqPanelBody = document.getElementById('req-panel-body');
+const reqBadge = document.getElementById('req-badge');
+const reqPanelHeader = document.getElementById('req-panel-header');
+const reqPanelChevron = document.getElementById('req-panel-chevron');
+
+let reqPanelOpen = true;
+reqPanelHeader.addEventListener('click', () => {
+  reqPanelOpen = !reqPanelOpen;
+  reqPanelBody.style.display = reqPanelOpen ? 'block' : 'none';
+  reqPanelChevron.textContent = reqPanelOpen ? '▲' : '▼';
+});
+
+let reqUnsubscribe = null;
 
 signinBtn.addEventListener('click', () => {
   errorEl.style.display = 'none';
+  pendingInfo.style.display = 'none';
   signinBtn.disabled = true;
   signinBtn.textContent = 'Signing in...';
   signInWithPopup(auth, provider).catch((err) => {
@@ -223,25 +276,133 @@ signinBtn.addEventListener('click', () => {
 
 signoutBtn.addEventListener('click', () => signOut(auth));
 
-onAuthStateChanged(auth, (user) => {
-  if (user && ALLOWED_EMAILS.includes((user.email || '').toLowerCase())) {
+function showPendingScreen(user) {
+  gate.style.display = 'flex';
+  dashboard.style.display = 'none';
+  signoutBtn.style.display = 'block';
+  authIcon.textContent = '⏳';
+  authTitle.textContent = 'Access Requested';
+  authDesc.textContent = 'Your request has been submitted to the admins for approval.';
+  signinBtn.style.display = 'none';
+  errorEl.style.display = 'none';
+  pendingInfo.style.display = 'block';
+  pendingInfo.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>You will get access once an admin approves your request.`;
+}
+
+function showSignInScreen() {
+  gate.style.display = 'flex';
+  dashboard.style.display = 'none';
+  signoutBtn.style.display = 'none';
+  authIcon.textContent = '🔒';
+  authTitle.textContent = 'Marketing Performance Dashboard';
+  authDesc.textContent = 'Sign in with your authorized Google account to view this dashboard.';
+  signinBtn.style.display = 'block';
+  signinBtn.disabled = false;
+  signinBtn.textContent = 'Sign in with Google';
+  errorEl.style.display = 'none';
+  pendingInfo.style.display = 'none';
+}
+
+function startAdminRequestListener() {
+  if (reqUnsubscribe) return;
+  const q = query(collection(db, 'access_requests'), where('status', '==', 'pending'));
+  reqUnsubscribe = onSnapshot(q, (snapshot) => {
+    const requests = [];
+    snapshot.forEach(d => requests.push({ id: d.id, ...d.data() }));
+    requests.sort((a, b) => (a.requestedAt?.seconds || 0) - (b.requestedAt?.seconds || 0));
+    reqBadge.textContent = requests.length;
+    reqPanel.style.display = 'block';
+    if (requests.length === 0) {
+      reqPanelBody.innerHTML = '<div class="req-empty">No pending requests</div>';
+    } else {
+      reqPanelBody.innerHTML = requests.map(r => {
+        const time = r.requestedAt ? new Date(r.requestedAt.seconds * 1000).toLocaleString('en-IN') : '';
+        return `<div class="req-item" id="req-${r.id}">
+          <img class="req-avatar" src="${r.photoURL || ''}" onerror="this.src=''" alt="">
+          <div class="req-info">
+            <div class="req-name">${r.name || 'Unknown'}</div>
+            <div class="req-email">${r.email}</div>
+            <div class="req-time">${time}</div>
+          </div>
+          <div class="req-actions">
+            <button class="req-approve" onclick="approveRequest('${r.id}','${r.email}')">Approve</button>
+            <button class="req-reject" onclick="rejectRequest('${r.id}')">Reject</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  });
+}
+
+window.approveRequest = async (email, displayEmail) => {
+  const btn = document.querySelector(`#req-${email} .req-approve`);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  await setDoc(doc(db, 'approved_emails', email), {
+    email: displayEmail || email,
+    approvedAt: serverTimestamp(),
+    approvedBy: auth.currentUser?.email || ''
+  });
+  await updateDoc(doc(db, 'access_requests', email), { status: 'approved' });
+};
+
+window.rejectRequest = async (email) => {
+  const btn = document.querySelector(`#req-${email} .req-reject`);
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  await updateDoc(doc(db, 'access_requests', email), { status: 'rejected' });
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    if (reqUnsubscribe) { reqUnsubscribe(); reqUnsubscribe = null; }
+    reqPanel.style.display = 'none';
+    showSignInScreen();
+    return;
+  }
+
+  const email = (user.email || '').toLowerCase();
+
+  if (ADMINS.includes(email)) {
     gate.style.display = 'none';
     dashboard.style.display = 'block';
     signoutBtn.style.display = 'block';
-  } else if (user) {
-    dashboard.style.display = 'none';
-    gate.style.display = 'flex';
-    signoutBtn.style.display = 'none';
-    errorEl.textContent = 'Access denied for ' + user.email + '. This dashboard is restricted.';
-    errorEl.style.display = 'block';
-    signOut(auth);
-  } else {
-    dashboard.style.display = 'none';
-    gate.style.display = 'flex';
-    signoutBtn.style.display = 'none';
-    signinBtn.disabled = false;
-    signinBtn.textContent = 'Sign in with Google';
+    startAdminRequestListener();
+    return;
   }
+
+  // Check if approved in Firestore
+  const approvedDoc = await getDoc(doc(db, 'approved_emails', email));
+  if (approvedDoc.exists()) {
+    gate.style.display = 'none';
+    dashboard.style.display = 'block';
+    signoutBtn.style.display = 'block';
+    return;
+  }
+
+  // Check if already rejected
+  const reqDoc = await getDoc(doc(db, 'access_requests', email));
+  if (reqDoc.exists() && reqDoc.data().status === 'rejected') {
+    gate.style.display = 'flex';
+    dashboard.style.display = 'none';
+    signoutBtn.style.display = 'block';
+    authIcon.textContent = '🚫';
+    authTitle.textContent = 'Access Denied';
+    authDesc.textContent = 'Your access request was not approved.';
+    signinBtn.style.display = 'none';
+    pendingInfo.style.display = 'block';
+    pendingInfo.innerHTML = `Signed in as <strong>${user.email}</strong>.<br>Contact an admin if you think this is a mistake.`;
+    return;
+  }
+
+  // Submit access request
+  await setDoc(doc(db, 'access_requests', email), {
+    email: user.email,
+    name: user.displayName || '',
+    photoURL: user.photoURL || '',
+    requestedAt: serverTimestamp(),
+    status: 'pending'
+  }, { merge: true });
+
+  showPendingScreen(user);
 });
 </script>
 <script>
