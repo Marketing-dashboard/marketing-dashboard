@@ -11,7 +11,7 @@ var FILE_PATH  = 'used_cars.html';
 // Run this once to store your GitHub token:
 //   setGitHubToken('ghp_yourTokenHere')
 function setGitHubToken(token) {
-  PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
+  PropertiesService.getScriptProperties().setProperty('ghp_DQOizXKsizU9klaKj14qm52WQ2HSIQ3Ax', token);
   Logger.log('Token saved.');
 }
 
