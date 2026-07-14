@@ -303,7 +303,7 @@ function createDailyTrigger() {
   ScriptApp.newTrigger('updateDashboard')
     .timeBased()
     .everyDays(1)
-    .atHour(8)
+    .atHour(10)
     .create();
   Logger.log('Daily trigger created (8 AM).');
 }
