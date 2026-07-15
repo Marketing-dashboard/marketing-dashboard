@@ -1897,10 +1897,10 @@ var DATA_TRIGGERS = [
   {Date:"2026-07-14",Campaign:"Nasik-Search-Buy-UsedCar-8april",Triggered_Leads:10,Dealer_Triggers:5}
 ];
 
-// Load manually-set dealer triggers for WhatsApp campaigns from localStorage
+// Load manually-set dealer triggers for WhatsApp and LeadForm campaigns from localStorage
 (function() {
   DATA_RAW.forEach(function(r) {
-    if (r.Type === 'WhatsApp') {
+    if (r.Type === 'WhatsApp' || r.Type === 'LeadForm') {
       var stored = localStorage.getItem('wa_dt_' + r.Campaign);
       if (stored !== null) r.Dealer_Triggers = parseInt(stored) || 0;
     }
@@ -1967,10 +1967,10 @@ function applyDateFilter() {
       .map(function(r) {
         var a = campAgg[r.Campaign];
         var trig = campTrigAgg[r.Campaign];
-        // WhatsApp: keep manually-set value; others: use date-filtered totals (0 if no rows match)
+        // WhatsApp/LeadForm: use manual localStorage value; others: use date-filtered totals (0 if no rows match)
         var gl = (r.Type === 'WhatsApp') ? r.Triggered_Leads
                : DATA_TRIGGERS.length ? (trig ? trig.Triggered_Leads : 0) : r.Triggered_Leads;
-        var dt = (r.Type === 'WhatsApp') ? r.Dealer_Triggers
+        var dt = (r.Type === 'WhatsApp' || r.Type === 'LeadForm') ? r.Dealer_Triggers
                : DATA_TRIGGERS.length ? (trig ? trig.Dealer_Triggers : 0) : r.Dealer_Triggers;
         return {
           Campaign:        r.Campaign,
@@ -2084,6 +2084,11 @@ function updateWaDt(input, campaign) {
   localStorage.setItem('wa_dt_' + campaign, val);
   DATA_RAW.forEach(function(r) { if (r.Campaign === campaign) r.Dealer_Triggers = val; });
   DATA.forEach(function(r)     { if (r.Campaign === campaign) r.Dealer_Triggers = val; });
+  // Invalidate all other panes so updated value is reflected everywhere
+  ['overview','city','types','comparison'].forEach(function(id) {
+    var el = document.getElementById('pane-' + id);
+    if (el) { el.dataset.done = ''; el.innerHTML = ''; }
+  });
   renderCampaigns();
 }
 window.updateWaDt = updateWaDt;
@@ -2201,7 +2206,7 @@ function renderComparison() {
   // Ensure HTML tooltip div exists once in DOM
   if(!document.getElementById('ctip')){
     var _td=document.createElement('div'); _td.id='ctip';
-    _td.style.cssText='position:fixed;display:none;background:#1D2939;color:#fff;border-radius:10px;padding:12px 16px;font-size:12px;font-family:Inter,system-ui,sans-serif;z-index:9999;pointer-events:none;min-width:190px;box-shadow:0 6px 24px rgba(0,0,0,0.28);line-height:1.75;border:1px solid rgba(255,255,255,0.07)';
+    _td.style.cssText='position:fixed;display:none;background:rgba(17,24,39,0.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;border-radius:10px;padding:10px 14px;font-size:12px;font-family:Inter,system-ui,sans-serif;z-index:9999;pointer-events:none;min-width:160px;box-shadow:0 4px 20px rgba(0,0,0,0.22);line-height:1.7;border:1px solid rgba(255,255,255,0.1)';
     document.body.appendChild(_td);
   }
 
@@ -2254,8 +2259,8 @@ function renderComparison() {
       var r=map[buckets[i]]||{sp:0,cv:0,gl:0,dt:0};
       // Tooltip data
       var td=JSON.stringify({
-        d:labels[i],c:city,
-        sp:Math.round(r.sp),cv:fmtN(r.cv),
+        d:labels[i],c:city,k:selKpi,
+        sp:Math.round(r.sp),cv:Math.round(r.cv),
         gl:Math.round(r.gl),dt:Math.round(r.dt),
         cpl:r.cv?Math.round(r.sp/r.cv):0,
         tcpl:r.gl?Math.round(r.sp/r.gl):0,
@@ -2399,27 +2404,33 @@ function showCTip(evt, rectEl) {
   if (!tip) return;
   try {
     var d = JSON.parse(rectEl.getAttribute('data-tip'));
-    var rows = [
-      ['<span style="font-weight:700;font-size:13px">'+d.d+'</span><span style="opacity:.6;font-size:11px;margin-left:6px">'+d.c+'</span>',''],
-      ['Spends', INR(d.sp)],
-      ['Panel Conv.', d.cv],
-      ['Trig. Leads', NUM(d.gl)],
-      ['Dealer Trig.', NUM(d.dt)],
-      ['CPL', d.cpl ? INR(d.cpl) : '—'],
-      ['TCPL', d.tcpl ? INR(d.tcpl) : '—'],
-      ['Dealer CPL', d.dcpl ? INR(d.dcpl) : '—']
-    ];
-    tip.innerHTML = rows.map(function(r,i){
-      return i===0
-        ? '<div style="padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.12)">'+r[0]+'</div>'
-        : '<div style="display:flex;justify-content:space-between;gap:20px"><span style="color:rgba(255,255,255,0.6)">'+r[0]+'</span><span style="font-weight:600">'+r[1]+'</span></div>';
-    }).join('');
-    var x = evt.clientX + 16, y = evt.clientY - 20;
-    if (x + 210 > window.innerWidth) x = evt.clientX - 224;
-    if (y + 180 > window.innerHeight) y = evt.clientY - 190;
-    tip.style.left = x + 'px';
-    tip.style.top  = y + 'px';
-    tip.style.display = 'block';
+    var k = d.k || 'sp';
+    var KPI_LABELS = {sp:'Spends',gl:'Trig. Leads',dt:'Dealer Trig.',cv:'Panel Conv.',cpl:'CPL',tcpl:'TCPL',dcpl:'Dealer CPL'};
+    var lbl = KPI_LABELS[k] || k;
+    var raw = d[k];
+    var valStr;
+    if (k==='sp'||k==='cpl'||k==='tcpl'||k==='dcpl') {
+      valStr = (!raw && k!=='sp') ? '—' : INR(raw);
+    } else if (k==='cv') {
+      valStr = raw ? NUM(raw) : '—';
+    } else {
+      valStr = (raw==null) ? '—' : NUM(raw);
+    }
+    tip.innerHTML =
+      '<div style="padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.15);white-space:nowrap">'
+        +'<span style="font-weight:700;font-size:13px">'+d.d+'</span>'
+        +'<span style="opacity:.55;font-size:11px;margin-left:7px">'+d.c+'</span>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;gap:28px;font-size:12px">'
+        +'<span style="color:rgba(255,255,255,0.62)">'+lbl+'</span>'
+        +'<span style="font-weight:700">'+valStr+'</span>'
+      +'</div>';
+    var x=evt.clientX+16, y=evt.clientY-20;
+    if(x+200>window.innerWidth) x=evt.clientX-210;
+    if(y+80>window.innerHeight) y=evt.clientY-80;
+    tip.style.left=x+'px';
+    tip.style.top=y+'px';
+    tip.style.display='block';
   } catch(e) {}
 }
 function hideCTip() {
@@ -2619,10 +2630,10 @@ function renderCampaigns() {
     html+='<td>'+INR(r.Spends)+'</td><td>'+NUM(r.Impressions)+'</td><td>'+NUM(r.Clicks)+'</td>';
     html+='<td>'+PCT(pctr_r)+'</td><td>'+fmtN(r.Conversions)+'</td>';
     html+='<td>'+(r.Type==='LeadForm'?'—':NUM(r.Triggered_Leads))+'</td>';
-    if (r.Type === 'WhatsApp') {
+    if (r.Type === 'WhatsApp' || r.Type === 'LeadForm') {
       var _cid = r.Campaign.replace(/[^a-zA-Z0-9]/g, '_');
       var _esc = r.Campaign.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      html+='<td><input type="number" id="wa_dt_'+_cid+'" value="'+r.Dealer_Triggers+'" min="0" title="Editable — enter dealer trigger count" style="width:62px;border:1.5px solid #CBD5E1;border-radius:4px;padding:2px 5px;font-size:12px;text-align:right;background:var(--card);color:var(--text1)" onchange="updateWaDt(this,\''+_esc+'\')" /></td>';
+      html+='<td><input type="number" id="wa_dt_'+_cid+'" value="'+r.Dealer_Triggers+'" min="0" title="Enter dealer trigger count manually" style="width:62px;border:1.5px solid #CBD5E1;border-radius:4px;padding:2px 5px;font-size:12px;text-align:right;background:var(--card);color:var(--text1)" onchange="updateWaDt(this,\''+_esc+'\')" /></td>';
     } else {
       html+='<td>'+NUM(r.Dealer_Triggers)+'</td>';
     }
