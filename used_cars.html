@@ -1967,11 +1967,11 @@ function applyDateFilter() {
       .map(function(r) {
         var a = campAgg[r.Campaign];
         var trig = campTrigAgg[r.Campaign];
-        // WhatsApp: keep manually-set localStorage value; others: use date-filtered trigger totals
+        // WhatsApp: keep manually-set value; others: use date-filtered totals (0 if no rows match)
         var gl = (r.Type === 'WhatsApp') ? r.Triggered_Leads
-               : (DATA_TRIGGERS.length && trig) ? trig.Triggered_Leads : r.Triggered_Leads;
+               : DATA_TRIGGERS.length ? (trig ? trig.Triggered_Leads : 0) : r.Triggered_Leads;
         var dt = (r.Type === 'WhatsApp') ? r.Dealer_Triggers
-               : (DATA_TRIGGERS.length && trig) ? trig.Dealer_Triggers : r.Dealer_Triggers;
+               : DATA_TRIGGERS.length ? (trig ? trig.Dealer_Triggers : 0) : r.Dealer_Triggers;
         return {
           Campaign:        r.Campaign,
           Platform:        r.Platform,
