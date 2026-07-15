@@ -218,15 +218,15 @@ tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
     <h1>Used Cars — Performance Dashboard</h1>
     <p>Ahmedabad &nbsp;·&nbsp; Chandigarh &nbsp;·&nbsp; Nashik &nbsp;·&nbsp; Google + Meta</p>
   </div>
-  <div class="period-badge" id="period-badge">Jul 1–13, 2026</div>
+  <div class="period-badge" id="period-badge">Jul 1–15, 2026</div>
 </div>
 
 <!-- ── DATE FILTER ── -->
 <div class="filter-bar">
   <label for="date-start">📅 Date Range</label>
-  <input type="date" id="date-start" class="date-input" value="2026-07-01" min="2026-04-06" max="2026-07-13">
+  <input type="date" id="date-start" class="date-input" min="2026-04-06">
   <span class="filter-sep">→</span>
-  <input type="date" id="date-end" class="date-input" value="2026-07-13" min="2026-04-06" max="2026-07-13">
+  <input type="date" id="date-end" class="date-input" min="2026-04-06">
   <span id="filter-active-badge" class="filter-active-badge" style="display:none">Filtered</span>
   <button class="filter-reset" id="filter-reset-btn" onclick="resetDateFilter()">Reset</button>
 </div>
@@ -628,8 +628,11 @@ var PLAT_BDR    = {Google:'#FCA5A5', Meta:'#93C5FD'};
 var TYPE_COLOR  = {Search:'#7C3AED', Catalogue:'#D97706', LeadForm:'#0891B2', 'Demand Gen':'#059669', 'Performance Max':'#9333EA', 'Website Conversion':'#0369A1', WhatsApp:'#25D366', Other:'#64748B'};
 var TYPE_LIGHT  = {Search:'#F5F3FF', Catalogue:'#FFFBEB', LeadForm:'#ECFEFF', 'Demand Gen':'#ECFDF5', 'Performance Max':'#FAF5FF', 'Website Conversion':'#EFF6FF', WhatsApp:'#F0FDF4', Other:'#F8FAFC'};
 
-var DEFAULT_START = '2026-07-01';
-var DEFAULT_END   = '2026-07-13';
+var _today = new Date();
+var _pad = function(n){return n<10?'0'+n:String(n);};
+var TODAY_STR = _today.getFullYear()+'-'+_pad(_today.getMonth()+1)+'-'+_pad(_today.getDate());
+var DEFAULT_START = TODAY_STR.substring(0,7)+'-01'; // first of current month
+var DEFAULT_END   = TODAY_STR;
 
 // ── DATE FILTER ──────────────────────────────────────────────────────────────
 function applyDateFilter() {
@@ -646,7 +649,7 @@ function applyDateFilter() {
 
   DATA = DATA_RAW.filter(function(r) {
     var campaignStart = r.StartDate || '2026-04-06';
-    var campaignEnd   = r.EndDate   || '2026-07-13';
+    var campaignEnd   = r.EndDate   || TODAY_STR;
     // Campaign is active in selected range if it started before filter end AND ended after filter start
     return campaignStart <= e && campaignEnd >= s;
   });
@@ -684,6 +687,14 @@ function formatDateRange(s, e) {
   return fmt(s) + ' – ' + fmt(e);
 }
 
+// Set date inputs dynamically to today's range
+(function() {
+  var s = document.getElementById('date-start');
+  var e = document.getElementById('date-end');
+  s.value = DEFAULT_START; s.max = TODAY_STR;
+  e.value = DEFAULT_END;   e.max = TODAY_STR;
+  document.getElementById('period-badge').textContent = formatDateRange(DEFAULT_START, DEFAULT_END);
+})();
 document.getElementById('date-start').addEventListener('change', applyDateFilter);
 document.getElementById('date-end').addEventListener('change', applyDateFilter);
 
