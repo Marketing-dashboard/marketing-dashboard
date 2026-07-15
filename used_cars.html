@@ -606,6 +606,9 @@ var DATA_RAW = [
   {Campaign:"Nasik-Search-Buy-UsedCar-8april", Spends:111138.53, Impressions:120034, Clicks:27194, Conversions:2896.95, Platform:"Google", City:"Nashik", Type:"Search", Triggered_Leads:1561, Dealer_Triggers:1139, Status:"Ongoing", StartDate:"2026-04-07", EndDate:null}
 ];
 
+// Daily spend rows — replaced by Apps Script; used by date filter to re-aggregate
+var DATA_DAILY = [];
+
 // Load manually-set dealer triggers for WhatsApp campaigns from localStorage
 (function() {
   DATA_RAW.forEach(function(r) {
@@ -616,8 +619,8 @@ var DATA_RAW = [
   });
 })();
 
-// Active filtered dataset
-var DATA = DATA_RAW.slice();
+// Active filtered dataset — populated by applyDateFilter()
+var DATA = [];
 
 var CITY_COLOR  = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857'};
 var CITY_LIGHT  = {Ahmedabad:'#F5F3FF', Chandigarh:'#EFF6FF', Nashik:'#ECFDF5'};
@@ -640,19 +643,54 @@ function applyDateFilter() {
   var e = document.getElementById('date-end').value;
   if (!s || !e || s > e) return;
 
+  // Aggregate spend from DATA_DAILY for the selected date range
+  var campAgg = {};
+  DATA_DAILY.forEach(function(d) {
+    if (d.Date >= s && d.Date <= e) {
+      if (!campAgg[d.Campaign]) campAgg[d.Campaign] = {Spends:0, Impressions:0, Clicks:0, Conversions:0};
+      campAgg[d.Campaign].Spends      += d.Spends;
+      campAgg[d.Campaign].Impressions += d.Impressions;
+      campAgg[d.Campaign].Clicks      += d.Clicks;
+      campAgg[d.Campaign].Conversions += d.Conversions;
+    }
+  });
+
+  // If no daily data yet (DATA_DAILY empty), fall back to campaign-overlap filter on DATA_RAW totals
+  if (DATA_DAILY.length === 0) {
+    DATA = DATA_RAW.filter(function(r) {
+      var cs = r.StartDate || '2026-04-06';
+      var ce = r.EndDate   || TODAY_STR;
+      return cs <= e && ce >= s;
+    });
+  } else {
+    // Build DATA: merge daily-aggregated spend with campaign metadata
+    DATA = DATA_RAW
+      .filter(function(r) { return campAgg[r.Campaign]; })
+      .map(function(r) {
+        var a = campAgg[r.Campaign];
+        return {
+          Campaign:        r.Campaign,
+          Platform:        r.Platform,
+          City:            r.City,
+          Type:            r.Type,
+          Status:          r.Status,
+          StartDate:       r.StartDate,
+          EndDate:         r.EndDate,
+          Triggered_Leads: r.Triggered_Leads,
+          Dealer_Triggers: r.Dealer_Triggers,
+          Spends:          Math.round(a.Spends * 100) / 100,
+          Impressions:     Math.round(a.Impressions),
+          Clicks:          Math.round(a.Clicks),
+          Conversions:     Math.round(a.Conversions * 100) / 100
+        };
+      });
+  }
+
   var badge = document.getElementById('filter-active-badge');
   var periodBadge = document.getElementById('period-badge');
   var isDefault = (s === DEFAULT_START && e === DEFAULT_END);
-
   badge.style.display = isDefault ? 'none' : 'inline-block';
   periodBadge.textContent = formatDateRange(s, e);
-
-  DATA = DATA_RAW.filter(function(r) {
-    var campaignStart = r.StartDate || '2026-04-06';
-    var campaignEnd   = r.EndDate   || TODAY_STR;
-    // Campaign is active in selected range if it started before filter end AND ended after filter start
-    return campaignStart <= e && campaignEnd >= s;
-  });
 
   // Invalidate rendered panes so they re-render
   ['overview','city','campaigns','types'].forEach(function(id) {
@@ -687,13 +725,13 @@ function formatDateRange(s, e) {
   return fmt(s) + ' – ' + fmt(e);
 }
 
-// Set date inputs dynamically to today's range
+// Set date inputs and run initial filter to populate DATA
 (function() {
   var s = document.getElementById('date-start');
   var e = document.getElementById('date-end');
   s.value = DEFAULT_START; s.max = TODAY_STR;
   e.value = DEFAULT_END;   e.max = TODAY_STR;
-  document.getElementById('period-badge').textContent = formatDateRange(DEFAULT_START, DEFAULT_END);
+  applyDateFilter();
 })();
 document.getElementById('date-start').addEventListener('change', applyDateFilter);
 document.getElementById('date-end').addEventListener('change', applyDateFilter);

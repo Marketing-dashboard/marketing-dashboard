@@ -29,16 +29,34 @@ function updateDashboard() {
 
   // ── 1. Build campaign → type map from Reference tab ──────────
   // Reference cols: [0]=Campaign, [1]=Campaign_type
+  var KNOWN_TYPES = {
+    'Search':true, 'Catalogue':true, 'Demand Gen':true,
+    'Performance Max':true, 'LeadForm':true, 'Website Conversion':true, 'WhatsApp':true
+  };
   var typeMap = {};
   for (var i = 1; i < refData.length; i++) {
     var n = String(refData[i][0] || '').trim();
     var t = String(refData[i][1] || '').trim();
     if (n && !typeMap[n]) typeMap[n] = t;
   }
+  // Fix any rows where col B was accidentally filled with wrong data
+  for (var campKey in typeMap) {
+    if (!KNOWN_TYPES[typeMap[campKey]]) {
+      var nl = campKey.toLowerCase();
+      if (nl.indexOf('leadform') !== -1 || nl.indexOf('lead-form') !== -1) typeMap[campKey] = 'LeadForm';
+      else if (nl.indexOf('catalogue') !== -1) typeMap[campKey] = 'Catalogue';
+      else if (nl.indexOf('whatsup') !== -1 || nl.indexOf('whatsapp') !== -1) typeMap[campKey] = 'WhatsApp';
+      else if (nl.indexOf('pmax') !== -1) typeMap[campKey] = 'Performance Max';
+      else if (nl.indexOf('static') !== -1 || nl.indexOf('website') !== -1) typeMap[campKey] = 'Website Conversion';
+      else if (nl.indexOf('demand') !== -1) typeMap[campKey] = 'Demand Gen';
+      else typeMap[campKey] = 'Search';
+    }
+  }
 
   // ── 2. Aggregate Google spend data ───────────────────────────
   // Google cols: [0]=Day, [1]=Campaign, [2]=Campaign_type, [3]=Impressions, [4]=Cost, [5]=Clicks, [6]=Conversions
   var gByC = {};
+  var gDailyRows = [];
   for (var i = 1; i < googleData.length; i++) {
     var row  = googleData[i];
     var camp = String(row[1] || '').trim();
@@ -54,11 +72,16 @@ function updateDashboard() {
     gByC[camp].cl  += cl;
     gByC[camp].cv  += cv;
     if (cost > 0) gByC[camp].spendDays[fmtDate(day)] = 1;
+    var dateStr = fmtDate(day);
+    if (dateStr && (cost > 0 || impr > 0)) {
+      gDailyRows.push({Date:dateStr, Campaign:camp, Spends:Math.round(cost*100)/100, Impressions:Math.round(impr), Clicks:Math.round(cl), Conversions:Math.round(cv*100)/100});
+    }
   }
 
   // ── 3. Aggregate Facebook spend data ─────────────────────────
   // Facebook cols: [0]=Day, [1]=Campaign, [2]=Conversions, [3]=Cost, [4]=Impressions, [5]=Clicks(all)
   var fbByC = {};
+  var fbDailyRows = [];
   for (var i = 1; i < fbData.length; i++) {
     var row  = fbData[i];
     var camp = String(row[1] || '').trim();
@@ -74,6 +97,10 @@ function updateDashboard() {
     fbByC[camp].cl  += cl;
     fbByC[camp].cv  += cv;
     if (cost > 0) fbByC[camp].spendDays[fmtDate(day)] = 1;
+    var dateStr = fmtDate(day);
+    if (dateStr && (cost > 0 || impr > 0)) {
+      fbDailyRows.push({Date:dateStr, Campaign:camp, Spends:Math.round(cost*100)/100, Impressions:Math.round(impr), Clicks:Math.round(cl), Conversions:Math.round(cv*100)/100});
+    }
   }
 
   // ── 4. Aggregate Triggers data ───────────────────────────────
@@ -216,13 +243,23 @@ function updateDashboard() {
   });
   var newDataRaw = 'var DATA_RAW = [\n' + lines.join(',\n') + '\n];';
 
-  // ── 7. Push to GitHub ────────────────────────────────────────
-  pushToGitHub(token, newDataRaw);
-  Logger.log('Done. ' + rows.length + ' campaigns pushed.');
+  // ── 7. Serialize DATA_DAILY ──────────────────────────────────
+  var allDaily = gDailyRows.concat(fbDailyRows);
+  allDaily.sort(function(a, b) { return a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0; });
+  var dailyLines = allDaily.map(function(d) {
+    return '  {Date:' + jstr(d.Date) + ',Campaign:' + jstr(d.Campaign)
+         + ',Spends:' + d.Spends + ',Impressions:' + d.Impressions
+         + ',Clicks:' + d.Clicks + ',Conversions:' + d.Conversions + '}';
+  });
+  var newDataDaily = 'var DATA_DAILY = [\n' + dailyLines.join(',\n') + '\n];';
+
+  // ── 8. Push to GitHub ────────────────────────────────────────
+  pushToGitHub(token, newDataRaw, newDataDaily);
+  Logger.log('Done. ' + rows.length + ' campaigns, ' + allDaily.length + ' daily rows pushed.');
 }
 
 // ── GITHUB HELPER ─────────────────────────────────────────────
-function pushToGitHub(token, newDataRaw) {
+function pushToGitHub(token, newDataRaw, newDataDaily) {
   var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + FILE_PATH;
 
   // Fetch current file
@@ -243,8 +280,11 @@ function pushToGitHub(token, newDataRaw) {
   var b64 = fileInfo.content.replace(/\n/g, '');
   var currentContent = Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString();
 
-  // Replace the DATA_RAW block (matches from "var DATA_RAW = [" to closing "];")
+  // Replace DATA_RAW and DATA_DAILY blocks
   var newContent = currentContent.replace(/var DATA_RAW = \[[\s\S]*?\];/, newDataRaw);
+  if (newDataDaily) {
+    newContent = newContent.replace(/var DATA_DAILY = \[[\s\S]*?\];/, newDataDaily);
+  }
 
   if (newContent === currentContent) {
     Logger.log('No changes detected — skipping push.');
