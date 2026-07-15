@@ -2115,6 +2115,33 @@ function renderComparison() {
 
   var period  = (document.getElementById('comp-period')||{value:'daily'}).value||'daily';
   var selType = (document.getElementById('comp-type')||{value:'All'}).value||'All';
+  var selKpi  = (document.getElementById('comp-kpi')||{value:'sp'}).value||'sp';
+
+  var KPI_OPTS=[
+    {k:'sp',   label:'Spends'},
+    {k:'gl',   label:'Triggered Leads'},
+    {k:'dt',   label:'Dealer Triggers'},
+    {k:'cv',   label:'Panel Conversions'},
+    {k:'cpl',  label:'CPL (₹)'},
+    {k:'tcpl', label:'TCPL (₹)'},
+    {k:'dcpl', label:'Dealer CPL (₹)'}
+  ];
+  function kpiVal(r,k){
+    if(!r) return null;
+    if(k==='sp')   return r.sp;
+    if(k==='gl')   return r.gl;
+    if(k==='dt')   return r.dt;
+    if(k==='cv')   return r.cv;
+    if(k==='cpl')  return r.cv?r.sp/r.cv:null;
+    if(k==='tcpl') return r.gl?r.sp/r.gl:null;
+    if(k==='dcpl') return r.dt?r.sp/r.dt:null;
+    return null;
+  }
+  function kpiFmt(v,k){
+    if(v==null) return '—';
+    if(k==='sp'||k==='cpl'||k==='tcpl'||k==='dcpl') return INR(Math.round(v));
+    return NUM(Math.round(v));
+  }
 
   // All campaign types from DATA_RAW
   var allTypes = ['All'];
@@ -2169,106 +2196,158 @@ function renderComparison() {
 
   if(!buckets.length){el.innerHTML=noDataMsg();return;}
 
-  // City chart
   var CC={Ahmedabad:'#7C3AED',Chandigarh:'#0369A1',Nashik:'#047857'};
-  function svgCityChart(map, color) {
-    var W=800,H=200,pL=72,pR=16,pT=16,pB=46;
+
+  // Ensure HTML tooltip div exists once in DOM
+  if(!document.getElementById('ctip')){
+    var _td=document.createElement('div'); _td.id='ctip';
+    _td.style.cssText='position:fixed;display:none;background:#1D2939;color:#fff;border-radius:10px;padding:12px 16px;font-size:12px;font-family:Inter,system-ui,sans-serif;z-index:9999;pointer-events:none;min-width:190px;box-shadow:0 6px 24px rgba(0,0,0,0.28);line-height:1.75;border:1px solid rgba(255,255,255,0.07)';
+    document.body.appendChild(_td);
+  }
+
+  function svgCityChart(map, color, city) {
+    var vals=buckets.map(function(b){ return kpiVal(map[b],selKpi); });
+    var valid=vals.filter(function(v){return v!=null&&v>=0;});
+    var maxV=valid.length?Math.max.apply(null,valid):1; if(maxV===0)maxV=1;
+    var W=880,H=230,pL=72,pR=20,pT=18,pB=44;
     var cW=W-pL-pR,cH=H-pT-pB,n=buckets.length;
-    var spVals=buckets.map(function(b){return map[b]?map[b].sp:0;});
-    var maxV=Math.max.apply(null,spVals.concat([1]));
     function xp(i){return Math.round(pL+(n<=1?cW/2:i*cW/(n-1)));}
-    function yp(v){return Math.round(pT+cH-v/maxV*cH);}
+    function yp(v){return v==null?pT+cH:Math.round(pT+cH-(v/maxV)*cH);}
     var uid='cc'+Math.floor(Math.random()*1e9);
+
     var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible" id="'+uid+'">';
-    svg+='<g id="'+uid+'tt" style="display:none;pointer-events:none"><rect id="'+uid+'tb" rx="6" ry="6" fill="#1D2939" opacity="0.95"/><text id="'+uid+'tx" font-size="11" fill="#fff" font-family="Inter,system-ui,sans-serif"></text></g>';
-    // Grid
+    // Gradient
+    svg+='<defs><linearGradient id="gr'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity="0.18"/><stop offset="85%" stop-color="'+color+'" stop-opacity="0.02"/></linearGradient></defs>';
+
+    // Horizontal grid lines
     for(var g=0;g<=4;g++){
       var gv=maxV*g/4,gy=yp(gv);
-      svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="#E4E7EC" stroke-width="1"/>';
-      var gl2=gv>=1e5?(gv/1e5).toFixed(1)+'L':gv>=1e3?(gv/1e3).toFixed(0)+'K':Math.round(gv)+'';
-      svg+='<text x="'+(pL-5)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3">'+gl2+'</text>';
+      svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="'+(g===0?'#E4E7EC':'#F2F4F7')+'" stroke-width="'+(g===0?1:1)+'"/>';
+      if(g>0){
+        var lbl=gv>=1e5?(gv/1e5).toFixed(1)+'L':gv>=1e3?(gv/1e3).toFixed(1)+'K':Math.round(gv)+'';
+        svg+='<text x="'+(pL-8)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+lbl+'</text>';
+      }
     }
-    // X labels
-    var step=n>16?Math.ceil(n/8):1;
+
+    // X-axis labels (max 10 visible)
+    var step=Math.max(1,Math.ceil(n/10));
     for(var i=0;i<n;i++){
       if(i%step!==0&&i!==n-1) continue;
-      svg+='<text x="'+xp(i)+'" y="'+(H-pB+18)+'" text-anchor="middle" font-size="10" fill="#98A2B3">'+labels[i]+'</text>';
+      svg+='<text x="'+xp(i)+'" y="'+(H-pB+16)+'" text-anchor="middle" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+labels[i]+'</text>';
     }
-    // Spend line
-    var pts=[]; spVals.forEach(function(v,i){pts.push(xp(i)+','+yp(v));});
-    if(n>1) svg+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
-    // Dots + hover rects
+
+    // Build valid point list
+    var pts=[]; for(var i=0;i<n;i++){ var v=vals[i]; if(v!=null&&v>=0) pts.push({i:i,x:xp(i),y:yp(v),v:v}); }
+
+    if(pts.length>1){
+      // Area fill
+      var ap='M '+pts[0].x+','+(pT+cH); pts.forEach(function(p){ap+=' L '+p.x+','+p.y;}); ap+=' L '+pts[pts.length-1].x+','+(pT+cH)+' Z';
+      svg+='<path d="'+ap+'" fill="url(#gr'+uid+')" />';
+      // Line
+      var lp='M '+pts[0].x+','+pts[0].y; pts.forEach(function(p,j){if(j>0)lp+=' L '+p.x+','+p.y;});
+      svg+='<path d="'+lp+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    }
+
+    // Dots + invisible hover columns
     for(var i=0;i<n;i++){
-      var r=map[buckets[i]]||{sp:0,cv:0,gl:0,dt:0,imp:0,cl:0};
-      var cx=xp(i),cy=yp(spVals[i]);
-      svg+='<circle cx="'+cx+'" cy="'+cy+'" r="3.5" fill="'+color+'" stroke="#fff" stroke-width="1.5" style="pointer-events:none"/>';
-      var tipLines=[
-        labels[i],
-        'Spends: '+(r.sp>=1e5?(r.sp/1e5).toFixed(1)+'L':r.sp>=1e3?(r.sp/1e3).toFixed(0)+'K':'₹'+Math.round(r.sp)),
-        'Panel Conv: '+Math.round(r.cv),
-        'Trig. Leads: '+Math.round(r.gl),
-        'Dealer Trig.: '+Math.round(r.dt),
-        'CPL: '+(r.cv?'₹'+Math.round(r.sp/r.cv):'—'),
-        'TCPL: '+(r.gl?'₹'+Math.round(r.sp/r.gl):'—'),
-        'Dealer CPL: '+(r.dt?'₹'+Math.round(r.sp/r.dt):'—')
-      ];
-      var x0=i===0?pL:Math.round((xp(i-1)+cx)/2);
-      var x1=i===n-1?W-pR:Math.round((cx+xp(i+1))/2);
-      svg+='<rect x="'+x0+'" y="'+pT+'" width="'+(x1-x0)+'" height="'+cH+'" fill="transparent"'
-          +' onmouseenter="showChartTip(\''+uid+'\','+cx+','+cy+','+JSON.stringify(tipLines).replace(/"/g,'&quot;')+')"'
-          +' onmouseleave="hideChartTip(\''+uid+'\')"'
-          +'/>';
+      var v=vals[i],cx=xp(i);
+      var r=map[buckets[i]]||{sp:0,cv:0,gl:0,dt:0};
+      // Tooltip data
+      var td=JSON.stringify({
+        d:labels[i],c:city,
+        sp:Math.round(r.sp),cv:fmtN(r.cv),
+        gl:Math.round(r.gl),dt:Math.round(r.dt),
+        cpl:r.cv?Math.round(r.sp/r.cv):0,
+        tcpl:r.gl?Math.round(r.sp/r.gl):0,
+        dcpl:r.dt?Math.round(r.sp/r.dt):0
+      }).replace(/"/g,'&quot;');
+      var x0=i===0?pL:Math.round((xp(Math.max(0,i-1))+cx)/2);
+      var x1=i===n-1?W-pR:Math.round((cx+xp(Math.min(n-1,i+1)))/2);
+      svg+='<rect x="'+x0+'" y="'+pT+'" width="'+(x1-x0)+'" height="'+cH+'" fill="transparent" style="cursor:crosshair"'
+          +' data-tip="'+td+'"'
+          +' onmouseenter="showCTip(event,this)" onmouseleave="hideCTip()" />';
+      if(v!=null&&v>=0)
+        svg+='<circle cx="'+cx+'" cy="'+yp(v)+'" r="4" fill="'+color+'" stroke="#fff" stroke-width="2.5" style="pointer-events:none"/>';
     }
     svg+='</svg>';
     return svg;
   }
 
-  // ── Build HTML ──
+  // ── HTML ──
   var html='';
 
-  // Period + Type filters
-  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
-  html+='<span style="font-size:12px;font-weight:600;color:var(--text2)">Period:</span>';
+  // Filter bar
+  html+='<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:#fff;padding:14px 20px;border-radius:14px;border:1px solid var(--border);margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
+
+  // Period
+  html+='<div style="display:flex;align-items:center;gap:6px">';
+  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Period</span>';
   ['daily','weekly','monthly'].forEach(function(p){
     var a=p===period;
-    html+='<button onclick="setCompPeriod(\''+p+'\')" style="padding:5px 14px;font-size:12px;font-family:inherit;font-weight:'+(a?700:500)+';border-radius:7px;border:1px solid '+(a?'var(--navy)':'var(--border2)')+';background:'+(a?'var(--navy)':'var(--surface)')+';color:'+(a?'#fff':'var(--text2)')+';cursor:pointer">'+(p.charAt(0).toUpperCase()+p.slice(1))+'</button>';
-  });
-  html+='</div>';
-  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
-  html+='<span style="font-size:12px;font-weight:600;color:var(--text2)">Campaign Type:</span>';
-  allTypes.forEach(function(t){
-    var a=t===selType;
-    html+='<button onclick="setCompType(\''+encodeURIComponent(t)+'\')" style="padding:5px 14px;font-size:12px;font-family:inherit;font-weight:'+(a?700:500)+';border-radius:7px;border:1px solid '+(a?'var(--navy)':'var(--border2)')+';background:'+(a?'var(--navy)':'var(--surface)')+';color:'+(a?'#fff':'var(--text2)')+';cursor:pointer">'+t+'</button>';
+    html+='<button onclick="setCompPeriod(\''+p+'\')" style="padding:5px 13px;font-size:12px;font-family:inherit;font-weight:'+(a?600:400)+';border-radius:7px;border:1px solid '+(a?'var(--navy)':'var(--border2)')+';background:'+(a?'var(--navy)':'transparent')+';color:'+(a?'#fff':'var(--text2)')+';cursor:pointer;transition:all .15s">'+(p.charAt(0).toUpperCase()+p.slice(1))+'</button>';
   });
   html+='</div>';
 
-  // 3 city charts
+  html+='<div style="width:1px;height:26px;background:var(--border);flex-shrink:0"></div>';
+
+  // Campaign type dropdown
+  html+='<div style="display:flex;align-items:center;gap:7px">';
+  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Type</span>';
+  html+='<select onchange="setCompType(encodeURIComponent(this.value))" style="font-size:12px;font-family:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:150px;outline:none">';
+  allTypes.forEach(function(t){ html+='<option value="'+t+'"'+(t===selType?' selected':'')+'>'+t+'</option>'; });
+  html+='</select></div>';
+
+  html+='<div style="width:1px;height:26px;background:var(--border);flex-shrink:0"></div>';
+
+  // KPI dropdown
+  html+='<div style="display:flex;align-items:center;gap:7px">';
+  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">KPI</span>';
+  html+='<select onchange="setCompKpi(this.value)" style="font-size:12px;font-family:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:170px;outline:none">';
+  KPI_OPTS.forEach(function(opt){ html+='<option value="'+opt.k+'"'+(opt.k===selKpi?' selected':'')+'>'+opt.label+'</option>'; });
+  html+='</select></div>';
+
+  html+='<span style="margin-left:auto;font-size:11px;color:var(--text3)">'+labels.length+' '+period+(labels.length!==1?'s':'')+' · hover dots for details</span>';
+  html+='</div>';
+
+  // 3 city cards
   CITIES.forEach(function(city){
     var map=cityMaps[city], color=CC[city];
     var tot={sp:0,cv:0,gl:0,dt:0};
     buckets.forEach(function(b){var r=map[b];if(r){tot.sp+=r.sp;tot.cv+=r.cv;tot.gl+=r.gl;tot.dt+=r.dt;}});
-    var hasDat=tot.sp>0||tot.gl>0;
-    html+='<div class="tbl-card" style="margin-bottom:16px">';
-    html+='<div class="tbl-toolbar"><span class="tbl-title" style="color:'+color+'">● '+city+'</span>';
-    html+='<span style="font-size:12px;color:var(--text2);margin-left:auto">Spends: <b>'+INR(Math.round(tot.sp))+'</b> &nbsp; Trig. Leads: <b>'+NUM(tot.gl)+'</b> &nbsp; TCPL: <b>'+(tot.gl?INR(Math.round(tot.sp/tot.gl)):'—')+'</b> &nbsp; Dealer CPL: <b>'+(tot.dt?INR(Math.round(tot.sp/tot.dt)):'—')+'</b></span>';
-    html+='</div>';
-    if(!hasDat){html+='<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">No data for this selection</div>';}
-    else{html+='<div style="padding:8px 16px 16px">'+svgCityChart(map,color)+'</div>';}
-    html+='</div>';
+    var hasData=tot.sp>0||tot.gl>0;
+
+    html+='<div style="background:#fff;border-radius:14px;border:1px solid var(--border);margin-bottom:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
+
+    // Card header
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 12px;border-bottom:1px solid var(--border)">';
+    html+='<div style="display:flex;align-items:center;gap:10px"><div style="width:11px;height:11px;border-radius:50%;background:'+color+'"></div>';
+    html+='<span style="font-size:15px;font-weight:700;color:var(--text)">'+city+'</span></div>';
+    html+='<div style="display:flex;gap:20px">';
+    [['Spends',INR(Math.round(tot.sp))],['Trig. Leads',NUM(tot.gl)],['Dealer Trig.',NUM(tot.dt)],['TCPL',tot.gl?INR(Math.round(tot.sp/tot.gl)):'—'],['Dealer CPL',tot.dt?INR(Math.round(tot.sp/tot.dt)):'—']].forEach(function(c){
+      html+='<div style="text-align:right"><div style="font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.4px">'+c[0]+'</div><div style="font-size:13px;font-weight:700;color:var(--text)">'+c[1]+'</div></div>';
+    });
+    html+='</div></div>';
+
+    // Chart
+    html+='<div style="padding:16px 20px 10px">';
+    if(!hasData){ html+='<div style="height:80px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px">No data for this filter</div>'; }
+    else { html+=svgCityChart(map,color,city); }
+    html+='</div></div>';
   });
 
-  // Period × City detail table
-  html+='<div class="tbl-card" style="margin-top:4px"><div class="tbl-toolbar"><span class="tbl-title">📅 Period Detail</span></div>';
+  // Detail table
+  html+='<div style="background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-top:4px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
+  html+='<div style="padding:14px 20px;border-bottom:1px solid var(--border)"><span style="font-size:14px;font-weight:700;color:var(--text)">Period Detail</span></div>';
   html+='<div class="tbl-wrap"><table><thead><tr>';
   html+='<th class="left sticky" style="left:0;min-width:80px">Period</th><th class="left">City</th>';
   ['Spends','Panel Conv.','Trig. Leads','Dealer Trig.','CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
   html+='</tr></thead><tbody>';
   buckets.forEach(function(b){
     CITIES.forEach(function(city){
-      var r=cityMaps[city][b]; if(!r||r.sp===0) return;
+      var r=cityMaps[city][b]; if(!r||(r.sp===0&&r.gl===0)) return;
       html+='<tr><td class="left sticky" style="left:0;font-weight:600;white-space:nowrap">'+bucketLabel(b)+'</td>';
-      html+='<td class="left" style="color:'+CC[city]+';font-weight:500">'+city+'</td>';
-      html+='<td>'+INR(Math.round(r.sp))+'</td><td>'+Math.round(r.cv)+'</td>';
+      html+='<td class="left"><span style="color:'+CC[city]+';font-weight:600">'+city+'</span></td>';
+      html+='<td>'+INR(Math.round(r.sp))+'</td><td>'+fmtN(r.cv)+'</td>';
       html+='<td>'+NUM(Math.round(r.gl))+'</td><td>'+NUM(Math.round(r.dt))+'</td>';
       html+='<td>'+(r.cv?INR(Math.round(r.sp/r.cv)):'—')+'</td>';
       html+='<td>'+(r.gl?INR(Math.round(r.sp/r.gl)):'—')+'</td>';
@@ -2278,7 +2357,6 @@ function renderComparison() {
   html+='</tbody></table></div></div>';
 
   el.innerHTML=html;
-
 }
 
 function setCompPeriod(p) {
@@ -2304,34 +2382,52 @@ function setCompType(t) {
 }
 window.setCompType = setCompType;
 
-// ── CHART TOOLTIP HELPERS ─────────────────────────────────────────────────────
-function showChartTip(uid, cx, cy, lines) {
-  var tt=document.getElementById(uid+'tt');
-  var tb=document.getElementById(uid+'tb');
-  var tx=document.getElementById(uid+'tx');
-  if(!tt||!tb||!tx) return;
-  // Build tspan rows
-  var html='';
-  lines.forEach(function(l,i){ html+='<tspan x="8" dy="'+(i===0?'0':'15')+'">'+l+'</tspan>'; });
-  tx.innerHTML=html;
-  tx.setAttribute('y','14');
-  tt.style.display='';
-  // Measure text bbox
-  var svg=document.getElementById(uid);
+function setCompKpi(k) {
+  var el = document.createElement('input');
+  el.id = 'comp-kpi'; el.type = 'hidden'; el.value = k;
+  var old = document.getElementById('comp-kpi');
+  if (old) old.parentNode.replaceChild(el, old);
+  else document.body.appendChild(el);
+  document.getElementById('pane-comparison').dataset.done = '';
+  renderComparison();
+}
+window.setCompKpi = setCompKpi;
+
+// ── CHART TOOLTIP (HTML floating div) ────────────────────────────────────────
+function showCTip(evt, rectEl) {
+  var tip = document.getElementById('ctip');
+  if (!tip) return;
   try {
-    var bbox=tx.getBBox();
-    var bw=bbox.width+16, bh=bbox.height+16;
-    var W=860;
-    var tx2=cx+10; if(tx2+bw>W-10) tx2=cx-bw-10;
-    var ty2=cy-bh/2; if(ty2<0) ty2=4;
-    tb.setAttribute('x',tx2); tb.setAttribute('y',ty2); tb.setAttribute('width',bw); tb.setAttribute('height',bh);
-    tx.setAttribute('transform','translate('+tx2+','+ty2+')');
-  } catch(e){}
+    var d = JSON.parse(rectEl.getAttribute('data-tip'));
+    var rows = [
+      ['<span style="font-weight:700;font-size:13px">'+d.d+'</span><span style="opacity:.6;font-size:11px;margin-left:6px">'+d.c+'</span>',''],
+      ['Spends', INR(d.sp)],
+      ['Panel Conv.', d.cv],
+      ['Trig. Leads', NUM(d.gl)],
+      ['Dealer Trig.', NUM(d.dt)],
+      ['CPL', d.cpl ? INR(d.cpl) : '—'],
+      ['TCPL', d.tcpl ? INR(d.tcpl) : '—'],
+      ['Dealer CPL', d.dcpl ? INR(d.dcpl) : '—']
+    ];
+    tip.innerHTML = rows.map(function(r,i){
+      return i===0
+        ? '<div style="padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,0.12)">'+r[0]+'</div>'
+        : '<div style="display:flex;justify-content:space-between;gap:20px"><span style="color:rgba(255,255,255,0.6)">'+r[0]+'</span><span style="font-weight:600">'+r[1]+'</span></div>';
+    }).join('');
+    var x = evt.clientX + 16, y = evt.clientY - 20;
+    if (x + 210 > window.innerWidth) x = evt.clientX - 224;
+    if (y + 180 > window.innerHeight) y = evt.clientY - 190;
+    tip.style.left = x + 'px';
+    tip.style.top  = y + 'px';
+    tip.style.display = 'block';
+  } catch(e) {}
 }
-function hideChartTip(uid) {
-  var tt=document.getElementById(uid+'tt'); if(tt) tt.style.display='none';
+function hideCTip() {
+  var tip = document.getElementById('ctip');
+  if (tip) tip.style.display = 'none';
 }
-window.showChartTip=showChartTip; window.hideChartTip=hideChartTip;
+window.showCTip = showCTip;
+window.hideCTip = hideCTip;
 
 // ── OVERVIEW ─────────────────────────────────────────────────────────────────
 function renderOverview() {
