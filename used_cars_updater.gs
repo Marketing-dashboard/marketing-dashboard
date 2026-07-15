@@ -198,16 +198,6 @@ function updateDashboard() {
     var triggeredLeads = trig ? trig.total  : 0;
     var dealerTriggers = trig ? trig.dealer : 0;
 
-    // LeadForm: extrapolate dealer triggers via daily rate × spend days
-    if (campType === 'LeadForm' && trig && trig.dealer > 0) {
-      var daysWithTrigData = Object.keys(trig.dealerDays).length;
-      if (daysWithTrigData > 0) {
-        var dailyRate  = trig.dealer / daysWithTrigData;
-        var spendDays  = spendDayKeys.length;
-        dealerTriggers = Math.round(dailyRate * spendDays);
-      }
-    }
-
     // WhatsApp: no trigger data — set 0 (dashboard makes it editable)
     if (campType === 'WhatsApp') {
       triggeredLeads = 0;
