@@ -106,6 +106,7 @@ function updateDashboard() {
   // ── 4. Aggregate Triggers data ───────────────────────────────
   // Triggers cols: [0]=Date, [1]=utm_campaign, [2]=Listing_Group, [3]=Total_lead, [4]=Unique, [5]=Type
   var trigByC = {};
+  var trigDailyMap = {};
   for (var i = 1; i < trigData.length; i++) {
     var row      = trigData[i];
     var camp     = String(row[1] || '').trim();
@@ -119,7 +120,18 @@ function updateDashboard() {
       trigByC[camp].dealer += unique;
       if (date) trigByC[camp].dealerDays[fmtDate(date)] = 1;
     }
+    // Daily trigger rows
+    var dateStr = date ? fmtDate(date) : '';
+    if (dateStr && unique > 0) {
+      var dkey = dateStr + '||' + camp;
+      if (!trigDailyMap[dkey]) trigDailyMap[dkey] = {Date:dateStr, Campaign:camp, Triggered_Leads:0, Dealer_Triggers:0};
+      trigDailyMap[dkey].Triggered_Leads += unique;
+      if (listGrp === 'dealer') trigDailyMap[dkey].Dealer_Triggers += unique;
+    }
   }
+  var trigDailyRows = [];
+  for (var dkey in trigDailyMap) trigDailyRows.push(trigDailyMap[dkey]);
+  trigDailyRows.sort(function(a,b){ return a.Date < b.Date ? -1 : 1; });
 
   // ── 5. Build DATA_RAW rows ───────────────────────────────────
   var EXP_TYPES = {
@@ -253,13 +265,20 @@ function updateDashboard() {
   });
   var newDataDaily = 'var DATA_DAILY = [\n' + dailyLines.join(',\n') + '\n];';
 
-  // ── 8. Push to GitHub ────────────────────────────────────────
-  pushToGitHub(token, newDataRaw, newDataDaily);
-  Logger.log('Done. ' + rows.length + ' campaigns, ' + allDaily.length + ' daily rows pushed.');
+  // ── 8. Serialize DATA_TRIGGERS ───────────────────────────────
+  var trigLines = trigDailyRows.map(function(d) {
+    return '  {Date:' + jstr(d.Date) + ',Campaign:' + jstr(d.Campaign)
+         + ',Triggered_Leads:' + d.Triggered_Leads + ',Dealer_Triggers:' + d.Dealer_Triggers + '}';
+  });
+  var newDataTriggers = 'var DATA_TRIGGERS = [\n' + trigLines.join(',\n') + '\n];';
+
+  // ── 9. Push to GitHub ────────────────────────────────────────
+  pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers);
+  Logger.log('Done. ' + rows.length + ' campaigns, ' + allDaily.length + ' spend rows, ' + trigDailyRows.length + ' trigger rows pushed.');
 }
 
 // ── GITHUB HELPER ─────────────────────────────────────────────
-function pushToGitHub(token, newDataRaw, newDataDaily) {
+function pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers) {
   var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + FILE_PATH;
 
   // Fetch current file
@@ -284,6 +303,9 @@ function pushToGitHub(token, newDataRaw, newDataDaily) {
   var newContent = currentContent.replace(/var DATA_RAW = \[[\s\S]*?\];/, newDataRaw);
   if (newDataDaily) {
     newContent = newContent.replace(/var DATA_DAILY = \[[\s\S]*?\];/, newDataDaily);
+  }
+  if (newDataTriggers) {
+    newContent = newContent.replace(/var DATA_TRIGGERS = \[[\s\S]*?\];/, newDataTriggers);
   }
 
   if (newContent === currentContent) {
@@ -319,13 +341,14 @@ function pushToGitHub(token, newDataRaw, newDataDaily) {
 // ── UTILITIES ─────────────────────────────────────────────────
 function fmtDate(val) {
   if (!val) return '';
-  if (val instanceof Date) return Utilities.formatDate(val, 'UTC', 'yyyy-MM-dd');
+  var tz = Session.getScriptTimeZone();
+  if (val instanceof Date) return Utilities.formatDate(val, tz, 'yyyy-MM-dd');
   var s = val.toString().trim();
   // Already ISO format
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
   // Try parsing
   var d = new Date(s);
-  if (!isNaN(d)) return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd');
+  if (!isNaN(d)) return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
   return s;
 }
 

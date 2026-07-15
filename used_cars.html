@@ -236,12 +236,14 @@ tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
   <button class="tab" onclick="switchTab('city')">City Comparison</button>
   <button class="tab" onclick="switchTab('campaigns')">Campaign Detail</button>
   <button class="tab" onclick="switchTab('types')">Campaign Type Analysis</button>
+  <button class="tab" onclick="switchTab('comparison')">Trend &amp; Comparison</button>
 </div>
 
 <div id="pane-overview" class="pane active"></div>
 <div id="pane-city"     class="pane"></div>
 <div id="pane-campaigns" class="pane"></div>
 <div id="pane-types"   class="pane"></div>
+<div id="pane-comparison" class="pane"></div>
 
 </div><!-- /.page -->
 </div><!-- /#dashboard-app -->
@@ -1307,6 +1309,9 @@ var DATA_DAILY = [
   {Date:"2026-07-14",Campaign:"UCR-Lead-Luxury-Cart-Classified-Jan25",Spends:468.11,Impressions:2103,Clicks:48,Conversions:7}
 ];
 
+// Daily trigger rows — replaced by Apps Script; used by date filter to re-aggregate
+var DATA_TRIGGERS = [];
+
 // Load manually-set dealer triggers for WhatsApp campaigns from localStorage
 (function() {
   DATA_RAW.forEach(function(r) {
@@ -1353,6 +1358,16 @@ function applyDateFilter() {
     }
   });
 
+  // Aggregate triggers from DATA_TRIGGERS for the selected range
+  var campTrigAgg = {};
+  DATA_TRIGGERS.forEach(function(d) {
+    if (d.Date >= s && d.Date <= e) {
+      if (!campTrigAgg[d.Campaign]) campTrigAgg[d.Campaign] = {Triggered_Leads:0, Dealer_Triggers:0};
+      campTrigAgg[d.Campaign].Triggered_Leads += d.Triggered_Leads;
+      campTrigAgg[d.Campaign].Dealer_Triggers += d.Dealer_Triggers;
+    }
+  });
+
   // If no daily data yet (DATA_DAILY empty), fall back to campaign-overlap filter on DATA_RAW totals
   if (DATA_DAILY.length === 0) {
     DATA = DATA_RAW.filter(function(r) {
@@ -1361,11 +1376,17 @@ function applyDateFilter() {
       return cs <= e && ce >= s;
     });
   } else {
-    // Build DATA: merge daily-aggregated spend with campaign metadata
+    // Build DATA: merge daily-aggregated spend + triggers with campaign metadata
     DATA = DATA_RAW
       .filter(function(r) { return campAgg[r.Campaign]; })
       .map(function(r) {
         var a = campAgg[r.Campaign];
+        var trig = campTrigAgg[r.Campaign];
+        // WhatsApp: keep manually-set localStorage value; others: use date-filtered trigger totals
+        var gl = (r.Type === 'WhatsApp') ? r.Triggered_Leads
+               : (DATA_TRIGGERS.length && trig) ? trig.Triggered_Leads : r.Triggered_Leads;
+        var dt = (r.Type === 'WhatsApp') ? r.Dealer_Triggers
+               : (DATA_TRIGGERS.length && trig) ? trig.Dealer_Triggers : r.Dealer_Triggers;
         return {
           Campaign:        r.Campaign,
           Platform:        r.Platform,
@@ -1374,8 +1395,8 @@ function applyDateFilter() {
           Status:          r.Status,
           StartDate:       r.StartDate,
           EndDate:         r.EndDate,
-          Triggered_Leads: r.Triggered_Leads,
-          Dealer_Triggers: r.Dealer_Triggers,
+          Triggered_Leads: gl,
+          Dealer_Triggers: dt,
           Spends:          Math.round(a.Spends * 100) / 100,
           Impressions:     Math.round(a.Impressions),
           Clicks:          Math.round(a.Clicks),
@@ -1391,7 +1412,7 @@ function applyDateFilter() {
   periodBadge.textContent = formatDateRange(s, e);
 
   // Invalidate rendered panes so they re-render
-  ['overview','city','campaigns','types'].forEach(function(id) {
+  ['overview','city','campaigns','types','comparison'].forEach(function(id) {
     var el = document.getElementById('pane-' + id);
     if (el) { el.dataset.done = ''; el.innerHTML = ''; }
   });
@@ -1399,7 +1420,7 @@ function applyDateFilter() {
   // Re-render active pane
   var activeTab = document.querySelector('.tab.active');
   if (activeTab) {
-    var ids = ['overview','city','campaigns','types'];
+    var ids = ['overview','city','campaigns','types','comparison'];
     document.querySelectorAll('.tab').forEach(function(t, i) {
       if (t.classList.contains('active')) switchTab(ids[i]);
     });
@@ -1485,17 +1506,204 @@ window.updateWaDt = updateWaDt;
 // ── TAB SWITCH ───────────────────────────────────────────────────────────────
 function switchTab(id) {
   document.querySelectorAll('.tab').forEach(function(t,i) {
-    var ids=['overview','city','campaigns','types'];
+    var ids=['overview','city','campaigns','types','comparison'];
     t.classList.toggle('active', ids[i]===id);
   });
   document.querySelectorAll('.pane').forEach(function(p) { p.classList.remove('active'); });
   document.getElementById('pane-'+id).classList.add('active');
-  if(id==='overview')  renderOverview();
-  if(id==='city')      renderCity();
-  if(id==='campaigns') renderCampaigns();
-  if(id==='types')     renderTypes();
+  if(id==='overview')   renderOverview();
+  if(id==='city')       renderCity();
+  if(id==='campaigns')  renderCampaigns();
+  if(id==='types')      renderTypes();
+  if(id==='comparison') renderComparison();
 }
 window.switchTab = switchTab;
+
+// ── TREND & COMPARISON ────────────────────────────────────────────────────────
+function renderComparison() {
+  var el = document.getElementById('pane-comparison');
+  if (!el) return;
+
+  var s = document.getElementById('date-start').value;
+  var e = document.getElementById('date-end').value;
+  if (!s || !e) { el.innerHTML = noDataMsg(); return; }
+
+  var period = (document.getElementById('comp-period') || {value:'daily'}).value || 'daily';
+  var spendRows = DATA_DAILY.filter(function(d){ return d.Date >= s && d.Date <= e; });
+  var trigRows  = DATA_TRIGGERS.filter(function(d){ return d.Date >= s && d.Date <= e; });
+
+  if (!spendRows.length && !trigRows.length) { el.innerHTML = noDataMsg(); return; }
+
+  // Bucket key from date
+  function getBucket(date) {
+    if (period === 'weekly') {
+      var d = new Date(date + 'T00:00:00');
+      var day = d.getDay(); var diff = d.getDate() - day + (day===0?-6:1);
+      d.setDate(diff);
+      var mm = d.getMonth()+1; var dd = d.getDate();
+      return d.getFullYear()+'-'+(mm<10?'0'+mm:mm)+'-'+(dd<10?'0'+dd:dd);
+    }
+    if (period === 'monthly') return date.substring(0,7);
+    return date; // daily
+  }
+
+  function bucketLabel(b) {
+    var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (period === 'monthly') { var p=b.split('-'); return M[+p[1]-1]+' '+p[0]; }
+    var p=b.split('-');
+    var label = p[2].replace(/^0/,'')+' '+M[+p[1]-1];
+    if (period === 'weekly') label = 'Wk '+label;
+    return label;
+  }
+
+  // City → campaign set
+  var CITY_CAMP = {};
+  DATA_RAW.forEach(function(r){ if(!CITY_CAMP[r.City]) CITY_CAMP[r.City]={}; CITY_CAMP[r.City][r.Campaign]=1; });
+  var CITIES = ['Ahmedabad','Chandigarh','Nashik'];
+
+  // Aggregate by bucket — total + per city
+  var totMap = {}; var cityMap = {};
+  CITIES.forEach(function(c){ cityMap[c]={}; });
+
+  function add(map, b, row, isSpend) {
+    if (!map[b]) map[b]={sp:0,imp:0,cl:0,cv:0,gl:0,dt:0};
+    if (isSpend) { map[b].sp+=row.Spends; map[b].imp+=row.Impressions; map[b].cl+=row.Clicks; map[b].cv+=row.Conversions; }
+    else         { map[b].gl+=row.Triggered_Leads; map[b].dt+=row.Dealer_Triggers; }
+  }
+
+  spendRows.forEach(function(d){ var b=getBucket(d.Date); add(totMap,b,d,true); CITIES.forEach(function(c){ if(CITY_CAMP[c]&&CITY_CAMP[c][d.Campaign]) add(cityMap[c],b,d,true); }); });
+  trigRows.forEach(function(d){  var b=getBucket(d.Date); add(totMap,b,d,false); CITIES.forEach(function(c){ if(CITY_CAMP[c]&&CITY_CAMP[c][d.Campaign]) add(cityMap[c],b,d,false); }); });
+
+  var buckets = Object.keys(totMap).sort();
+  var labels  = buckets.map(bucketLabel);
+
+  // SVG line chart
+  function svgChart(seriesArr, yFmt) {
+    var W=860, H=180, pL=68, pR=14, pT=14, pB=36;
+    var cW=W-pL-pR, cH=H-pT-pB, n=buckets.length;
+    var allV=[]; seriesArr.forEach(function(s){ allV=allV.concat(s.values.filter(function(v){return v!=null&&!isNaN(v);})); });
+    var maxV=Math.max.apply(null,allV.concat([0])); if(maxV===0) maxV=1;
+    function xp(i){ return pL+(n<=1?cW/2:i*cW/(n-1)); }
+    function yp(v){ return pT+cH-v/maxV*cH; }
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">';
+    // Grid
+    for(var g=0;g<=4;g++){
+      var gv=maxV*g/4; var gy=yp(gv);
+      svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="#E4E7EC" stroke-width="1"/>';
+      svg+='<text x="'+(pL-5)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3">'+yFmt(gv)+'</text>';
+    }
+    // X labels
+    var step=n>16?Math.ceil(n/8):1;
+    for(var i=0;i<n;i++){
+      if(i%step!==0&&i!==n-1) continue;
+      svg+='<text x="'+xp(i)+'" y="'+(H-pB+14)+'" text-anchor="middle" font-size="10" fill="#98A2B3">'+labels[i]+'</text>';
+    }
+    // Series
+    seriesArr.forEach(function(s){
+      var pts=[]; for(var i=0;i<n;i++){ var v=s.values[i]; if(v!=null&&!isNaN(v)) pts.push(xp(i)+','+yp(v)); }
+      if(pts.length>1) svg+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+s.color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+      if(n<=25){ for(var i=0;i<n;i++){ var v=s.values[i]; if(v!=null&&!isNaN(v)) svg+='<circle cx="'+xp(i)+'" cy="'+yp(v)+'" r="3" fill="'+s.color+'" stroke="#fff" stroke-width="1.5"/>'; } }
+    });
+    svg+='</svg>';
+    return svg;
+  }
+
+  function vals(map, key) { return buckets.map(function(b){ return map[b]?map[b][key]:0; }); }
+  function derived(map, fn) { return buckets.map(function(b){ return map[b]?fn(map[b]):null; }); }
+
+  var CC={Ahmedabad:'#7C3AED',Chandigarh:'#0369A1',Nashik:'#047857'};
+
+  function chartSeries(key) {
+    return [
+      {label:'Total',color:'#1D2939',values:vals(totMap,key)}
+    ].concat(CITIES.map(function(c){ return {label:c,color:CC[c],values:vals(cityMap[c],key)}; }));
+  }
+  function derivedSeries(fn) {
+    return [
+      {label:'Total',color:'#1D2939',values:derived(totMap,fn)}
+    ].concat(CITIES.map(function(c){ return {label:c,color:CC[c],values:derived(cityMap[c],fn)}; }));
+  }
+
+  function legend() {
+    var s='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;justify-content:flex-end">';
+    [{label:'Total',color:'#1D2939'}].concat(CITIES.map(function(c){return{label:c,color:CC[c]};})).forEach(function(x){
+      s+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:18px;height:3px;background:'+x.color+';border-radius:2px"></div>'+x.label+'</div>';
+    });
+    return s+'</div>';
+  }
+
+  function metricCard(title, series, yFmt, icon) {
+    return '<div class="tbl-card" style="margin-bottom:16px"><div class="tbl-toolbar"><span class="tbl-title">'+icon+' '+title+'</span>'+legend()+'</div><div style="padding:8px 16px 16px">'+svgChart(series,yFmt)+'</div></div>';
+  }
+
+  // Period toggle buttons
+  var html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap">';
+  html += '<span style="font-size:12px;font-weight:600;color:var(--text2)">Group by:</span>';
+  ['daily','weekly','monthly'].forEach(function(p){
+    var active = p===period;
+    html += '<button onclick="setCompPeriod(\''+p+'\')" style="padding:5px 14px;font-size:12px;font-family:inherit;font-weight:'+(active?'700':'500')+';border-radius:7px;border:1px solid '+(active?'var(--navy)':'var(--border2)')+';background:'+(active?'var(--navy)':'var(--surface)')+';color:'+(active?'#fff':'var(--text2)')+';cursor:pointer">'+p.charAt(0).toUpperCase()+p.slice(1)+'</button>';
+  });
+  html += '<span style="margin-left:auto;font-size:12px;color:var(--text3)">'+labels.length+' '+period+' bucket'+(labels.length!==1?'s':'')+'</span></div>';
+
+  // Summary strip
+  var tot=totMap[buckets[0]]||{sp:0,imp:0,cl:0,cv:0,gl:0,dt:0};
+  var totAll={sp:0,imp:0,cl:0,cv:0,gl:0,dt:0};
+  buckets.forEach(function(b){ var r=totMap[b]; if(r){totAll.sp+=r.sp;totAll.imp+=r.imp;totAll.cl+=r.cl;totAll.cv+=r.cv;totAll.gl+=r.gl;totAll.dt+=r.dt;} });
+  var avgSp=totAll.sp/buckets.length, avgImp=totAll.imp/buckets.length;
+  html += '<div class="summary" style="margin-bottom:18px">';
+  [ ['Total Spends',INR(totAll.sp),'Avg/'+period+': '+INR(Math.round(avgSp))],
+    ['Impressions',NUM(totAll.imp),'Avg: '+NUM(Math.round(avgImp))],
+    ['Clicks',NUM(totAll.cl),'CTR: '+(totAll.imp?PCT(totAll.cl/totAll.imp):'—')],
+    ['Panel Conv.',fmtN(totAll.cv),'CPL: '+fmt(totAll.cv?totAll.sp/totAll.cv:null,0)],
+    ['Triggered Leads',NUM(totAll.gl),'TCPL: '+fmt(totAll.gl?totAll.sp/totAll.gl:null,0)],
+    ['Dealer Triggers',NUM(totAll.dt),'DCPL: '+fmt(totAll.dt?totAll.sp/totAll.dt:null,0)]
+  ].forEach(function(c){ html+='<div class="sum-card"><div class="sum-label">'+c[0]+'</div><div class="sum-val">'+c[1]+'</div><div class="sum-sub">'+c[2]+'</div></div>'; });
+  html += '</div>';
+
+  // Charts grid (2-column)
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  html += metricCard('Spends',          chartSeries('sp'),  function(v){return v>=1e5?(v/1e5).toFixed(1)+'L':v>=1e3?(v/1e3).toFixed(0)+'K':Math.round(v)+'';}, '₹');
+  html += metricCard('Impressions',     chartSeries('imp'), function(v){return v>=1e5?(v/1e5).toFixed(1)+'L':v>=1e3?(v/1e3).toFixed(0)+'K':Math.round(v)+'';}, '👁');
+  html += metricCard('Clicks',          chartSeries('cl'),  function(v){return v>=1e3?(v/1e3).toFixed(0)+'K':Math.round(v)+'';}, '🖱');
+  html += metricCard('Panel Conversions',chartSeries('cv'), function(v){return v>0?fmtN(v):'0';}, '📋');
+  html += metricCard('Triggered Leads', chartSeries('gl'),  function(v){return Math.round(v)+'';}, '🎯');
+  html += metricCard('Dealer Triggers', chartSeries('dt'),  function(v){return Math.round(v)+'';}, '🏪');
+  html += metricCard('CPM (₹)', derivedSeries(function(r){ return r.imp?Math.round(r.sp/r.imp*1000):null; }), function(v){return v!=null?Math.round(v)+'':'';}, '📡');
+  html += metricCard('TCPL (₹)',  derivedSeries(function(r){ return r.gl?Math.round(r.sp/r.gl):null; }),  function(v){return v!=null?Math.round(v)+'':'';}, '💰');
+  html += '</div>';
+
+  // Period-by-period table
+  html += '<div class="tbl-card" style="margin-top:16px"><div class="tbl-toolbar"><span class="tbl-title">📅 Period Detail</span></div>';
+  html += '<div class="tbl-wrap"><table><thead><tr>';
+  html += '<th class="left sticky" style="left:0">Period</th>';
+  ['Spends','Impr.','Clicks','CTR','Panel Conv.','Trig. Leads','Dealer Trig.','Trig %','Panel CPL','TCPL','Dealer CPL','CPM'].forEach(function(k){html+='<th>'+k+'</th>';});
+  html += '</tr></thead><tbody>';
+  buckets.forEach(function(b){
+    var r=totMap[b]; if(!r) return;
+    var tpct=r.gl>0?r.dt/r.gl:null;
+    html+='<tr><td class="left sticky" style="left:0;font-weight:600;white-space:nowrap">'+bucketLabel(b)+'</td>';
+    html+='<td>'+INR(Math.round(r.sp))+'</td><td>'+NUM(r.imp)+'</td><td>'+NUM(r.cl)+'</td>';
+    html+='<td>'+PCT(r.imp?r.cl/r.imp:0)+'</td><td>'+fmtN(r.cv)+'</td>';
+    html+='<td>'+NUM(r.gl)+'</td><td>'+NUM(r.dt)+'</td>';
+    html+='<td>'+(tpct!=null?PCT(tpct):'—')+'</td>';
+    html+='<td>'+fmt(r.cv?r.sp/r.cv:null,0)+'</td><td>'+fmt(r.gl?r.sp/r.gl:null,0)+'</td><td>'+fmt(r.dt?r.sp/r.dt:null,0)+'</td>';
+    html+='<td>'+fmt(r.imp?r.sp/r.imp*1000:null,1)+'</td></tr>';
+  });
+  html+='</tbody></table></div></div>';
+
+  el.innerHTML = html;
+}
+
+function setCompPeriod(p) {
+  var el = document.createElement('input');
+  el.id = 'comp-period'; el.type = 'hidden'; el.value = p;
+  var old = document.getElementById('comp-period');
+  if (old) old.parentNode.replaceChild(el, old);
+  else document.body.appendChild(el);
+  document.getElementById('pane-comparison').dataset.done = '';
+  renderComparison();
+}
+window.setCompPeriod = setCompPeriod;
 
 // ── OVERVIEW ─────────────────────────────────────────────────────────────────
 function renderOverview() {
