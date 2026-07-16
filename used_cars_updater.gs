@@ -31,7 +31,7 @@ function updateDashboard() {
   // Reference cols: [0]=Campaign, [1]=Campaign_type
   var KNOWN_TYPES = {
     'Search':true, 'Catalogue':true, 'Demand Gen':true,
-    'Performance Max':true, 'LeadForm':true, 'Website Conversion':true, 'WhatsApp':true
+    'Performance Max':true, 'LeadForm':true, 'Website Conversion':true, 'WhatsApp':true, 'YouTube':true
   };
   var typeMap = {};
   for (var i = 1; i < refData.length; i++) {
@@ -49,6 +49,7 @@ function updateDashboard() {
       else if (nl.indexOf('pmax') !== -1) typeMap[campKey] = 'Performance Max';
       else if (nl.indexOf('static') !== -1 || nl.indexOf('website') !== -1) typeMap[campKey] = 'Website Conversion';
       else if (nl.indexOf('demand') !== -1) typeMap[campKey] = 'Demand Gen';
+      else if (nl.indexOf('yt') !== -1 || nl.indexOf('youtube') !== -1) typeMap[campKey] = 'YouTube';
       else typeMap[campKey] = 'Search';
     }
   }

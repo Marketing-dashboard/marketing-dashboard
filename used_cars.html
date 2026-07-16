@@ -603,7 +603,7 @@ var DATA_RAW = [
   {Campaign:"Nashik-Whatsup-Leads", Spends:509.13, Impressions:11113, Clicks:95, Conversions:7, Platform:"Meta", City:"Nashik", Type:"WhatsApp", Triggered_Leads:0, Dealer_Triggers:0, Status:"Experiment · Ongoing", StartDate:"2026-07-13", EndDate:null},
   {Campaign:"Nashik-Whatsup-Leads -13thJuly", Spends:6443.66, Impressions:266514, Clicks:1534, Conversions:150, Platform:"Meta", City:"Nashik", Type:"WhatsApp", Triggered_Leads:0, Dealer_Triggers:0, Status:"Experiment · Ongoing", StartDate:"2026-07-13", EndDate:null},
   {Campaign:"Nasik-Search-Buy-UsedCar-8april", Spends:113112.9, Impressions:121737, Clicks:27527, Conversions:2905.95, Platform:"Google", City:"Nashik", Type:"Search", Triggered_Leads:1568, Dealer_Triggers:1145, Status:"Ongoing", StartDate:"2026-04-08", EndDate:null},
-  {Campaign:"YT_UC_Nashik", Spends:1430.05, Impressions:8984, Clicks:125, Conversions:1, Platform:"Google", City:"Nashik", Type:"Search", Triggered_Leads:1, Dealer_Triggers:0, Status:"Ongoing", StartDate:"2026-07-14", EndDate:null}
+  {Campaign:"YT_UC_Nashik", Spends:1430.05, Impressions:8984, Clicks:125, Conversions:1, Platform:"Google", City:"Nashik", Type:"YouTube", Triggered_Leads:1, Dealer_Triggers:0, Status:"Ongoing", StartDate:"2026-07-14", EndDate:null}
 ];
 
 // Daily spend rows — replaced by Apps Script; used by date filter to re-aggregate
@@ -1837,8 +1837,8 @@ var CITY_BORDER = {Ahmedabad:'#C4B5FD', Chandigarh:'#BAE6FD', Nashik:'#6EE7B7'};
 var PLAT_COLOR  = {Google:'#EA4335', Meta:'#1877F2'};
 var PLAT_LIGHT  = {Google:'#FEF2F2', Meta:'#EFF6FF'};
 var PLAT_BDR    = {Google:'#FCA5A5', Meta:'#93C5FD'};
-var TYPE_COLOR  = {Search:'#7C3AED', Catalogue:'#D97706', LeadForm:'#0891B2', 'Demand Gen':'#059669', 'Performance Max':'#9333EA', 'Website Conversion':'#0369A1', WhatsApp:'#25D366', Other:'#64748B'};
-var TYPE_LIGHT  = {Search:'#F5F3FF', Catalogue:'#FFFBEB', LeadForm:'#ECFEFF', 'Demand Gen':'#ECFDF5', 'Performance Max':'#FAF5FF', 'Website Conversion':'#EFF6FF', WhatsApp:'#F0FDF4', Other:'#F8FAFC'};
+var TYPE_COLOR  = {Search:'#7C3AED', Catalogue:'#D97706', LeadForm:'#0891B2', 'Demand Gen':'#059669', 'Performance Max':'#9333EA', 'Website Conversion':'#0369A1', WhatsApp:'#25D366', YouTube:'#FF0000', Other:'#64748B'};
+var TYPE_LIGHT  = {Search:'#F5F3FF', Catalogue:'#FFFBEB', LeadForm:'#ECFEFF', 'Demand Gen':'#ECFDF5', 'Performance Max':'#FAF5FF', 'Website Conversion':'#EFF6FF', WhatsApp:'#F0FDF4', YouTube:'#FFF1F2', Other:'#F8FAFC'};
 
 var _today = new Date();
 var _pad = function(n){return n<10?'0'+n:String(n);};
@@ -2627,7 +2627,7 @@ function renderTypes() {
     var plats=[...new Set(typeRows.map(function(r){return r.Platform;}))];
     var maxSp=Math.max.apply(null, cities.map(function(c){return cityTots[c].sp;}));
     html+='<div class="type-card"><div class="type-hdr"><div class="type-icon" style="background:'+TYPE_LIGHT[type]+'">';
-    html+=type==='Search'?'🔍':type==='Catalogue'?'📋':type==='LeadForm'?'📝':type==='Demand Gen'?'📣':type==='Performance Max'?'⚡':type==='Website Conversion'?'🌐':'💬';
+    html+=type==='Search'?'🔍':type==='Catalogue'?'📋':type==='LeadForm'?'📝':type==='Demand Gen'?'📣':type==='Performance Max'?'⚡':type==='Website Conversion'?'🌐':type==='YouTube'?'▶️':'💬';
     html+='</div><div><div class="type-hdr-name">'+type+'</div>';
     html+='<div class="type-hdr-plat" style="color:var(--text2)">'+plats.map(function(p){return '<span style="color:'+PLAT_COLOR[p]+'">'+p+'</span>';}).join(' · ')+'</div></div></div>';
     html+='<div class="type-body">';
