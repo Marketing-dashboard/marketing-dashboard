@@ -2351,33 +2351,25 @@ function renderComparison() {
 
   var period  = (document.getElementById('comp-period')||{value:'daily'}).value||'daily';
   var selType = (document.getElementById('comp-type')||{value:'All'}).value||'All';
-  var selKpi  = (document.getElementById('comp-kpi')||{value:'sp'}).value||'sp';
 
-  var KPI_OPTS=[
-    {k:'sp',   label:'Spends'},
-    {k:'gl',   label:'Triggered Leads'},
-    {k:'dt',   label:'Dealer Triggers'},
-    {k:'cv',   label:'Panel Conversions'},
-    {k:'cpl',  label:'CPL (₹)'},
-    {k:'tcpl', label:'TCPL (₹)'},
-    {k:'dcpl', label:'Dealer CPL (₹)'}
+  var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik'];
+  var CC = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857'};
+
+  var citiesRaw = (document.getElementById('comp-cities')||{value:''}).value||'';
+  var selCities = citiesRaw ? citiesRaw.split(',').filter(function(c){return CITIES_ALL.indexOf(c)>=0;}) : CITIES_ALL.slice();
+  if (!selCities.length) selCities = CITIES_ALL.slice();
+
+  var SERIES_ALL = [
+    {k:'sp',  label:'Spends',       color:'#3B82F6', dash:false},
+    {k:'gl',  label:'Trig. Leads',  color:'#7C3AED', dash:false},
+    {k:'dt',  label:'Dealer Trig.', color:'#059669', dash:false},
+    {k:'tcpl',label:'TCPL',         color:'#F59E0B', dash:true},
+    {k:'dcpl',label:'Dealer CPL',   color:'#EF4444', dash:true}
   ];
-  function kpiVal(r,k){
-    if(!r) return null;
-    if(k==='sp')   return r.sp;
-    if(k==='gl')   return r.gl;
-    if(k==='dt')   return r.dt;
-    if(k==='cv')   return r.cv;
-    if(k==='cpl')  return r.cv?r.sp/r.cv:null;
-    if(k==='tcpl') return r.gl?r.sp/r.gl:null;
-    if(k==='dcpl') return r.dt?r.sp/r.dt:null;
-    return null;
-  }
-  function kpiFmt(v,k){
-    if(v==null) return '—';
-    if(k==='sp'||k==='cpl'||k==='tcpl'||k==='dcpl') return INR(Math.round(v));
-    return NUM(Math.round(v));
-  }
+  var kpisRaw = (document.getElementById('comp-kpis')||{value:''}).value||'';
+  var selKpis = kpisRaw ? kpisRaw.split(',').filter(function(k){return k;}) : ['sp'];
+  if (!selKpis.length) selKpis = ['sp'];
+  var activeSeries = SERIES_ALL.filter(function(s){ return selKpis.indexOf(s.k)>=0; });
 
   // All campaign types from DATA_RAW
   var allTypes = ['All'];
@@ -2385,8 +2377,7 @@ function renderComparison() {
   DATA_RAW.forEach(function(r){ if(r.Type&&!_ts[r.Type]){_ts[r.Type]=1;allTypes.push(r.Type);} });
 
   // Build city → campaign set (filtered by type)
-  var CITIES = ['Ahmedabad','Chandigarh','Nashik'];
-  var cityCamps = {}; CITIES.forEach(function(c){cityCamps[c]={};});
+  var cityCamps = {}; CITIES_ALL.forEach(function(c){cityCamps[c]={};});
   DATA_RAW.forEach(function(r){
     if (selType!=='All' && r.Type!==selType) return;
     if (cityCamps[r.City]) cityCamps[r.City][r.Campaign]=1;
@@ -2411,28 +2402,44 @@ function renderComparison() {
   }
 
   // Aggregate per city per bucket
-  var cityMaps={}; CITIES.forEach(function(c){cityMaps[c]={};});
+  var cityMaps={}; CITIES_ALL.forEach(function(c){cityMaps[c]={};});
   function ensureBucket(map,b){if(!map[b])map[b]={sp:0,imp:0,cl:0,cv:0,gl:0,dt:0};}
 
   DATA_DAILY.forEach(function(d){
     if(d.Date<s||d.Date>e) return;
     var b=getBucket(d.Date);
-    CITIES.forEach(function(c){ if(cityCamps[c][d.Campaign]){ensureBucket(cityMaps[c],b); var r=cityMaps[c][b]; r.sp+=d.Spends;r.imp+=d.Impressions;r.cl+=d.Clicks;r.cv+=d.Conversions;} });
+    CITIES_ALL.forEach(function(c){ if(cityCamps[c][d.Campaign]){ensureBucket(cityMaps[c],b); var r=cityMaps[c][b]; r.sp+=d.Spends;r.imp+=d.Impressions;r.cl+=d.Clicks;r.cv+=d.Conversions;} });
   });
   DATA_TRIGGERS.forEach(function(d){
     if(d.Date<s||d.Date>e) return;
     var b=getBucket(d.Date);
-    CITIES.forEach(function(c){ if(cityCamps[c][d.Campaign]){ensureBucket(cityMaps[c],b); var r=cityMaps[c][b]; r.gl+=d.Triggered_Leads;r.dt+=d.Dealer_Triggers;} });
+    CITIES_ALL.forEach(function(c){ if(cityCamps[c][d.Campaign]){ensureBucket(cityMaps[c],b); var r=cityMaps[c][b]; r.gl+=d.Triggered_Leads;r.dt+=d.Dealer_Triggers;} });
   });
 
-  // Union of all buckets
-  var bucketSet={}; CITIES.forEach(function(c){Object.keys(cityMaps[c]).forEach(function(b){bucketSet[b]=1;});});
+  // Merge selected cities into one combined map
+  var mergedMap={};
+  function ensureMerged(b){if(!mergedMap[b])mergedMap[b]={sp:0,imp:0,cl:0,cv:0,gl:0,dt:0};}
+  selCities.forEach(function(c){
+    Object.keys(cityMaps[c]).forEach(function(b){
+      ensureMerged(b);
+      var src=cityMaps[c][b],dst=mergedMap[b];
+      dst.sp+=src.sp;dst.gl+=src.gl;dst.dt+=src.dt;dst.cv+=src.cv;dst.imp+=src.imp;dst.cl+=src.cl;
+    });
+  });
+
+  // Union of all buckets (all cities, so timeline is stable regardless of city filter)
+  var bucketSet={}; CITIES_ALL.forEach(function(c){Object.keys(cityMaps[c]).forEach(function(b){bucketSet[b]=1;});});
   var buckets=Object.keys(bucketSet).sort();
   var labels=buckets.map(bucketLabel);
 
   if(!buckets.length){el.innerHTML=noDataMsg();return;}
 
-  var CC={Ahmedabad:'#7C3AED',Chandigarh:'#0369A1',Nashik:'#047857'};
+  function seriesVal(r, k) {
+    if (!r) return 0;
+    if (k==='tcpl') return r.gl ? r.sp/r.gl : 0;
+    if (k==='dcpl') return r.dt ? r.sp/r.dt : 0;
+    return r[k] || 0;
+  }
 
   // Ensure HTML tooltip div exists once in DOM
   if(!document.getElementById('ctip')){
@@ -2441,101 +2448,61 @@ function renderComparison() {
     document.body.appendChild(_td);
   }
 
-  // 5 fixed KPI series colours
-  var SERIES = [
-    {k:'sp',  label:'Spends',       color:'#3B82F6', dash:false},
-    {k:'gl',  label:'Trig. Leads',  color:'#7C3AED', dash:false},
-    {k:'dt',  label:'Dealer Trig.', color:'#059669', dash:false},
-    {k:'tcpl',label:'TCPL',         color:'#F59E0B', dash:true},
-    {k:'dcpl',label:'Dealer CPL',   color:'#EF4444', dash:true}
-  ];
-  function seriesVal(r, k) {
-    if (!r) return 0;
-    if (k==='tcpl') return r.gl ? r.sp/r.gl : 0;
-    if (k==='dcpl') return r.dt ? r.sp/r.dt : 0;
-    return r[k] || 0;
-  }
-
-  function svgCityChart(map, color, city) {
+  function svgChart() {
     var W=880,H=240,pL=52,pR=20,pT=18,pB=44;
     var cW=W-pL-pR,cH=H-pT-pB,n=buckets.length;
     function xp(i){return Math.round(pL+(n<=1?cW/2:i*cW/(n-1)));}
-    var uid='cc'+city.replace(/\s/g,'');
-
-    // Per-series data + max
-    var seriesData = SERIES.map(function(s){
-      var vals = buckets.map(function(b){ return seriesVal(map[b],s.k); });
-      var maxV = Math.max.apply(null, vals.concat([1])); if(maxV===0) maxV=1;
-      return {s:s, vals:vals, maxV:maxV};
+    var seriesData=activeSeries.map(function(s){
+      var vals=buckets.map(function(b){return seriesVal(mergedMap[b],s.k);});
+      var maxV=Math.max.apply(null,vals.concat([1])); if(maxV===0)maxV=1;
+      return {s:s,vals:vals,maxV:maxV};
     });
-    function yp(v, maxV){ return Math.round(pT+cH-(v/maxV)*cH); }
-
-    var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible" id="'+uid+'">';
-
-    // Horizontal grid lines (percentage scale 0–100%)
+    function yp(v,maxV){return Math.round(pT+cH-(v/maxV)*cH);}
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible">';
     for(var g=0;g<=4;g++){
       var gy=Math.round(pT+cH*(1-g/4));
       svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="'+(g===0?'#E4E7EC':'#F2F4F7')+'" stroke-width="1"/>';
       svg+='<text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+(g*25)+'%</text>';
     }
-
-    // X-axis labels
     var step=Math.max(1,Math.ceil(n/10));
     for(var i=0;i<n;i++){
       if(i%step!==0&&i!==n-1) continue;
       svg+='<text x="'+xp(i)+'" y="'+(H-pB+16)+'" text-anchor="middle" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+labels[i]+'</text>';
     }
-
-    // Draw lines (back to front: dashed first so solid overlap)
     seriesData.slice().reverse().forEach(function(sd){
-      var pts=[];
+      var lp='',started=false;
       for(var i=0;i<n;i++){
         var v=sd.vals[i];
-        if(v>=0) pts.push({x:xp(i),y:yp(v,sd.maxV)});
-        else pts.push(null);
+        if(v>0){if(!started){lp+='M '+xp(i)+','+yp(v,sd.maxV);started=true;}else lp+=' L '+xp(i)+','+yp(v,sd.maxV);}
+        else started=false;
       }
-      var valid=pts.filter(function(p){return p;});
-      if(valid.length<2) return;
-      var lp=''; var started=false;
-      pts.forEach(function(p){
-        if(!p){started=false;return;}
-        if(!started){lp+='M '+p.x+','+p.y; started=true;}
-        else lp+=' L '+p.x+','+p.y;
-      });
-      svg+='<path d="'+lp+'" fill="none" stroke="'+sd.s.color+'" stroke-width="2" '+(sd.s.dash?'stroke-dasharray="6 3"':'')+' stroke-linejoin="round" stroke-linecap="round" style="pointer-events:none"/>';
-      // Dots
+      if(lp) svg+='<path d="'+lp+'" fill="none" stroke="'+sd.s.color+'" stroke-width="2.5" '+(sd.s.dash?'stroke-dasharray="6 3"':'')+' stroke-linejoin="round" stroke-linecap="round" style="pointer-events:none"/>';
       for(var i=0;i<n;i++){
         var v=sd.vals[i]; if(v<=0) continue;
         svg+='<circle cx="'+xp(i)+'" cy="'+yp(v,sd.maxV)+'" r="3.5" fill="'+sd.s.color+'" stroke="#fff" stroke-width="2" style="pointer-events:none"/>';
       }
     });
-
-    // Invisible hover columns
     for(var i=0;i<n;i++){
       var cx=xp(i);
-      var r=map[buckets[i]]||{sp:0,cv:0,gl:0,dt:0};
+      var r=mergedMap[buckets[i]]||{sp:0,gl:0,dt:0};
       var td=JSON.stringify({
-        d:labels[i], c:city,
-        sp:Math.round(r.sp), gl:Math.round(r.gl), dt:Math.round(r.dt),
+        d:labels[i], c:selCities.join(' + '),
+        sp:Math.round(r.sp),gl:Math.round(r.gl),dt:Math.round(r.dt),
         tcpl:r.gl?Math.round(r.sp/r.gl):0,
         dcpl:r.dt?Math.round(r.sp/r.dt):0
       }).replace(/"/g,'&quot;');
       var x0=i===0?pL:Math.round((xp(Math.max(0,i-1))+cx)/2);
       var x1=i===n-1?W-pR:Math.round((cx+xp(Math.min(n-1,i+1)))/2);
-      svg+='<rect x="'+x0+'" y="'+pT+'" width="'+(x1-x0)+'" height="'+cH+'" fill="transparent" style="cursor:crosshair"'
-          +' data-tip="'+td+'" onmouseenter="showCTip(event,this)" onmouseleave="hideCTip()" />';
+      svg+='<rect x="'+x0+'" y="'+pT+'" width="'+(x1-x0)+'" height="'+cH+'" fill="transparent" style="cursor:crosshair" data-tip="'+td+'" onmouseenter="showCTip(event,this)" onmouseleave="hideCTip()" />';
     }
     svg+='</svg>';
-
-    // Legend strip
-    var legend='<div style="display:flex;gap:18px;flex-wrap:wrap;padding:4px 0 8px;justify-content:center">';
-    SERIES.forEach(function(s){
+    var legend='<div style="display:flex;gap:16px;flex-wrap:wrap;padding:4px 0 8px;justify-content:center">';
+    activeSeries.forEach(function(s){
       legend+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)">'
         +'<svg width="22" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="22" y2="5" stroke="'+s.color+'" stroke-width="2"'+(s.dash?' stroke-dasharray="5 2"':'')+'/></svg>'
         +'<span>'+s.label+'</span></div>';
     });
     legend+='</div>';
-
     return legend+svg;
   }
 
@@ -2543,7 +2510,8 @@ function renderComparison() {
   var html='';
 
   // Filter bar
-  html+='<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:#fff;padding:14px 20px;border-radius:14px;border:1px solid var(--border);margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
+  var fbStyle='display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;padding:14px 20px;border-radius:14px;border:1px solid var(--border);margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04)';
+  html+='<div style="'+fbStyle+'">';
 
   // Period
   html+='<div style="display:flex;align-items:center;gap:6px">';
@@ -2559,39 +2527,58 @@ function renderComparison() {
   // Campaign type dropdown
   html+='<div style="display:flex;align-items:center;gap:7px">';
   html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Type</span>';
-  html+='<select onchange="setCompType(encodeURIComponent(this.value))" style="font-size:12px;font-family:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:150px;outline:none">';
+  html+='<select onchange="setCompType(encodeURIComponent(this.value))" style="font-size:12px;font-family:inherit;padding:5px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:140px;outline:none">';
   allTypes.forEach(function(t){ html+='<option value="'+t+'"'+(t===selType?' selected':'')+'>'+t+'</option>'; });
   html+='</select></div>';
+
+  html+='<div style="width:1px;height:26px;background:var(--border);flex-shrink:0"></div>';
+
+  // City checkboxes
+  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Cities</span>';
+  CITIES_ALL.forEach(function(c){
+    var chk=selCities.indexOf(c)>=0;
+    html+='<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--text2);user-select:none">'
+      +'<input type="checkbox" '+(chk?'checked':'')+' onchange="toggleCompCity(\''+c+'\')" style="cursor:pointer;accent-color:'+CC[c]+';width:14px;height:14px">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+CC[c]+';display:inline-block;flex-shrink:0"></span>'
+      +c+'</label>';
+  });
+  html+='</div>';
+
+  html+='<div style="width:1px;height:26px;background:var(--border);flex-shrink:0"></div>';
+
+  // KPI checkboxes
+  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">KPIs</span>';
+  SERIES_ALL.forEach(function(s){
+    var chk=selKpis.indexOf(s.k)>=0;
+    html+='<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:var(--text2);user-select:none">'
+      +'<input type="checkbox" '+(chk?'checked':'')+' onchange="toggleCompKpi(\''+s.k+'\')" style="cursor:pointer;accent-color:'+s.color+';width:14px;height:14px">'
+      +'<svg width="18" height="8" style="flex-shrink:0"><line x1="0" y1="4" x2="18" y2="4" stroke="'+s.color+'" stroke-width="2"'+(s.dash?' stroke-dasharray="4 2"':'')+'/></svg>'
+      +s.label+'</label>';
+  });
+  html+='</div>';
 
   html+='<span style="margin-left:auto;font-size:11px;color:var(--text3)">'+labels.length+' '+period+(labels.length!==1?'s':'')+' · hover for values</span>';
   html+='</div>';
 
-  // 3 city cards
-  CITIES.forEach(function(city){
-    var map=cityMaps[city], color=CC[city];
-    var tot={sp:0,cv:0,gl:0,dt:0};
-    buckets.forEach(function(b){var r=map[b];if(r){tot.sp+=r.sp;tot.cv+=r.cv;tot.gl+=r.gl;tot.dt+=r.dt;}});
-    var hasData=tot.sp>0||tot.gl>0;
+  // Single chart card
+  var tot={sp:0,cv:0,gl:0,dt:0};
+  buckets.forEach(function(b){var r=mergedMap[b];if(r){tot.sp+=r.sp;tot.cv+=r.cv;tot.gl+=r.gl;tot.dt+=r.dt;}});
+  var hasData=tot.sp>0||tot.gl>0;
 
-    html+='<div style="background:#fff;border-radius:14px;border:1px solid var(--border);margin-bottom:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
-
-    // Card header
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 12px;border-bottom:1px solid var(--border)">';
-    html+='<div style="display:flex;align-items:center;gap:10px"><div style="width:11px;height:11px;border-radius:50%;background:'+color+'"></div>';
-    html+='<span style="font-size:15px;font-weight:700;color:var(--text)">'+city+'</span>';
-    html+='</div>';
-    html+='<div style="display:flex;gap:20px">';
-    [['Spends',INR(Math.round(tot.sp))],['Trig. Leads',NUM(tot.gl)],['Dealer Trig.',NUM(tot.dt)],['TCPL',tot.gl?INR(Math.round(tot.sp/tot.gl)):'—'],['Dealer CPL',tot.dt?INR(Math.round(tot.sp/tot.dt)):'—']].forEach(function(c){
-      html+='<div style="text-align:right"><div style="font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.4px">'+c[0]+'</div><div style="font-size:13px;font-weight:700;color:var(--text)">'+c[1]+'</div></div>';
-    });
-    html+='</div></div>';
-
-    // Chart
-    html+='<div style="padding:16px 20px 10px">';
-    if(!hasData){ html+='<div style="height:80px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px">No data for this filter</div>'; }
-    else { html+=svgCityChart(map,color,city); }
-    html+='</div></div>';
+  html+='<div style="background:#fff;border-radius:14px;border:1px solid var(--border);margin-bottom:20px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 12px;border-bottom:1px solid var(--border)">';
+  html+='<span style="font-size:15px;font-weight:700;color:var(--text)">'+selCities.join(' · ')+'</span>';
+  html+='<div style="display:flex;gap:20px">';
+  [['Spends',INR(Math.round(tot.sp))],['Trig. Leads',NUM(tot.gl)],['Dealer Trig.',NUM(tot.dt)],['TCPL',tot.gl?INR(Math.round(tot.sp/tot.gl)):'—'],['Dealer CPL',tot.dt?INR(Math.round(tot.sp/tot.dt)):'—']].forEach(function(c){
+    html+='<div style="text-align:right"><div style="font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.4px">'+c[0]+'</div><div style="font-size:13px;font-weight:700;color:var(--text)">'+c[1]+'</div></div>';
   });
+  html+='</div></div>';
+  html+='<div style="padding:16px 20px 10px">';
+  if(!hasData) html+='<div style="height:80px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px">No data for this filter</div>';
+  else html+=svgChart();
+  html+='</div></div>';
 
   // Detail table
   html+='<div style="background:#fff;border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-top:4px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">';
@@ -2601,7 +2588,7 @@ function renderComparison() {
   ['Spends','Panel Conv.','Trig. Leads','Dealer Trig.','CPL','TCPL','Dealer CPL'].forEach(function(k){html+='<th>'+k+'</th>';});
   html+='</tr></thead><tbody>';
   buckets.forEach(function(b){
-    CITIES.forEach(function(city){
+    selCities.forEach(function(city){
       var r=cityMaps[city][b]; if(!r||(r.sp===0&&r.gl===0)) return;
       html+='<tr><td class="left sticky" style="left:0;font-weight:600;white-space:nowrap">'+bucketLabel(b)+'</td>';
       html+='<td class="left"><span style="color:'+CC[city]+';font-weight:600">'+city+'</span></td>';
@@ -2650,6 +2637,35 @@ function setCompKpi(k) {
   renderComparison();
 }
 window.setCompKpi = setCompKpi;
+
+function toggleCompCity(city) {
+  var raw = (document.getElementById('comp-cities')||{value:''}).value||'';
+  var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik'];
+  var sel = raw ? raw.split(',').filter(function(c){return CITIES_ALL.indexOf(c)>=0;}) : CITIES_ALL.slice();
+  var idx = sel.indexOf(city);
+  if (idx>=0) sel.splice(idx,1); else sel.push(city);
+  if (!sel.length) sel = CITIES_ALL.slice();
+  var el = document.createElement('input'); el.id='comp-cities'; el.type='hidden'; el.value=sel.join(',');
+  var old = document.getElementById('comp-cities');
+  if (old) old.parentNode.replaceChild(el,old); else document.body.appendChild(el);
+  document.getElementById('pane-comparison').dataset.done='';
+  renderComparison();
+}
+window.toggleCompCity = toggleCompCity;
+
+function toggleCompKpi(k) {
+  var raw = (document.getElementById('comp-kpis')||{value:''}).value||'';
+  var sel = raw ? raw.split(',').filter(function(x){return x;}) : ['sp'];
+  var idx = sel.indexOf(k);
+  if (idx>=0) sel.splice(idx,1); else sel.push(k);
+  if (!sel.length) sel = ['sp'];
+  var el = document.createElement('input'); el.id='comp-kpis'; el.type='hidden'; el.value=sel.join(',');
+  var old = document.getElementById('comp-kpis');
+  if (old) old.parentNode.replaceChild(el,old); else document.body.appendChild(el);
+  document.getElementById('pane-comparison').dataset.done='';
+  renderComparison();
+}
+window.toggleCompKpi = toggleCompKpi;
 
 // ── CHART TOOLTIP (HTML floating div) ────────────────────────────────────────
 function showCTip(evt, rectEl) {
