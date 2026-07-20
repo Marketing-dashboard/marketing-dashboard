@@ -2129,10 +2129,10 @@ var DATA_TRIGGERS = [
   {Date:"2026-07-19",Campaign:"Nashik-Whatsup-Leads -13thJuly",Triggered_Leads:23,Dealer_Triggers:19}
 ];
 
-// Load manually-set dealer triggers for WhatsApp and LeadForm campaigns from localStorage
+// Load manually-set dealer triggers for LeadForm campaigns from localStorage
 (function() {
   DATA_RAW.forEach(function(r) {
-    if (r.Type === 'WhatsApp' || r.Type === 'LeadForm') {
+    if (r.Type === 'LeadForm') {
       var stored = localStorage.getItem('wa_dt_' + r.Campaign);
       if (stored !== null) r.Dealer_Triggers = parseInt(stored) || 0;
     }
@@ -2199,10 +2199,9 @@ function applyDateFilter() {
       .map(function(r) {
         var a = campAgg[r.Campaign];
         var trig = campTrigAgg[r.Campaign];
-        // WhatsApp/LeadForm: use manual localStorage value; others: use date-filtered totals (0 if no rows match)
-        var gl = (r.Type === 'WhatsApp') ? r.Triggered_Leads
-               : DATA_TRIGGERS.length ? (trig ? trig.Triggered_Leads : 0) : r.Triggered_Leads;
-        var dt = (r.Type === 'WhatsApp' || r.Type === 'LeadForm') ? r.Dealer_Triggers
+        // LeadForm: use manual localStorage value; all others: use date-filtered totals (0 if no rows match)
+        var gl = DATA_TRIGGERS.length ? (trig ? trig.Triggered_Leads : 0) : r.Triggered_Leads;
+        var dt = (r.Type === 'LeadForm') ? r.Dealer_Triggers
                : DATA_TRIGGERS.length ? (trig ? trig.Dealer_Triggers : 0) : r.Dealer_Triggers;
         return {
           Campaign:        r.Campaign,
@@ -2862,7 +2861,7 @@ function renderCampaigns() {
     html+='<td>'+INR(r.Spends)+'</td><td>'+NUM(r.Impressions)+'</td><td>'+NUM(r.Clicks)+'</td>';
     html+='<td>'+PCT(pctr_r)+'</td><td>'+fmtN(r.Conversions)+'</td>';
     html+='<td>'+(r.Type==='LeadForm'?'—':NUM(r.Triggered_Leads))+'</td>';
-    if (r.Type === 'WhatsApp' || r.Type === 'LeadForm') {
+    if (r.Type === 'LeadForm') {
       var _cid = r.Campaign.replace(/[^a-zA-Z0-9]/g, '_');
       var _esc = r.Campaign.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       html+='<td><input type="number" id="wa_dt_'+_cid+'" value="'+r.Dealer_Triggers+'" min="0" title="Enter dealer trigger count manually" style="width:62px;border:1.5px solid #CBD5E1;border-radius:4px;padding:2px 5px;font-size:12px;text-align:right;background:var(--card);color:var(--text1)" onchange="updateWaDt(this,\''+_esc+'\')" /></td>';
