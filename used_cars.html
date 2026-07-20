@@ -2451,9 +2451,14 @@ function renderComparison() {
     function yp(v){return v==null?pT+cH:Math.round(pT+cH-(v/maxV)*cH);}
     var uid='cc'+Math.floor(Math.random()*1e9);
 
+    var kpiLabel = KPI_OPTS.filter(function(o){return o.k===selKpi;})[0];
+    var kpiLabelText = kpiLabel ? kpiLabel.label : selKpi;
     var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible" id="'+uid+'">';
     // Gradient
     svg+='<defs><linearGradient id="gr'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity="0.18"/><stop offset="85%" stop-color="'+color+'" stop-opacity="0.02"/></linearGradient></defs>';
+    // Y-axis label (rotated)
+    var yCentre=pT+cH/2;
+    svg+='<text transform="rotate(-90,'+(pL-52)+','+yCentre+')" x="'+(pL-52)+'" y="'+yCentre+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+color+'" font-family="Inter,system-ui,sans-serif" opacity="0.75">'+kpiLabelText+'</text>';
 
     // Horizontal grid lines
     for(var g=0;g<=4;g++){
@@ -2556,8 +2561,11 @@ function renderComparison() {
 
     // Card header
     html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 12px;border-bottom:1px solid var(--border)">';
+    var kpiChipLabel = KPI_OPTS.filter(function(o){return o.k===selKpi;})[0];
     html+='<div style="display:flex;align-items:center;gap:10px"><div style="width:11px;height:11px;border-radius:50%;background:'+color+'"></div>';
-    html+='<span style="font-size:15px;font-weight:700;color:var(--text)">'+city+'</span></div>';
+    html+='<span style="font-size:15px;font-weight:700;color:var(--text)">'+city+'</span>';
+    html+='<span style="font-size:10px;font-weight:600;background:'+color+'18;color:'+color+';border:1px solid '+color+'33;border-radius:20px;padding:2px 9px;letter-spacing:.3px">'+(kpiChipLabel?kpiChipLabel.label:selKpi)+'</span>';
+    html+='</div>';
     html+='<div style="display:flex;gap:20px">';
     [['Spends',INR(Math.round(tot.sp))],['Trig. Leads',NUM(tot.gl)],['Dealer Trig.',NUM(tot.dt)],['TCPL',tot.gl?INR(Math.round(tot.sp/tot.gl)):'—'],['Dealer CPL',tot.dt?INR(Math.round(tot.sp/tot.dt)):'—']].forEach(function(c){
       html+='<div style="text-align:right"><div style="font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.4px">'+c[0]+'</div><div style="font-size:13px;font-weight:700;color:var(--text)">'+c[1]+'</div></div>';
