@@ -235,14 +235,12 @@ tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
   <button class="tab active" onclick="switchTab('overview')">Overview</button>
   <button class="tab" onclick="switchTab('city')">City Comparison</button>
   <button class="tab" onclick="switchTab('campaigns')">Campaign Detail</button>
-  <button class="tab" onclick="switchTab('types')">Campaign Type Analysis</button>
   <button class="tab" onclick="switchTab('comparison')">Trend &amp; Comparison</button>
 </div>
 
 <div id="pane-overview" class="pane active"></div>
 <div id="pane-city"     class="pane"></div>
 <div id="pane-campaigns" class="pane"></div>
-<div id="pane-types"   class="pane"></div>
 <div id="pane-comparison" class="pane"></div>
 
 </div><!-- /.page -->
@@ -2335,7 +2333,6 @@ function switchTab(id) {
   if(id==='overview')   renderOverview();
   if(id==='city')       renderCity();
   if(id==='campaigns')  renderCampaigns();
-  if(id==='types')      renderTypes();
   if(id==='comparison') renderComparison();
 }
 window.switchTab = switchTab;
@@ -2397,8 +2394,14 @@ function renderComparison() {
   function bucketLabel(b) {
     var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     if (period==='monthly'){var p=b.split('-');return M[+p[1]-1]+' '+p[0];}
-    var p=b.split('-'); var lbl=p[2].replace(/^0/,'')+' '+M[+p[1]-1];
-    return period==='weekly'?'Wk '+lbl:lbl;
+    if (period==='weekly'){
+      var start=new Date(b+'T00:00:00');
+      var end=new Date(start); end.setDate(end.getDate()+6);
+      var sm=M[start.getMonth()],sd=start.getDate();
+      var em=M[end.getMonth()],ed=end.getDate();
+      return sd+' '+sm+(sm!==em?' – '+ed+' '+em:' – '+ed);
+    }
+    var p=b.split('-'); return p[2].replace(/^0/,'')+' '+M[+p[1]-1];
   }
 
   // Aggregate per city per bucket
@@ -2452,17 +2455,28 @@ function renderComparison() {
     var W=880,H=240,pL=52,pR=20,pT=18,pB=44;
     var cW=W-pL-pR,cH=H-pT-pB,n=buckets.length;
     function xp(i){return Math.round(pL+(n<=1?cW/2:i*cW/(n-1)));}
+    // Use a shared Y scale across all active series so lines are comparable
+    var allVals=[];
     var seriesData=activeSeries.map(function(s){
       var vals=buckets.map(function(b){return seriesVal(mergedMap[b],s.k);});
-      var maxV=Math.max.apply(null,vals.concat([1])); if(maxV===0)maxV=1;
-      return {s:s,vals:vals,maxV:maxV};
+      vals.forEach(function(v){if(v>0)allVals.push(v);});
+      return {s:s,vals:vals};
     });
+    // Each series normalised to its own max so shape is visible regardless of magnitude
+    seriesData.forEach(function(sd){
+      var mx=Math.max.apply(null,sd.vals.concat([1])); if(mx===0)mx=1;
+      sd.maxV=mx;
+    });
+    // For Y-axis labels use first active series (Spends if present)
+    var yAxisSeries=seriesData[0];
+    function fmtY(v){return v>=1e5?(v/1e5).toFixed(1)+'L':v>=1e3?(v/1e3).toFixed(1)+'K':Math.round(v)+'';}
     function yp(v,maxV){return Math.round(pT+cH-(v/maxV)*cH);}
     var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible">';
     for(var g=0;g<=4;g++){
       var gy=Math.round(pT+cH*(1-g/4));
       svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="'+(g===0?'#E4E7EC':'#F2F4F7')+'" stroke-width="1"/>';
-      svg+='<text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+(g*25)+'%</text>';
+      var yLblVal=yAxisSeries?yAxisSeries.maxV*g/4:0;
+      svg+='<text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+fmtY(yLblVal)+'</text>';
     }
     var step=Math.max(1,Math.ceil(n/10));
     for(var i=0;i<n;i++){
@@ -2922,11 +2936,10 @@ function renderCampaigns() {
 }
 window.renderCampaigns = renderCampaigns;
 
-// ── CAMPAIGN TYPE ANALYSIS ────────────────────────────────────────────────────
+// ── CAMPAIGN TYPE ANALYSIS (removed) ─────────────────────────────────────────
 function renderTypes() {
   var el=document.getElementById('pane-types');
-  if(!DATA.length) { el.innerHTML=noDataMsg(); return; }
-
+  if(!el||!DATA.length) return;
   var types=[...new Set(DATA.map(function(r){return r.Type;}))].sort();
   var cities=['Ahmedabad','Chandigarh','Nashik'];
   var html='';
