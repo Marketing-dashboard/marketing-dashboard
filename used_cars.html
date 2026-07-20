@@ -2441,77 +2441,102 @@ function renderComparison() {
     document.body.appendChild(_td);
   }
 
+  // 5 fixed KPI series colours
+  var SERIES = [
+    {k:'sp',  label:'Spends',       color:'#3B82F6', dash:false},
+    {k:'gl',  label:'Trig. Leads',  color:'#7C3AED', dash:false},
+    {k:'dt',  label:'Dealer Trig.', color:'#059669', dash:false},
+    {k:'tcpl',label:'TCPL',         color:'#F59E0B', dash:true},
+    {k:'dcpl',label:'Dealer CPL',   color:'#EF4444', dash:true}
+  ];
+  function seriesVal(r, k) {
+    if (!r) return 0;
+    if (k==='tcpl') return r.gl ? r.sp/r.gl : 0;
+    if (k==='dcpl') return r.dt ? r.sp/r.dt : 0;
+    return r[k] || 0;
+  }
+
   function svgCityChart(map, color, city) {
-    var vals=buckets.map(function(b){ return kpiVal(map[b],selKpi); });
-    var valid=vals.filter(function(v){return v!=null&&v>=0;});
-    var maxV=valid.length?Math.max.apply(null,valid):1; if(maxV===0)maxV=1;
-    var W=880,H=230,pL=72,pR=20,pT=18,pB=44;
+    var W=880,H=240,pL=52,pR=20,pT=18,pB=44;
     var cW=W-pL-pR,cH=H-pT-pB,n=buckets.length;
     function xp(i){return Math.round(pL+(n<=1?cW/2:i*cW/(n-1)));}
-    function yp(v){return v==null?pT+cH:Math.round(pT+cH-(v/maxV)*cH);}
-    var uid='cc'+Math.floor(Math.random()*1e9);
+    var uid='cc'+city.replace(/\s/g,'');
 
-    var kpiLabel = KPI_OPTS.filter(function(o){return o.k===selKpi;})[0];
-    var kpiLabelText = kpiLabel ? kpiLabel.label : selKpi;
+    // Per-series data + max
+    var seriesData = SERIES.map(function(s){
+      var vals = buckets.map(function(b){ return seriesVal(map[b],s.k); });
+      var maxV = Math.max.apply(null, vals.concat([1])); if(maxV===0) maxV=1;
+      return {s:s, vals:vals, maxV:maxV};
+    });
+    function yp(v, maxV){ return Math.round(pT+cH-(v/maxV)*cH); }
+
     var svg='<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible" id="'+uid+'">';
-    // Gradient
-    svg+='<defs><linearGradient id="gr'+uid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+color+'" stop-opacity="0.18"/><stop offset="85%" stop-color="'+color+'" stop-opacity="0.02"/></linearGradient></defs>';
-    // Y-axis label (rotated)
-    var yCentre=pT+cH/2;
-    svg+='<text transform="rotate(-90,'+(pL-52)+','+yCentre+')" x="'+(pL-52)+'" y="'+yCentre+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+color+'" font-family="Inter,system-ui,sans-serif" opacity="0.75">'+kpiLabelText+'</text>';
 
-    // Horizontal grid lines
+    // Horizontal grid lines (percentage scale 0–100%)
     for(var g=0;g<=4;g++){
-      var gv=maxV*g/4,gy=yp(gv);
-      svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="'+(g===0?'#E4E7EC':'#F2F4F7')+'" stroke-width="'+(g===0?1:1)+'"/>';
-      if(g>0){
-        var lbl=gv>=1e5?(gv/1e5).toFixed(1)+'L':gv>=1e3?(gv/1e3).toFixed(1)+'K':Math.round(gv)+'';
-        svg+='<text x="'+(pL-8)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+lbl+'</text>';
-      }
+      var gy=Math.round(pT+cH*(1-g/4));
+      svg+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="'+(g===0?'#E4E7EC':'#F2F4F7')+'" stroke-width="1"/>';
+      svg+='<text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+(g*25)+'%</text>';
     }
 
-    // X-axis labels (max 10 visible)
+    // X-axis labels
     var step=Math.max(1,Math.ceil(n/10));
     for(var i=0;i<n;i++){
       if(i%step!==0&&i!==n-1) continue;
       svg+='<text x="'+xp(i)+'" y="'+(H-pB+16)+'" text-anchor="middle" font-size="10" fill="#98A2B3" font-family="Inter,system-ui,sans-serif">'+labels[i]+'</text>';
     }
 
-    // Build valid point list
-    var pts=[]; for(var i=0;i<n;i++){ var v=vals[i]; if(v!=null&&v>=0) pts.push({i:i,x:xp(i),y:yp(v),v:v}); }
+    // Draw lines (back to front: dashed first so solid overlap)
+    seriesData.slice().reverse().forEach(function(sd){
+      var pts=[];
+      for(var i=0;i<n;i++){
+        var v=sd.vals[i];
+        if(v>=0) pts.push({x:xp(i),y:yp(v,sd.maxV)});
+        else pts.push(null);
+      }
+      var valid=pts.filter(function(p){return p;});
+      if(valid.length<2) return;
+      var lp=''; var started=false;
+      pts.forEach(function(p){
+        if(!p){started=false;return;}
+        if(!started){lp+='M '+p.x+','+p.y; started=true;}
+        else lp+=' L '+p.x+','+p.y;
+      });
+      svg+='<path d="'+lp+'" fill="none" stroke="'+sd.s.color+'" stroke-width="2" '+(sd.s.dash?'stroke-dasharray="6 3"':'')+' stroke-linejoin="round" stroke-linecap="round" style="pointer-events:none"/>';
+      // Dots
+      for(var i=0;i<n;i++){
+        var v=sd.vals[i]; if(v<=0) continue;
+        svg+='<circle cx="'+xp(i)+'" cy="'+yp(v,sd.maxV)+'" r="3.5" fill="'+sd.s.color+'" stroke="#fff" stroke-width="2" style="pointer-events:none"/>';
+      }
+    });
 
-    if(pts.length>1){
-      // Area fill
-      var ap='M '+pts[0].x+','+(pT+cH); pts.forEach(function(p){ap+=' L '+p.x+','+p.y;}); ap+=' L '+pts[pts.length-1].x+','+(pT+cH)+' Z';
-      svg+='<path d="'+ap+'" fill="url(#gr'+uid+')" />';
-      // Line
-      var lp='M '+pts[0].x+','+pts[0].y; pts.forEach(function(p,j){if(j>0)lp+=' L '+p.x+','+p.y;});
-      svg+='<path d="'+lp+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
-    }
-
-    // Dots + invisible hover columns
+    // Invisible hover columns
     for(var i=0;i<n;i++){
-      var v=vals[i],cx=xp(i);
+      var cx=xp(i);
       var r=map[buckets[i]]||{sp:0,cv:0,gl:0,dt:0};
-      // Tooltip data
       var td=JSON.stringify({
-        d:labels[i],c:city,k:selKpi,
-        sp:Math.round(r.sp),cv:Math.round(r.cv),
-        gl:Math.round(r.gl),dt:Math.round(r.dt),
-        cpl:r.cv?Math.round(r.sp/r.cv):0,
+        d:labels[i], c:city,
+        sp:Math.round(r.sp), gl:Math.round(r.gl), dt:Math.round(r.dt),
         tcpl:r.gl?Math.round(r.sp/r.gl):0,
         dcpl:r.dt?Math.round(r.sp/r.dt):0
       }).replace(/"/g,'&quot;');
       var x0=i===0?pL:Math.round((xp(Math.max(0,i-1))+cx)/2);
       var x1=i===n-1?W-pR:Math.round((cx+xp(Math.min(n-1,i+1)))/2);
       svg+='<rect x="'+x0+'" y="'+pT+'" width="'+(x1-x0)+'" height="'+cH+'" fill="transparent" style="cursor:crosshair"'
-          +' data-tip="'+td+'"'
-          +' onmouseenter="showCTip(event,this)" onmouseleave="hideCTip()" />';
-      if(v!=null&&v>=0)
-        svg+='<circle cx="'+cx+'" cy="'+yp(v)+'" r="4" fill="'+color+'" stroke="#fff" stroke-width="2.5" style="pointer-events:none"/>';
+          +' data-tip="'+td+'" onmouseenter="showCTip(event,this)" onmouseleave="hideCTip()" />';
     }
     svg+='</svg>';
-    return svg;
+
+    // Legend strip
+    var legend='<div style="display:flex;gap:18px;flex-wrap:wrap;padding:4px 0 8px;justify-content:center">';
+    SERIES.forEach(function(s){
+      legend+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)">'
+        +'<svg width="22" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="22" y2="5" stroke="'+s.color+'" stroke-width="2"'+(s.dash?' stroke-dasharray="5 2"':'')+'/></svg>'
+        +'<span>'+s.label+'</span></div>';
+    });
+    legend+='</div>';
+
+    return legend+svg;
   }
 
   // ── HTML ──
@@ -2538,16 +2563,7 @@ function renderComparison() {
   allTypes.forEach(function(t){ html+='<option value="'+t+'"'+(t===selType?' selected':'')+'>'+t+'</option>'; });
   html+='</select></div>';
 
-  html+='<div style="width:1px;height:26px;background:var(--border);flex-shrink:0"></div>';
-
-  // KPI dropdown
-  html+='<div style="display:flex;align-items:center;gap:7px">';
-  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">KPI</span>';
-  html+='<select onchange="setCompKpi(this.value)" style="font-size:12px;font-family:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:170px;outline:none">';
-  KPI_OPTS.forEach(function(opt){ html+='<option value="'+opt.k+'"'+(opt.k===selKpi?' selected':'')+'>'+opt.label+'</option>'; });
-  html+='</select></div>';
-
-  html+='<span style="margin-left:auto;font-size:11px;color:var(--text3)">'+labels.length+' '+period+(labels.length!==1?'s':'')+' · hover dots for details</span>';
+  html+='<span style="margin-left:auto;font-size:11px;color:var(--text3)">'+labels.length+' '+period+(labels.length!==1?'s':'')+' · hover for values</span>';
   html+='</div>';
 
   // 3 city cards
@@ -2561,10 +2577,8 @@ function renderComparison() {
 
     // Card header
     html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 12px;border-bottom:1px solid var(--border)">';
-    var kpiChipLabel = KPI_OPTS.filter(function(o){return o.k===selKpi;})[0];
     html+='<div style="display:flex;align-items:center;gap:10px"><div style="width:11px;height:11px;border-radius:50%;background:'+color+'"></div>';
     html+='<span style="font-size:15px;font-weight:700;color:var(--text)">'+city+'</span>';
-    html+='<span style="font-size:10px;font-weight:600;background:'+color+'18;color:'+color+';border:1px solid '+color+'33;border-radius:20px;padding:2px 9px;letter-spacing:.3px">'+(kpiChipLabel?kpiChipLabel.label:selKpi)+'</span>';
     html+='</div>';
     html+='<div style="display:flex;gap:20px">';
     [['Spends',INR(Math.round(tot.sp))],['Trig. Leads',NUM(tot.gl)],['Dealer Trig.',NUM(tot.dt)],['TCPL',tot.gl?INR(Math.round(tot.sp/tot.gl)):'—'],['Dealer CPL',tot.dt?INR(Math.round(tot.sp/tot.dt)):'—']].forEach(function(c){
@@ -2643,30 +2657,27 @@ function showCTip(evt, rectEl) {
   if (!tip) return;
   try {
     var d = JSON.parse(rectEl.getAttribute('data-tip'));
-    var k = d.k || 'sp';
-    var KPI_LABELS = {sp:'Spends',gl:'Trig. Leads',dt:'Dealer Trig.',cv:'Panel Conv.',cpl:'CPL',tcpl:'TCPL',dcpl:'Dealer CPL'};
-    var lbl = KPI_LABELS[k] || k;
-    var raw = d[k];
-    var valStr;
-    if (k==='sp'||k==='cpl'||k==='tcpl'||k==='dcpl') {
-      valStr = (!raw && k!=='sp') ? '—' : INR(raw);
-    } else if (k==='cv') {
-      valStr = raw ? NUM(raw) : '—';
-    } else {
-      valStr = (raw==null) ? '—' : NUM(raw);
-    }
-    tip.innerHTML =
-      '<div style="padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.15);white-space:nowrap">'
-        +'<span style="font-weight:700;font-size:13px">'+d.d+'</span>'
-        +'<span style="opacity:.55;font-size:11px;margin-left:7px">'+d.c+'</span>'
-      +'</div>'
-      +'<div style="display:flex;justify-content:space-between;gap:28px;font-size:12px">'
-        +'<span style="color:rgba(255,255,255,0.62)">'+lbl+'</span>'
-        +'<span style="font-weight:700">'+valStr+'</span>'
+    var rows = [
+      {label:'Spends',      color:'#3B82F6', val: d.sp ? INR(d.sp) : '—'},
+      {label:'Trig. Leads', color:'#7C3AED', val: d.gl ? NUM(d.gl) : '—'},
+      {label:'Dealer Trig.',color:'#059669', val: d.dt ? NUM(d.dt) : '—'},
+      {label:'TCPL',        color:'#F59E0B', val: d.tcpl ? INR(d.tcpl) : '—'},
+      {label:'Dealer CPL',  color:'#EF4444', val: d.dcpl ? INR(d.dcpl) : '—'}
+    ];
+    var inner = '<div style="padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.15);white-space:nowrap">'
+      +'<span style="font-weight:700;font-size:13px">'+d.d+'</span>'
+      +'<span style="opacity:.55;font-size:11px;margin-left:7px">'+d.c+'</span>'
       +'</div>';
-    var x=evt.clientX+16, y=evt.clientY-20;
-    if(x+200>window.innerWidth) x=evt.clientX-210;
-    if(y+80>window.innerHeight) y=evt.clientY-80;
+    rows.forEach(function(row){
+      inner += '<div style="display:flex;justify-content:space-between;gap:24px;font-size:12px;margin-top:3px">'
+        +'<span style="color:'+row.color+';font-weight:600">'+row.label+'</span>'
+        +'<span style="font-weight:700">'+row.val+'</span>'
+        +'</div>';
+    });
+    tip.innerHTML = inner;
+    var x=evt.clientX+16, y=evt.clientY-30;
+    if(x+220>window.innerWidth) x=evt.clientX-230;
+    if(y+140>window.innerHeight) y=evt.clientY-140;
     tip.style.left=x+'px';
     tip.style.top=y+'px';
     tip.style.display='block';
