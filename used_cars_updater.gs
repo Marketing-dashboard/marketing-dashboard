@@ -4,14 +4,14 @@
 // ============================================================
 
 // ── CONFIGURATION ─────────────────────────────────────────────
-var REPO_OWNER = 'marketing-dashboard';
-var REPO_NAME  = 'marketing-dashboard';
-var FILE_PATH  = 'used_cars.html';
+var REPO_OWNER = 'Marketing-dashboard';
+var REPO_NAME  = 'used_cars_dashboard';
+var FILE_PATH  = 'index.html';
 
 // Run this once to store your GitHub token:
 //   setGitHubToken('ghp_yourTokenHere')
 function setGitHubToken(token) {
-  PropertiesService.getScriptProperties().setProperty('ghp_DQOizXKsizU9klaKj14qm52WQ2HSIQ3Ax', token);
+  PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
   Logger.log('Token saved.');
 }
 
@@ -264,12 +264,13 @@ function updateDashboard() {
   var newDataTriggers = 'var DATA_TRIGGERS = [\n' + trigLines.join(',\n') + '\n];';
 
   // ── 9. Push to GitHub ────────────────────────────────────────
-  pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers);
+  var buildTs = new Date().toISOString(); // e.g. "2026-07-31T09:26:00.000Z"
+  pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers, buildTs);
   Logger.log('Done. ' + rows.length + ' campaigns, ' + allDaily.length + ' spend rows, ' + trigDailyRows.length + ' trigger rows pushed.');
 }
 
 // ── GITHUB HELPER ─────────────────────────────────────────────
-function pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers) {
+function pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers, buildTs) {
   var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + FILE_PATH;
 
   // Fetch current file
@@ -290,13 +291,16 @@ function pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers) {
   var b64 = fileInfo.content.replace(/\n/g, '');
   var currentContent = Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString();
 
-  // Replace DATA_RAW and DATA_DAILY blocks
+  // Replace DATA_RAW, DATA_DAILY, DATA_TRIGGERS, and BUILD_TS
   var newContent = currentContent.replace(/var DATA_RAW = \[[\s\S]*?\];/, newDataRaw);
   if (newDataDaily) {
     newContent = newContent.replace(/var DATA_DAILY = \[[\s\S]*?\];/, newDataDaily);
   }
   if (newDataTriggers) {
     newContent = newContent.replace(/var DATA_TRIGGERS = \[[\s\S]*?\];/, newDataTriggers);
+  }
+  if (buildTs) {
+    newContent = newContent.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + buildTs + "';");
   }
 
   if (newContent === currentContent) {
