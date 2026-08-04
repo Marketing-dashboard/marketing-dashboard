@@ -581,7 +581,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try {
-    // Check if already approved
+    // Primary check: approved_emails collection
     const approvedSnap = await getDoc(doc(db, COL_APPROVED, email));
     if (approvedSnap.exists()) {
       gate.style.display  = 'none';
@@ -595,12 +595,26 @@ onAuthStateChanged(auth, async (user) => {
     const reqSnap = await getDoc(doc(db, COL_REQUESTS, email));
     if (reqSnap.exists()) {
       const status = reqSnap.data().status;
-      if (status === 'rejected') { showDenied(user); return; }
+      // Fallback: request was approved but approved_emails write may have failed
+      if (status === 'approved') {
+        // Heal: write to approved_emails so future loads are fast
+        try {
+          await setDoc(doc(db, COL_APPROVED, email), {
+            email: user.email, approvedAt: serverTimestamp(), approvedBy: 'auto-healed'
+          });
+        } catch(_) {}
+        gate.style.display  = 'none';
+        dashboard.style.display = 'block';
+        signoutBtn.style.display = 'block';
+        initDashboard();
+        return;
+      }
+      if (status === 'rejected') { showDenied(user);  return; }
       if (status === 'revoked')  { showRevoked(user); return; }
       if (status === 'pending')  { showPending(user); return; }
     }
 
-    // Submit fresh access request
+    // No record at all — submit fresh access request
     await setDoc(doc(db, COL_REQUESTS, email), {
       email: user.email,
       name: user.displayName || '',
@@ -611,16 +625,16 @@ onAuthStateChanged(auth, async (user) => {
     showPending(user);
 
   } catch(e) {
-    // Show the error so the user knows what happened
     gate.style.display  = 'flex';
     dashboard.style.display = 'none';
     authIcon.textContent = '⚠️';
-    authTitle.textContent = 'Something went wrong';
-    authDesc.textContent = 'There was a problem submitting your access request.';
+    authTitle.textContent = 'Access check failed';
+    authDesc.textContent = 'Could not verify your access. Please try signing out and back in.';
     errorEl.textContent = 'Error: ' + e.message;
     errorEl.style.display = 'block';
     signinBtn.style.display = 'none';
     signoutBtn.style.display = 'block';
+    console.error('[Auth] Firestore check failed for', email, e);
   }
 });
 </script>
