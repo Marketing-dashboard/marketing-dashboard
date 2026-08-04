@@ -291,21 +291,20 @@ function pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers, buildTs)
   var b64 = fileInfo.content.replace(/\n/g, '');
   var currentContent = Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString();
 
-  // Replace DATA_RAW, DATA_DAILY, DATA_TRIGGERS, and BUILD_TS
-  var newContent = currentContent.replace(/var DATA_RAW = \[[\s\S]*?\];/, newDataRaw);
-  if (newDataDaily) {
-    newContent = newContent.replace(/var DATA_DAILY = \[[\s\S]*?\];/, newDataDaily);
-  }
-  if (newDataTriggers) {
-    newContent = newContent.replace(/var DATA_TRIGGERS = \[[\s\S]*?\];/, newDataTriggers);
-  }
-  if (buildTs) {
-    newContent = newContent.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + buildTs + "';");
+  // Replace data blocks using indexOf for reliability with large arrays
+  function replaceBlock(content, marker, replacement) {
+    var start = content.indexOf(marker);
+    if (start === -1) { Logger.log('WARN: marker not found: ' + marker); return content; }
+    var end = content.indexOf('];', start + marker.length);
+    if (end === -1) { Logger.log('WARN: closing ]; not found for: ' + marker); return content; }
+    return content.substring(0, start) + replacement + content.substring(end + 2);
   }
 
-  if (newContent === currentContent) {
-    Logger.log('No changes detected — skipping push.');
-    return;
+  var newContent = replaceBlock(currentContent, 'var DATA_RAW = [', newDataRaw);
+  if (newDataDaily)    newContent = replaceBlock(newContent, 'var DATA_DAILY = [',    newDataDaily);
+  if (newDataTriggers) newContent = replaceBlock(newContent, 'var DATA_TRIGGERS = [', newDataTriggers);
+  if (buildTs) {
+    newContent = newContent.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + buildTs + "';");
   }
 
   // Push updated file

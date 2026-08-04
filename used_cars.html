@@ -2638,6 +2638,73 @@ function renderComparison() {
   html+='<span style="margin-left:auto;font-size:11px;color:var(--text3)">'+labels.length+' '+period+(labels.length!==1?'s':'')+' · hover for values</span>';
   html+='</div>';
 
+  // ── Jun vs July comparison grid ──────────────────────────────
+  function aggPeriod(startDate, endDate) {
+    var acc = {sp:0,imp:0,cl:0,cv:0,gl:0,dt:0};
+    DATA_DAILY.forEach(function(d){
+      if(d.Date<startDate||d.Date>endDate) return;
+      selCities.forEach(function(c){ if(cityCamps[c][d.Campaign]){ acc.sp+=d.Spends;acc.imp+=d.Impressions;acc.cl+=d.Clicks;acc.cv+=d.Conversions; } });
+    });
+    DATA_TRIGGERS.forEach(function(d){
+      if(d.Date<startDate||d.Date>endDate) return;
+      selCities.forEach(function(c){ if(cityCamps[c][d.Campaign]){ acc.gl+=d.Triggered_Leads;acc.dt+=d.Dealer_Triggers; } });
+    });
+    return acc;
+  }
+  var jun = aggPeriod('2026-06-01','2026-06-30');
+  var jul = aggPeriod('2026-07-01','2026-07-31');
+
+  function pctDelta(a, b) { if(!a) return b>0?100:0; return Math.round((b-a)/a*100); }
+  function gridKpi(label, junVal, julVal, fmt, unit) {
+    var delta = pctDelta(junVal, julVal);
+    var up = delta >= 0;
+    var arrow = up ? '▲' : '▼';
+    var dCol = up ? '#059669' : '#DC2626';
+    // For cost metrics (CPL), lower is better
+    if(unit==='cpl') { dCol = up ? '#DC2626' : '#059669'; }
+    var formattedJun = fmt(junVal);
+    var formattedJul = fmt(julVal);
+    return '<div style="flex:1;min-width:130px;background:var(--bg,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">'
+      +'<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">'+label+'</div>'
+      +'<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px">'
+        +'<div style="display:flex;flex-direction:column;gap:2px">'
+          +'<div style="font-size:9px;color:var(--text3);font-weight:500">Jun</div>'
+          +'<div style="font-size:13px;font-weight:700;color:var(--text2)">'+formattedJun+'</div>'
+        +'</div>'
+        +'<div style="font-size:15px;color:#C7CDD9">→</div>'
+        +'<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">'
+          +'<div style="font-size:9px;color:var(--text3);font-weight:500">Jul</div>'
+          +'<div style="font-size:13px;font-weight:700;color:var(--text)">'+formattedJul+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="margin-top:2px;display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;background:'+(up?'#ECFDF5':'#FEF2F2')+';width:fit-content">'
+        +'<span style="font-size:10px;color:'+dCol+';font-weight:700">'+arrow+' '+(delta>0?'+':'')+delta+'%</span>'
+      +'</div>'
+    +'</div>';
+  }
+
+  var junTcpl = jun.gl ? jun.sp/jun.gl : 0;
+  var julTcpl = jul.gl ? jul.sp/jul.gl : 0;
+  var junDcpl = jun.dt ? jun.sp/jun.dt : 0;
+  var julDcpl = jul.dt ? jul.sp/jul.dt : 0;
+
+  var cityLabel = selCities.length===3 ? 'All Cities' : selCities.join(' + ');
+  html += '<div style="margin-bottom:20px">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+  html += '<span style="font-size:13px;font-weight:700;color:var(--text)">Jun vs Jul — '+cityLabel+'</span>';
+  html += '<span style="font-size:11px;color:var(--text3);background:var(--bg2,#F9FAFB);padding:3px 9px;border-radius:20px;border:1px solid var(--border)">Monthly Comparison</span>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  html += gridKpi('Spends', jun.sp, jul.sp, function(v){return INR(Math.round(v));}, 'spend');
+  html += gridKpi('Impressions', jun.imp, jul.imp, function(v){return NUM(Math.round(v));}, '');
+  html += gridKpi('Clicks', jun.cl, jul.cl, function(v){return NUM(Math.round(v));}, '');
+  html += gridKpi('Conversions', jun.cv, jul.cv, function(v){return v?v.toFixed(1):'0';}, '');
+  html += gridKpi('Trig. Leads', jun.gl, jul.gl, function(v){return NUM(Math.round(v));}, '');
+  html += gridKpi('Dealer Trig.', jun.dt, jul.dt, function(v){return NUM(Math.round(v));}, '');
+  html += gridKpi('TCPL', junTcpl, julTcpl, function(v){return v?INR(Math.round(v)):'—';}, 'cpl');
+  html += gridKpi('Dealer CPL', junDcpl, julDcpl, function(v){return v?INR(Math.round(v)):'—';}, 'cpl');
+  html += '</div></div>';
+
   // Single chart card
   var tot={sp:0,cv:0,gl:0,dt:0};
   buckets.forEach(function(b){var r=mergedMap[b];if(r){tot.sp+=r.sp;tot.cv+=r.cv;tot.gl+=r.gl;tot.dt+=r.dt;}});
