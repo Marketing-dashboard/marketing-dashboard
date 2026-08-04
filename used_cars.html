@@ -3041,10 +3041,7 @@ function renderComparison() {
   html += '<span style="font-size:11px;color:var(--text3);background:var(--bg2,#F9FAFB);padding:3px 9px;border-radius:20px;border:1px solid var(--border)">Monthly Comparison</span>';
   html += '</div>';
   html += '<div style="display:flex;gap:10px;flex-wrap:nowrap;align-items:stretch">';
-  html += gridKpi('Spends',       jun.sp,  jul.sp,  function(v){return INR(Math.round(v));}, 'spend');
-  html += gridKpi('Impressions',  jun.imp, jul.imp, function(v){return NUM(Math.round(v));}, '');
-  html += gridKpi('Clicks',       jun.cl,  jul.cl,  function(v){return NUM(Math.round(v));}, '');
-  html += gridKpi('Conversions',  jun.cv,  jul.cv,  function(v){return v?v.toFixed(1):'0';}, '');
+  html += gridKpi('Spends', jun.sp, jul.sp, function(v){return INR(Math.round(v));}, 'spend');
   html += gridKpiDouble(
     'Trig. Leads', jun.gl, jul.gl, function(v){return NUM(Math.round(v));},
     'TCPL',        junTcpl, julTcpl, function(v){return v?INR(Math.round(v)):'—';}
