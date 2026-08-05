@@ -221,20 +221,20 @@ def build_model_tree(filepath):
                         "margin":round(margin,4),"validation":round(v["val_sum"]/v["count"],4)})
         return out
 
-    apr_rows = aggregate(read_sheet("Apr'26"))
-    may_rows = aggregate(read_sheet("May'26"))
+    jun_rows = aggregate(read_sheet("Jun'26"))
+    jul_rows = aggregate(read_sheet("Jul'26"))
 
     all_keys = set()
-    for r in apr_rows + may_rows:
+    for r in jun_rows + jul_rows:
         all_keys.add((r["segment"], r["brand"], r["model"]))
 
     tree = {}
     for seg, brand, model in sorted(all_keys):
         if seg not in tree:          tree[seg] = {}
         if brand not in tree[seg]:   tree[seg][brand] = {}
-        apr_r = next((r for r in apr_rows if r["segment"]==seg and r["brand"]==brand and r["model"]==model), None)
-        may_r = next((r for r in may_rows if r["segment"]==seg and r["brand"]==brand and r["model"]==model), None)
-        tree[seg][brand][model] = {"apr": apr_r, "may": may_r}
+        jun_r = next((r for r in jun_rows if r["segment"]==seg and r["brand"]==brand and r["model"]==model), None)
+        jul_r = next((r for r in jul_rows if r["segment"]==seg and r["brand"]==brand and r["model"]==model), None)
+        tree[seg][brand][model] = {"jun": jun_r, "jul": jul_r}
 
     return f"\nconst MODEL_TREE = {json.dumps(tree)};\n"
 
@@ -247,11 +247,15 @@ def build_cv_tree(filepath):
     rows = list(ws.iter_rows(values_only=True))
 
     # Row 0 = KPI group headers, Row 1 = month sub-headers, Rows 2+ = data
+    # Each KPI group has 5 months: Apr(0) May(1) Jun(2) Jul(3) Aug(4)
     # Cols: Brand(0), Model(1), BU(2),
-    #   Spends Apr(3) May(4) Jun(5),  Leads Apr(6) May(7) Jun(8),
-    #   CPL Apr(9) May(10) Jun(11),   TLeads Apr(12) May(13) Jun(14),
-    #   TCPL Apr(15) May(16) Jun(17), Margin Apr(18) May(19) Jun(20),
-    #   Validation Apr(21) May(22) Jun(23)
+    #   Spends:          3-7  (Apr=3,  May=4,  Jun=5,  Jul=6,  Aug=7)
+    #   Leads:           8-12 (Apr=8,  May=9,  Jun=10, Jul=11, Aug=12)
+    #   CPL:            13-17 (Apr=13, May=14, Jun=15, Jul=16, Aug=17)
+    #   Triggered Leads:18-22 (Apr=18, May=19, Jun=20, Jul=21, Aug=22)
+    #   TCPL:           23-27 (Apr=23, May=24, Jun=25, Jul=26, Aug=27)
+    #   Margin:         28-32 (Apr=28, May=29, Jun=30, Jul=31, Aug=32)
+    #   Validation:     33-37 (Apr=33, May=34, Jun=35, Jul=36, Aug=37)
 
     tree = {}
     for row in rows[2:]:
@@ -261,21 +265,22 @@ def build_cv_tree(filepath):
         if brand not in tree:
             tree[brand] = {}
 
-        def make_period(offset):
-            spends = to_float(row[3  + offset])
-            leads  = to_float(row[6  + offset])
-            tleads = to_float(row[12 + offset])
+        def make_period(mo):
+            # mo: 0=Apr,1=May,2=Jun,3=Jul,4=Aug
+            spends = to_float(row[3  + mo])
+            leads  = to_float(row[8  + mo])
+            tleads = to_float(row[18 + mo])
             return {
                 "spends":     spends,
                 "leads":      leads,
                 "tleads":     tleads,
-                "margin":     to_float(row[18 + offset]),
-                "validation": to_float(row[21 + offset]),
+                "margin":     to_float(row[28 + mo]),
+                "validation": to_float(row[33 + mo]),
             } if spends > 0 else None
 
         tree[brand][model] = {
-            "apr": make_period(0),
-            "may": make_period(1),
+            "jun": make_period(2),
+            "jul": make_period(3),
         }
 
     return f"\nconst CV_TREE = {json.dumps(tree)};\n"
