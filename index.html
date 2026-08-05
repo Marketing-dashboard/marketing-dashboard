@@ -691,14 +691,14 @@ const MODEL_KPIS = [
 const MODEL_KPI_VAL = { key: 'validation', label: 'Validation %', fmt: v => v==null?'—':(v*100).toFixed(1)+'%' };
 
 function modelBadge(jun, jul, key, lowerBetter) {
-  if (!apr || !may) return '';
+  if (!jun || !jul) return '';
   let aVal, mVal;
   if (key === 'gcpl') {
-    aVal = (apr.spends && apr.leads)  ? apr.spends / apr.leads  : null;
-    mVal = (may.spends && may.leads)  ? may.spends / may.leads  : null;
+    aVal = (jun.spends && jun.leads)  ? jun.spends / jun.leads  : null;
+    mVal = (jul.spends && jul.leads)  ? jul.spends / jul.leads  : null;
   } else if (key === 'tcpl') {
-    aVal = (apr.spends && apr.tleads) ? apr.spends / apr.tleads : null;
-    mVal = (may.spends && may.tleads) ? may.spends / may.tleads : null;
+    aVal = (jun.spends && jun.tleads) ? jun.spends / jun.tleads : null;
+    mVal = (jul.spends && jul.tleads) ? jul.spends / jul.tleads : null;
   } else {
     aVal = jun[key]; mVal = jul[key];
   }
@@ -763,7 +763,7 @@ function buildModelCard(brand, modelsObj) {
       <div style="background:#f2f2f2;padding:9px 14px;font-size:12px;font-weight:600;color:#333;border-bottom:1.5px solid #d0d0d0">${model}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr">
         <div style="padding:10px 14px;border-right:1.5px solid #d8d8d8">
-          <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Apr\'26</div>
+          <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Jun\'26</div>
           ${MODEL_KPIS.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f5f5f5">
             <span style="font-size:11px;color:#999">${k.label}</span>
             <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.jun, k.key, k.fmt)}</span></div>`).join('')}
@@ -773,7 +773,7 @@ function buildModelCard(brand, modelsObj) {
           </div>
         </div>
         <div style="padding:10px 14px;background:${d.jul ? '#fffaf7' : '#fafafa'}">
-          <div style="font-size:10px;font-weight:700;color:#E8650A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">May\'26</div>
+          <div style="font-size:10px;font-weight:700;color:#E8650A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Jul\'26</div>
           ${MODEL_KPIS.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f5f5f5">
             <span style="font-size:11px;color:#999">${k.label}</span>
             <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.jul, k.key, k.fmt)}${hasBoth ? modelBadge(d.jun, d.jul, k.key, k.lowerBetter) : ''}</span></div>`).join('')}
@@ -793,8 +793,8 @@ function buildModelCard(brand, modelsObj) {
       <div style="flex:1;min-width:0">
         <div style="display:flex;gap:4px;font-size:9px;color:#bbb;margin-bottom:2px;padding-left:2px">
           <span style="width:46px;flex-shrink:0">KPI</span>
-          <span style="width:90px;text-align:right;flex-shrink:0">Apr\'26</span>
-          <span style="padding-left:10px">May\'26</span>
+          <span style="width:90px;text-align:right;flex-shrink:0">Jun\'26</span>
+          <span style="padding-left:10px">Jul\'26</span>
         </div>
         ${summaryRows}
       </div>
@@ -838,7 +838,7 @@ buildModels();
 function buildCVModels() {
   const container = document.getElementById('section-cv-models');
   if (!container) return;
-  let html = '<div style="margin-top:32px"><div class="section-header"><div class="section-bar"></div><div class="section-title">CV — Brand &amp; Model Comparison (Apr…26 vs May…26)</div></div>';
+  let html = '<div style="margin-top:32px"><div class="section-header"><div class="section-bar"></div><div class="section-title">CV — Brand &amp; Model Comparison (Jun\'26 vs Jul\'26)</div></div>';
   Object.keys(CV_TREE).forEach(function(brand) {
     html += buildModelCard(brand, CV_TREE[brand]);
   });
