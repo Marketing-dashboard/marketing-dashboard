@@ -158,7 +158,7 @@
 
   <!-- ENTERPRISE TAB -->
   <div id="tab-enterprise" class="tab-panel">
-    <div class="note-box"><strong>Note:</strong> * June 2026 data is current/partial — the month is not yet complete. Revenue & Margin for June will be updated once the month closes.</div>
+    <div class="note-box"><strong>Note:</strong> * July 2026 data is current/partial — the month is not yet complete. Revenue & Margin for July will be updated once the month closes.</div>
     <div id="section-combined"></div>
     <hr class="divider">
     <div id="section-cars"></div>
@@ -193,7 +193,7 @@
 
   <!-- NEW AUTO CLASSIFIED TAB -->
   <div id="tab-newauto" class="tab-panel active">
-    <div class="note-box"><strong>Note:</strong> * June 2026 data is current/partial — the month is not yet complete. Revenue & Margin for June will be updated once the month closes.</div>
+    <div class="note-box"><strong>Note:</strong> * July 2026 data is current/partial — the month is not yet complete. Revenue & Margin for July will be updated once the month closes.</div>
     <div id="section-newauto"></div>
   </div>
 
@@ -600,7 +600,7 @@ const MODEL_KPIS = [
 ];
 const MODEL_KPI_VAL = { key: 'validation', label: 'Validation %', fmt: v => v==null?'—':(v*100).toFixed(1)+'%' };
 
-function modelBadge(apr, may, key, lowerBetter) {
+function modelBadge(jun, jul, key, lowerBetter) {
   if (!apr || !may) return '';
   let aVal, mVal;
   if (key === 'gcpl') {
@@ -610,7 +610,7 @@ function modelBadge(apr, may, key, lowerBetter) {
     aVal = (apr.spends && apr.tleads) ? apr.spends / apr.tleads : null;
     mVal = (may.spends && may.tleads) ? may.spends / may.tleads : null;
   } else {
-    aVal = apr[key]; mVal = may[key];
+    aVal = jun[key]; mVal = jul[key];
   }
   if (aVal == null || mVal == null || aVal === 0) return '';
   const chg = ((mVal - aVal) / Math.abs(aVal)) * 100;
@@ -637,11 +637,11 @@ function buildModelCard(brand, modelsObj) {
   let as=0,al=0,at2=0,ar=0, ms=0,ml=0,mt=0,mr=0;
   modelNames.forEach(m => {
     const d = modelsObj[m];
-    if (d.apr){as+=d.apr.spends||0;al+=d.apr.leads||0;at2+=d.apr.tleads||0;ar+=d.apr.revenue||0;}
-    if (d.may){ms+=d.may.spends||0;ml+=d.may.leads||0;mt+=d.may.tleads||0;mr+=d.may.revenue||0;}
+    if (d.jun){as+=d.jun.spends||0;al+=d.jun.leads||0;at2+=d.jun.tleads||0;ar+=d.jun.revenue||0;}
+    if (d.jul){ms+=d.jul.spends||0;ml+=d.jul.leads||0;mt+=d.jul.tleads||0;mr+=d.jul.revenue||0;}
   });
-  const aprB = al ? {spends:as,leads:al,tleads:at2,revenue:ar,gcpl:as/al,tcpl:at2?as/at2:0,margin:ar?1-as/ar:0} : null;
-  const mayB = ml ? {spends:ms,leads:ml,tleads:mt,revenue:mr,gcpl:ms/ml,tcpl:mt?ms/mt:0,margin:mr?1-ms/mr:0} : null;
+  const junB = al ? {spends:as,leads:al,tleads:at2,revenue:ar,gcpl:as/al,tcpl:at2?as/at2:0,margin:ar?1-as/ar:0} : null;
+  const julB = ml ? {spends:ms,leads:ml,tleads:mt,revenue:mr,gcpl:ms/ml,tcpl:mt?ms/mt:0,margin:mr?1-ms/mr:0} : null;
   const cardId = 'brand-' + brand.replace(/[^a-z0-9]/gi,'_');
 
   const summaryKpis = [
@@ -654,9 +654,9 @@ function buildModelCard(brand, modelsObj) {
   ];
 
   const summaryRows = summaryKpis.map(k => {
-    const av = aprB ? k.fmt(aprB[k.key]) : '—';
-    const mv = mayB ? k.fmt(mayB[k.key]) : '—';
-    const badge = modelBadge(aprB, mayB, k.key, k.lowerBetter);
+    const av = junB ? k.fmt(junB[k.key]) : '—';
+    const mv = julB ? k.fmt(julB[k.key]) : '—';
+    const badge = modelBadge(junB, julB, k.key, k.lowerBetter);
     return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:0.5px solid #f5ede5">
       <span style="font-size:10px;color:#999;width:46px;flex-shrink:0">${k.label}</span>
       <span style="font-size:11px;color:#aaa;width:90px;text-align:right;flex-shrink:0">${av}</span>
@@ -667,7 +667,7 @@ function buildModelCard(brand, modelsObj) {
   let modelRows = '';
   modelNames.forEach(model => {
     const d = modelsObj[model];
-    const hasBoth = d.apr && d.may;
+    const hasBoth = d.jun && d.jul;
     modelRows += `
     <div style="border:1.5px solid #d0d0d0;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)">
       <div style="background:#f2f2f2;padding:9px 14px;font-size:12px;font-weight:600;color:#333;border-bottom:1.5px solid #d0d0d0">${model}</div>
@@ -676,20 +676,20 @@ function buildModelCard(brand, modelsObj) {
           <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Apr\'26</div>
           ${MODEL_KPIS.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f5f5f5">
             <span style="font-size:11px;color:#999">${k.label}</span>
-            <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.apr, k.key, k.fmt)}</span></div>`).join('')}
+            <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.jun, k.key, k.fmt)}</span></div>`).join('')}
           <div style="display:flex;justify-content:space-between;padding:4px 6px;margin-top:4px;background:#f5f5f5;border-radius:4px">
             <span style="font-size:11px;color:#666;font-weight:600">Validation %</span>
-            <span style="font-size:12px;font-weight:600;color:#555">${d.apr ? MODEL_KPI_VAL.fmt(d.apr.validation) : '—'}</span>
+            <span style="font-size:12px;font-weight:600;color:#555">${d.jun ? MODEL_KPI_VAL.fmt(d.jun.validation) : '—'}</span>
           </div>
         </div>
-        <div style="padding:10px 14px;background:${d.may ? '#fffaf7' : '#fafafa'}">
+        <div style="padding:10px 14px;background:${d.jul ? '#fffaf7' : '#fafafa'}">
           <div style="font-size:10px;font-weight:700;color:#E8650A;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">May\'26</div>
           ${MODEL_KPIS.map(k => `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f5f5f5">
             <span style="font-size:11px;color:#999">${k.label}</span>
-            <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.may, k.key, k.fmt)}${hasBoth ? modelBadge(d.apr, d.may, k.key, k.lowerBetter) : ''}</span></div>`).join('')}
+            <span style="font-size:12px;font-weight:500;color:#333">${kpiVal(d.jul, k.key, k.fmt)}${hasBoth ? modelBadge(d.jun, d.jul, k.key, k.lowerBetter) : ''}</span></div>`).join('')}
           <div style="display:flex;justify-content:space-between;padding:4px 6px;margin-top:4px;background:#fff8f3;border-radius:4px">
             <span style="font-size:11px;color:#E8650A;font-weight:600">Validation %</span>
-            <span style="font-size:12px;font-weight:600;color:#E8650A">${d.may ? MODEL_KPI_VAL.fmt(d.may.validation) : (d.apr ? MODEL_KPI_VAL.fmt(d.apr.validation) : '—')}</span>
+            <span style="font-size:12px;font-weight:600;color:#E8650A">${d.jul ? MODEL_KPI_VAL.fmt(d.jul.validation) : (d.jun ? MODEL_KPI_VAL.fmt(d.jun.validation) : '—')}</span>
           </div>
         </div>
       </div>
