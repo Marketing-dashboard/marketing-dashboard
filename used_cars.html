@@ -643,15 +643,15 @@ onAuthStateChanged(auth, async (user) => {
 <script>
 var BUILD_TS = '2026-08-04T05:28:34.041Z'; // replaced by Apps Script on each push
 
-// Force reload if a newer version has been pushed
+// Force reload if a newer version has been pushed (localStorage persists across sessions)
 (function(){
-  var stored = sessionStorage.getItem('uc_build_ts');
+  var stored = localStorage.getItem('uc_build_ts');
   if (stored && stored !== BUILD_TS) {
-    sessionStorage.setItem('uc_build_ts', BUILD_TS);
+    localStorage.setItem('uc_build_ts', BUILD_TS);
     location.reload(true);
     return;
   }
-  sessionStorage.setItem('uc_build_ts', BUILD_TS);
+  localStorage.setItem('uc_build_ts', BUILD_TS);
 })();
 
 var DATA_RAW = [
