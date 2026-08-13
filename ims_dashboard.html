@@ -756,16 +756,19 @@ function renderDashboard() {
    RENDER TRACKER
 ══════════════════════════════════════════════ */
 function renderTracker() {
-  const saved       = loadTargets();
-  const today       = new Date();
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const remaining   = daysInMonth - today.getDate();
+  const saved         = loadTargets();
+  const today         = new Date();
 
+  // Compute remaining days from the last data date, not today.
+  // "Yesterday" in the projection formula = last data date, so remaining = days after last data date.
   const latestDateStr = [...new Set(RAW.map(r => r.dateStr))].sort().pop() || '';
-  const latestDate    = latestDateStr ? new Date(latestDateStr) : null;
+  const latestDate    = latestDateStr ? parseDate(latestDateStr) : null;
+  const refDate       = latestDate || today;
+  const daysInMonth   = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate();
+  const remaining     = daysInMonth - refDate.getDate();
 
   document.getElementById('trackerMeta').textContent =
-    `Last data: ${latestDate ? F.dateL(latestDate) : '—'} · Remaining days in month: ${remaining} · Projection = yesterday × ${remaining} + delivered`;
+    `Last data: ${latestDate ? F.dateL(latestDate) : '—'} · Days remaining after last data: ${remaining} · Projection = last-day × ${remaining} + delivered`;
 
   const entities = buildEntities(saved);
   const hasLeads = RAW.some(r => r.leads > 0);
@@ -904,28 +907,48 @@ function renderTracker() {
 
 function buildEntities(saved) {
   const list = [];
-  const coveredBrands    = new Set(); // brands with explicit brand-level entry
-  const modelOnlyBrands  = new Set(); // brands with ONLY model-level entries (per-model mode)
 
-  // Add all saved entries to the list
-  for (const [key, t] of Object.entries(saved)) {
-    list.push({
-      level: t.level, brand: t.brand, model: t.model || null,
-      groupMode: t.groupMode || t.level, key,
-    });
-    if (t.level === 'brand') coveredBrands.add(t.brand);
+  // Determine per-brand mode from saved data
+  // mixed    = brand entry with targetType 'budget-only'
+  // per-model = model entries with groupMode 'model' (no brand entry)
+  const brandMode = {};   // brand → 'mixed' | 'per-model' | 'brand'
+  for (const t of Object.values(saved)) {
+    const b = t.brand;
+    if (t.level === 'brand' && t.targetType === 'budget-only') {
+      brandMode[b] = 'mixed';
+    } else if (t.level === 'model' && (t.groupMode === 'model') && brandMode[b] !== 'mixed') {
+      brandMode[b] = 'per-model';
+    } else if (t.level === 'brand' && !brandMode[b]) {
+      brandMode[b] = 'brand';
+    }
   }
 
-  // Identify brands with only model entries (per-model mode, no brand row)
-  BRANDS.forEach(b => {
-    const hasModel = list.some(e => e.brand === b && e.level === 'model');
-    const hasBrand = list.some(e => e.brand === b && e.level === 'brand');
-    if (hasModel && !hasBrand) modelOnlyBrands.add(b);
-  });
+  // Add all explicitly saved entries
+  const savedModelKeys = new Set();
+  for (const [key, t] of Object.entries(saved)) {
+    list.push({ level: t.level, brand: t.brand, model: t.model || null,
+                groupMode: t.groupMode || t.level, key });
+    if (t.level === 'model') savedModelKeys.add(key);
+  }
 
-  // Default brand rows only for brands with NO entries at all
+  // For mixed/per-model brands auto-add rows for models not explicitly saved
+  // so every model in the data appears in the tracker (targets shown as "Not set")
+  for (const [brand, mode] of Object.entries(brandMode)) {
+    if (mode === 'mixed' || mode === 'per-model') {
+      (MODELS[brand] || []).forEach(model => {
+        const mk = `model::${brand}::${model}`;
+        if (!savedModelKeys.has(mk)) {
+          list.push({ level: 'model', brand, model, groupMode: mode,
+                      key: `default-model::${brand}::${model}` });
+        }
+      });
+    }
+  }
+
+  // Add default brand rows for brands with no entries at all
+  const coveredBrands = new Set(list.map(e => e.brand));
   BRANDS.forEach(b => {
-    if (!coveredBrands.has(b) && !modelOnlyBrands.has(b)) {
+    if (!coveredBrands.has(b)) {
       list.push({ level: 'brand', brand: b, model: null, groupMode: 'brand', key: 'default::' + b });
     }
   });
@@ -984,38 +1007,57 @@ function openModal(existingKey) {
   // Load existing if editing
   if (existingKey) {
     const saved = loadTargets();
-    const t = saved[existingKey];
-    if (t) {
-      const gm = t.groupMode || t.level;
 
-      if (gm === 'mixed' || t.targetType === 'budget-only') {
-        // Open in mixed mode — find the brand
-        modal.level = 'mixed';
-        modal.brand = t.brand;
-        modal._editBrand = t.brand;
-      } else if (t.level === 'model' && gm === 'model') {
-        // Per-model group — open in per-model mode
-        modal.level = 'model';
-        modal.brand = t.brand;
-        modal._editBrand = t.brand;
-        modal.ttype = t.targetType || 'impressions';
-        document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
-      } else {
-        // Brand-level entry
-        modal.level = 'brand';
-        modal.brand = t.brand;
-        modal.ttype = t.targetType || (t.targetImpr && t.targetLeads ? 'both' : t.targetImpr ? 'impressions' : 'leads');
-        modal._editKey = existingKey;
-
-        document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
-        if (t.targetImpr)  document.getElementById('inTargetImpr').value  = t.targetImpr;
-        if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
-        if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
-        if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
+    // Auto-added row (no explicit saved entry) — detect mode from the brand's existing data
+    if (existingKey.startsWith('default-model::') || existingKey.startsWith('default::')) {
+      const parts = existingKey.split('::');
+      const brand = parts[1];
+      const brandEntry = saved[`brand::${brand}`];
+      const hasPerModel = Object.values(saved).some(e => e.brand === brand && e.level === 'model' && e.groupMode === 'model');
+      if (brandEntry && brandEntry.targetType === 'budget-only') {
+        modal.level = 'mixed'; modal.brand = brand; modal._editBrand = brand;
+      } else if (hasPerModel) {
+        modal.level = 'model'; modal.brand = brand; modal._editBrand = brand;
+        modal.ttype = 'impressions';
+        document.querySelector('[data-ttype="impressions"]')?.classList.add('sel');
       }
+      // else fall through — opens as fresh modal (user can pick brand level)
+      if (modal.level) {
+        document.querySelector(`[data-level="${modal.level}"]`)?.classList.add('sel');
+        document.getElementById('mBrand').value = brand;
+      }
+    } else {
+      const t = saved[existingKey];
+      if (t) {
+        const gm = t.groupMode || t.level;
 
-      document.querySelector(`[data-level="${modal.level}"]`)?.classList.add('sel');
-      document.getElementById('mBrand').value = modal.brand || '';
+        if (gm === 'mixed' || t.targetType === 'budget-only') {
+          modal.level = 'mixed';
+          modal.brand = t.brand;
+          modal._editBrand = t.brand;
+        } else if (t.level === 'model' && gm === 'model') {
+          modal.level = 'model';
+          modal.brand = t.brand;
+          modal._editBrand = t.brand;
+          modal.ttype = t.targetType || 'impressions';
+          document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
+        } else {
+          // Brand-level entry
+          modal.level = 'brand';
+          modal.brand = t.brand;
+          modal.ttype = t.targetType || (t.targetImpr && t.targetLeads ? 'both' : t.targetImpr ? 'impressions' : 'leads');
+          modal._editKey = existingKey;
+
+          document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
+          if (t.targetImpr)  document.getElementById('inTargetImpr').value  = t.targetImpr;
+          if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
+          if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
+          if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
+        }
+
+        document.querySelector(`[data-level="${modal.level}"]`)?.classList.add('sel');
+        document.getElementById('mBrand').value = modal.brand || '';
+      }
     }
   }
 
@@ -1092,12 +1134,25 @@ function modalNext() {
       });
     }
 
+    // Collect per-model values by iterating the rendered inputs (avoids CSS.escape issues)
+    const mmData = {};
+    document.querySelectorAll('#mmTbody input').forEach(el => {
+      const m = el.getAttribute('data-model');
+      if (!m) return;
+      mmData[m] = mmData[m] || {};
+      if (el.classList.contains('mm-ti')) mmData[m].ti = parseFloat(el.value) || null;
+      else if (el.classList.contains('mm-bi')) mmData[m].bi = parseFloat(el.value) || null;
+      else if (el.classList.contains('mm-tl')) mmData[m].tl = parseFloat(el.value) || null;
+      else if (el.classList.contains('mm-bl')) mmData[m].bl = parseFloat(el.value) || null;
+    });
+
     let saved = 0;
     models.forEach(m => {
-      const ti = si ? parseFloat(document.querySelector(`.mm-ti[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
-      const bi = si ? parseFloat(document.querySelector(`.mm-bi[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
-      const tl = sl ? parseFloat(document.querySelector(`.mm-tl[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
-      const bl = sl ? parseFloat(document.querySelector(`.mm-bl[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
+      const d  = mmData[m] || {};
+      const ti = si ? (d.ti || null) : null;
+      const bi = si ? (d.bi || null) : null;
+      const tl = sl ? (d.tl || null) : null;
+      const bl = sl ? (d.bl || null) : null;
       if (!ti && !bi && !tl && !bl) return; // skip blank rows
       all[`model::${modal.brand}::${m}`] = {
         level: 'model', brand: modal.brand, model: m, groupMode: 'model',
@@ -1116,7 +1171,6 @@ function modalNext() {
   } else if (modal.step === 'msMX') {
     // ── Save mixed: brand budget + per-model impression targets ──
     if (!modal.brand) { alert('Brand is required.'); return; }
-    const models = MODELS[modal.brand] || [];
     const brandBudget = parseFloat(document.getElementById('inBrandBudget').value) || null;
     const all = loadTargets();
 
@@ -1138,10 +1192,15 @@ function modalNext() {
       };
     }
 
-    // Save per-model impression targets
+    // Collect per-model impression targets by iterating rendered inputs
+    const mxData = {};
+    document.querySelectorAll('#mxTbody input.mx-ti').forEach(el => {
+      const m = el.getAttribute('data-model');
+      if (m) mxData[m] = parseFloat(el.value) || null;
+    });
+
     let saved = 0;
-    models.forEach(m => {
-      const ti = parseFloat(document.querySelector(`.mx-ti[data-model="${CSS.escape(m)}"]`)?.value) || null;
+    Object.entries(mxData).forEach(([m, ti]) => {
       if (!ti) return;
       all[`model::${modal.brand}::${m}`] = {
         level: 'model', brand: modal.brand, model: m, groupMode: 'mixed',
