@@ -430,7 +430,7 @@ function fetchJsonp(url) {
     };
 
     const sep = url.includes('?') ? '&' : '?';
-    script.src = url + sep + 'callback=' + cbName;
+    script.src = url + sep + '_=' + Date.now() + '&callback=' + cbName;
     document.head.appendChild(script);
   });
 }
@@ -451,8 +451,16 @@ function parseDate(v) {
   if (!v) return null;
   if (v instanceof Date) return isNaN(v) ? null : v;
   if (typeof v === 'string') {
-    // GAS now returns clean YYYY-MM-DD strings (e.g. "2026-08-07")
-    const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    // Full ISO datetime from GAS (e.g. "2026-07-31T18:30:00.000Z" = midnight IST Aug 1).
+    // Must parse as full UTC datetime then extract LOCAL date parts — NOT just the date prefix,
+    // which would give one day earlier due to the IST midnight → UTC 18:30 offset.
+    if (v.includes('T') || v.includes('Z')) {
+      const d = new Date(v);
+      if (isNaN(d)) return null;
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    // Clean YYYY-MM-DD from Utilities.formatDate
+    const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
     // Legacy GViz "Date(year,month0,day)" format
     const m = v.match(/Date\((\d+),(\d+),(\d+)\)/);
@@ -481,7 +489,7 @@ function processRows(rows) {
       views:       num(r['Views']),
       leads:       num(r['Leads']),
       platform:    (r['Platform'] || '').trim(),
-      brand:       (r['Brand'] || '').trim(),
+      brand:       (r['Brand'] === 'Taigun-Imp' ? 'Taigun-Leads' : (r['Brand'] || '').trim()),
       model:       (r['Model'] || '').trim(),
       segment:     (r['Segment'] || '').trim(),
     }))
