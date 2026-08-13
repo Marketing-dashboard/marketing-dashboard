@@ -44,15 +44,26 @@ function doGet(e) {
         return obj;
       });
 
-    return jsonOut({ status: 'ok', rows: rows, timestamp: new Date().toISOString() });
+    const result = { status: 'ok', rows: rows, timestamp: new Date().toISOString() };
+    return respond(e, result);
 
   } catch (err) {
-    return jsonOut({ status: 'error', message: err.message });
+    return respond(e, { status: 'error', message: err.message });
   }
 }
 
-function jsonOut(obj) {
+// Supports both plain JSON and JSONP (callback= param) so fetch() and <script> both work.
+// Workspace GAS URLs (/a/macros/domain/) block cross-origin fetch() due to auth redirects;
+// JSONP via <script> tag bypasses CORS entirely.
+function respond(e, obj) {
+  const output = JSON.stringify(obj);
+  const cb = e && e.parameter && e.parameter.callback;
+  if (cb) {
+    return ContentService
+      .createTextOutput(cb + '(' + output + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
   return ContentService
-    .createTextOutput(JSON.stringify(obj))
+    .createTextOutput(output)
     .setMimeType(ContentService.MimeType.JSON);
 }
