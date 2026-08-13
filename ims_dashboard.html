@@ -392,8 +392,9 @@ const modal = {
 /* ═══════════════════════════════════════════════
    FETCH  (GAS Web App)
 ══════════════════════════════════════════════ */
+const HARDCODED_GAS_URL = 'https://script.google.com/a/macros/girnarsoft.com/s/AKfycbyh1XRAIWoHXDV4_SUZp9Gcf4ePSwsW-3zq4SeveKhDeMv5gA5OvBCU0ZDN1jAknXHN/exec';
 function getGasUrl() {
-  return localStorage.getItem(LS_GAS_URL) || '';
+  return HARDCODED_GAS_URL;
 }
 
 /* JSONP avoids CORS entirely — works for Workspace GAS URLs (/a/macros/domain/...)
@@ -1113,27 +1114,11 @@ function showError(msg) {
    INIT
 ══════════════════════════════════════════════ */
 async function init() {
-  const gasUrl = getGasUrl();
-  if (!gasUrl) {
-    showSetup();
-    document.getElementById('summaryCards').innerHTML = '<div class="empty">Configure the data connection above to get started.</div>';
-    document.getElementById('dashTable').innerHTML = '';
-    return;
-  }
-
-  document.getElementById('resetUrlBtn') && (document.getElementById('setupBanner').style.display = 'none');
-
   try {
-    const rows = await fetchSheet(gasUrl);
+    const rows = await fetchSheet();
     await loadAndRender(rows);
   } catch (err) {
-    if (err.message === 'NO_URL') { showSetup(); return; }
-    // URL saved but fetch failed — show setup with error
-    showSetup();
-    const errEl = document.getElementById('setupError');
-    errEl.textContent = '⚠️ Previous connection failed: ' + err.message + ' — update the URL below or re-deploy the Web App.';
-    errEl.style.display = '';
-    showError(err.message);
+    showError('Failed to load data: ' + err.message);
   }
 }
 
