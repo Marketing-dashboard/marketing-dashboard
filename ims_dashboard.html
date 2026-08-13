@@ -127,6 +127,18 @@ tfoot td:first-child { text-align: left; }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
 
+/* Multi-model table inside modal */
+.modal { width: 620px; }
+.mm-scroll { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 7px; }
+.mm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mm-table th { text-align: left; padding: 6px 10px; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; background: var(--surface2); position: sticky; top: 0; }
+.mm-table td { padding: 5px 8px; border-top: 1px solid var(--border); vertical-align: middle; }
+.mm-table td:first-child { font-weight: 500; min-width: 90px; padding-left: 10px; }
+.mm-table input[type=number] { width: 100%; min-width: 80px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 7px; border-radius: 5px; font-size: 12px; outline: none; }
+.mm-table input[type=number]:focus { border-color: var(--accent); }
+.radio-row { flex-wrap: wrap; }
+.radio-card .rc-hint { font-size: 10px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+
 /* ── Loading / Empty ── */
 .loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--muted); gap: 10px; }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
@@ -277,15 +289,22 @@ tfoot td:first-child { text-align: left; }
     <!-- Step 1: Level -->
     <div class="modal-step active" id="ms1">
       <div class="mf">
-        <label>Is the target at Brand level or Brand + Model level?</label>
+        <label>How would you like to set targets?</label>
         <div class="radio-row">
           <div class="radio-card" data-level="brand">
             <div class="rc-icon">🏷️</div>
             <div class="rc-label">Brand Level</div>
+            <div class="rc-hint">One budget + target for the whole brand</div>
           </div>
           <div class="radio-card" data-level="model">
             <div class="rc-icon">🚗</div>
-            <div class="rc-label">Brand + Model Level</div>
+            <div class="rc-label">Per-Model</div>
+            <div class="rc-hint">Set all models at once with own budget &amp; target</div>
+          </div>
+          <div class="radio-card" data-level="mixed">
+            <div class="rc-icon">🔀</div>
+            <div class="rc-label">Brand Budget +<br>Model Targets</div>
+            <div class="rc-hint">Total brand budget, impression target per model</div>
           </div>
         </div>
       </div>
@@ -299,15 +318,37 @@ tfoot td:first-child { text-align: left; }
       </div>
     </div>
 
-    <!-- Step 3: Select Model (model-level only) -->
-    <div class="modal-step" id="ms3">
+    <!-- Step 3: Per-Model table (level=model) -->
+    <div class="modal-step" id="msMM">
       <div class="mf">
-        <label>Select Model</label>
-        <select id="mModel"></select>
+        <label id="mmTableLabel">Set target &amp; budget for each model (leave blank to skip)</label>
+        <div class="mm-scroll">
+          <table class="mm-table" id="mmTable">
+            <thead id="mmThead"></thead>
+            <tbody id="mmTbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- Step 4: Target Type -->
+    <!-- Step 4: Mixed — brand budget + per-model impression targets -->
+    <div class="modal-step" id="msMX">
+      <div class="mf">
+        <label>Total Brand Budget (₹)</label>
+        <input type="number" id="inBrandBudget" placeholder="e.g. 5000000" min="0">
+      </div>
+      <div class="mf">
+        <label>Target Impressions per Model (leave blank to skip)</label>
+        <div class="mm-scroll">
+          <table class="mm-table" id="mxTable">
+            <thead><tr><th>Model</th><th>Target Impressions</th></tr></thead>
+            <tbody id="mxTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Target Type (brand level only) -->
     <div class="modal-step" id="ms4">
       <div class="mf">
         <label>What are you targeting?</label>
@@ -764,9 +805,10 @@ function renderTracker() {
     }
 
     const t     = saved[e.key] || {};
+    const isBudgetOnly = t.targetType === 'budget-only';
 
-    const tImpr  = t.targetImpr  || null;
-    const tLeads = t.targetLeads || null;
+    const tImpr  = isBudgetOnly ? null : (t.targetImpr  || null);
+    const tLeads = isBudgetOnly ? null : (t.targetLeads || null);
     const budget = (t.budgetImpr || 0) + (t.budgetLeads || 0);
 
     const expImpr  = total.impressions + yest.impressions * remaining;
@@ -779,17 +821,43 @@ function renderTracker() {
 
     const imprPct  = tImpr  ? (total.impressions / tImpr)  * 100 : null;
     const leadsPct = tLeads ? (total.leads / tLeads) * 100 : null;
+    const budgetPct = budget > 0 ? (total.spend / budget) * 100 : null;
 
-    const lbl = e.level === 'model' && e.model
-      ? `${e.brand}<br><small style="color:var(--muted);font-weight:400;">${e.model}</small>`
-      : e.brand;
+    // Label: model sub-label, or "(Total Budget)" hint for mixed brand rows
+    let lbl;
+    if (e.level === 'model' && e.model) {
+      lbl = `${e.brand}<br><small style="color:var(--muted);font-weight:400;">${e.model}</small>`;
+    } else if (isBudgetOnly) {
+      lbl = `${e.brand}<br><small style="color:var(--warn);font-weight:400;">Total Budget</small>`;
+    } else {
+      lbl = e.brand;
+    }
 
     const na = '<span class="exp-na">—</span>';
     const editBtn = `<button class="btn-primary btn-sm" onclick="editTarget('${e.key}')">Edit</button>`;
 
-    // Columns match header exactly — 13 cells (14 with leads):
-    // Entity | Impr Del | [Leads Del] | Spend TTD | Yest Impr | [Yest Leads] | Yest Spend
-    // | Tgt Impr | [Tgt Leads] | Budget | Exp ME Impr | [Exp ME Leads] | Exp ME Spend | Edit
+    if (isBudgetOnly) {
+      // Budget-only brand row (mixed mode): show spend vs budget prominently, no impr target
+      const spendPctDisp = budgetPct !== null ? `<div class="prog-bar"><div class="prog-fill" style="width:${Math.min(100,budgetPct).toFixed(1)}%;background:${budgetPct > 100 ? 'var(--bad)' : 'var(--warn)'}"></div></div>` : '';
+      return `<tr style="background:rgba(210,153,34,0.05);">
+        <td>${lbl}</td>
+        <td>${F.bignum(total.impressions)}</td>
+        ${hasLeads ? `<td>${total.leads > 0 ? F.bignum(total.leads) : na}</td>` : ''}
+        <td>${F.cur(total.spend)}${spendPctDisp}</td>
+        <td>${yest.impressions > 0 ? F.bignum(yest.impressions) : na}</td>
+        ${hasLeads ? `<td>${yest.leads > 0 ? F.bignum(yest.leads) : na}</td>` : ''}
+        <td>${F.cur(yest.spend)}</td>
+        <td>${na}</td>
+        ${hasLeads ? `<td>${na}</td>` : ''}
+        <td class="exp-warn" style="color:var(--warn);font-weight:700;">${F.cur(budget)}</td>
+        <td>${na}</td>
+        ${hasLeads ? `<td>${na}</td>` : ''}
+        <td class="${expSpendCls}">${F.cur(expSpend)}</td>
+        <td>${editBtn}</td>
+      </tr>`;
+    }
+
+    // Normal row
     return `<tr>
       <td>${lbl}</td>
       <td>${F.bignum(total.impressions)}${prog(imprPct, expImprCls)}</td>
@@ -836,28 +904,35 @@ function renderTracker() {
 
 function buildEntities(saved) {
   const list = [];
-  const coveredBrands = new Set();
+  const coveredBrands    = new Set(); // brands with explicit brand-level entry
+  const modelOnlyBrands  = new Set(); // brands with ONLY model-level entries (per-model mode)
 
-  // Saved targets first
+  // Add all saved entries to the list
   for (const [key, t] of Object.entries(saved)) {
-    list.push({ level: t.level, brand: t.brand, model: t.model || null, key });
+    list.push({
+      level: t.level, brand: t.brand, model: t.model || null,
+      groupMode: t.groupMode || t.level, key,
+    });
     if (t.level === 'brand') coveredBrands.add(t.brand);
   }
 
-  // Default brand rows for uncovered brands
+  // Identify brands with only model entries (per-model mode, no brand row)
   BRANDS.forEach(b => {
-    if (!coveredBrands.has(b) && !list.find(e => e.brand === b && e.level === 'model')) {
-      // Check if this brand has model-level entries — if so, skip brand-level default
-      const hasModelEntries = list.some(e => e.brand === b && e.level === 'model');
-      if (!hasModelEntries) {
-        list.push({ level: 'brand', brand: b, model: null, key: 'default::' + b });
-      }
+    const hasModel = list.some(e => e.brand === b && e.level === 'model');
+    const hasBrand = list.some(e => e.brand === b && e.level === 'brand');
+    if (hasModel && !hasBrand) modelOnlyBrands.add(b);
+  });
+
+  // Default brand rows only for brands with NO entries at all
+  BRANDS.forEach(b => {
+    if (!coveredBrands.has(b) && !modelOnlyBrands.has(b)) {
+      list.push({ level: 'brand', brand: b, model: null, groupMode: 'brand', key: 'default::' + b });
     }
   });
 
   return list.sort((a, b) => {
     if (a.brand !== b.brand) return a.brand.localeCompare(b.brand);
-    if (!a.model && b.model) return -1;
+    if (!a.model && b.model) return -1;   // brand row first within brand group
     if (a.model && !b.model) return 1;
     return (a.model || '').localeCompare(b.model || '');
   });
@@ -877,15 +952,17 @@ function saveTargets(obj) {
    MODAL LOGIC
 ══════════════════════════════════════════════ */
 function getStepSeq() {
-  return modal.level === 'model' ? [1,2,3,4,5] : [1,2,4,5];
+  if (modal.level === 'model') return ['ms1','ms2','ms4','msMM'];
+  if (modal.level === 'mixed') return ['ms1','ms2','msMX'];
+  return ['ms1','ms2','ms4','ms5']; // brand level
 }
 
-function showStep(n) {
+function showStep(stepId) {
   document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
-  document.getElementById('ms' + n).classList.add('active');
-  modal.step = n;
+  document.getElementById(stepId).classList.add('active');
+  modal.step = stepId;
   const seq = getStepSeq();
-  const idx = seq.indexOf(n);
+  const idx = seq.indexOf(stepId);
   const total = seq.length;
   document.getElementById('stepInd').textContent = `Step ${idx+1} of ${total}`;
   document.getElementById('mBack').style.display = idx > 0 ? '' : 'none';
@@ -895,8 +972,9 @@ function showStep(n) {
 function openModal(existingKey) {
   // Reset
   modal.level = null; modal.brand = null; modal.model = null; modal.ttype = null;
+  modal._editKey = null; modal._editBrand = null;
   document.querySelectorAll('[data-level],[data-ttype]').forEach(el => el.classList.remove('sel'));
-  ['inTargetImpr','inBudgetImpr','inTargetLeads','inBudgetLeads'].forEach(id => {
+  ['inTargetImpr','inBudgetImpr','inTargetLeads','inBudgetLeads','inBrandBudget'].forEach(id => {
     document.getElementById(id).value = '';
   });
 
@@ -908,34 +986,40 @@ function openModal(existingKey) {
     const saved = loadTargets();
     const t = saved[existingKey];
     if (t) {
-      modal.level = t.level;
-      modal.brand = t.brand;
-      modal.model = t.model;
-      modal.ttype = t.targetType || (t.targetImpr && t.targetLeads ? 'both' : t.targetImpr ? 'impressions' : 'leads');
+      const gm = t.groupMode || t.level;
 
-      // Select radio
-      document.querySelector(`[data-level="${t.level}"]`)?.classList.add('sel');
-      document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
-      document.getElementById('mBrand').value = t.brand || '';
+      if (gm === 'mixed' || t.targetType === 'budget-only') {
+        // Open in mixed mode — find the brand
+        modal.level = 'mixed';
+        modal.brand = t.brand;
+        modal._editBrand = t.brand;
+      } else if (t.level === 'model' && gm === 'model') {
+        // Per-model group — open in per-model mode
+        modal.level = 'model';
+        modal.brand = t.brand;
+        modal._editBrand = t.brand;
+        modal.ttype = t.targetType || 'impressions';
+        document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
+      } else {
+        // Brand-level entry
+        modal.level = 'brand';
+        modal.brand = t.brand;
+        modal.ttype = t.targetType || (t.targetImpr && t.targetLeads ? 'both' : t.targetImpr ? 'impressions' : 'leads');
+        modal._editKey = existingKey;
 
-      // Update model dropdown
-      const mSel = document.getElementById('mModel');
-      mSel.innerHTML = (MODELS[t.brand] || []).map(m => `<option value="${m}">${m}</option>`).join('');
-      if (t.model) mSel.value = t.model;
+        document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
+        if (t.targetImpr)  document.getElementById('inTargetImpr').value  = t.targetImpr;
+        if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
+        if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
+        if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
+      }
 
-      if (t.targetImpr)  document.getElementById('inTargetImpr').value  = t.targetImpr;
-      if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
-      if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
-      if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
-
-      // Store old key to overwrite
-      modal._editKey = existingKey;
+      document.querySelector(`[data-level="${modal.level}"]`)?.classList.add('sel');
+      document.getElementById('mBrand').value = modal.brand || '';
     }
-  } else {
-    modal._editKey = null;
   }
 
-  showStep(1);
+  showStep('ms1');
   document.getElementById('modal').classList.add('open');
 }
 
@@ -945,26 +1029,32 @@ function modalNext() {
   const seq = getStepSeq();
   const idx = seq.indexOf(modal.step);
 
-  // Validate
-  if (modal.step === 1) {
+  // ── Validate / process current step ──
+  if (modal.step === 'ms1') {
     if (!modal.level) { alert('Please choose a level.'); return; }
-  } else if (modal.step === 2) {
+
+  } else if (modal.step === 'ms2') {
     modal.brand = document.getElementById('mBrand').value;
     if (!modal.brand) { alert('Please select a brand.'); return; }
-    // Update model dropdown
-    const mSel = document.getElementById('mModel');
-    mSel.innerHTML = (MODELS[modal.brand] || []).map(m => `<option value="${m}">${m}</option>`).join('');
-  } else if (modal.step === 3) {
-    modal.model = document.getElementById('mModel').value;
-    if (!modal.model) { alert('Please select a model.'); return; }
-  } else if (modal.step === 4) {
+    // Prepare next steps based on level
+    if (modal.level === 'model') {
+      // ms4 (target type) comes next — nothing extra needed here
+    } else if (modal.level === 'mixed') {
+      populateMixed(modal.brand);
+    }
+
+  } else if (modal.step === 'ms4') {
     if (!modal.ttype) { alert('Please choose what you are targeting.'); return; }
     const si = ['impressions','both'].includes(modal.ttype);
     const sl = ['leads','both'].includes(modal.ttype);
     document.getElementById('imprFields').style.display = si ? '' : 'none';
     document.getElementById('leadFields').style.display = sl ? '' : 'none';
-  } else if (modal.step === 5) {
-    // Save
+    if (modal.level === 'model') {
+      populateMultiModel(modal.brand, modal.ttype);
+    }
+
+  } else if (modal.step === 'ms5') {
+    // ── Save brand-level target ──
     if (!modal.brand) { alert('Brand is required.'); return; }
     const si = ['impressions','both'].includes(modal.ttype);
     const sl = ['leads','both'].includes(modal.ttype);
@@ -973,20 +1063,95 @@ function modalNext() {
     const tl = sl ? parseFloat(document.getElementById('inTargetLeads').value) || null : null;
     const bl = sl ? parseFloat(document.getElementById('inBudgetLeads').value) || null : null;
 
-    const key = modal.level === 'model' && modal.model
-      ? `model::${modal.brand}::${modal.model}`
-      : `brand::${modal.brand}`;
-
+    const key = `brand::${modal.brand}`;
     const all = loadTargets();
-    // Remove old key if editing and key changed
     if (modal._editKey && modal._editKey !== key) delete all[modal._editKey];
-
     all[key] = {
-      level: modal.level, brand: modal.brand,
-      model: modal.level === 'model' ? modal.model : null,
+      level: 'brand', brand: modal.brand, model: null, groupMode: 'brand',
       targetType: modal.ttype,
       targetImpr: ti, budgetImpr: bi, targetLeads: tl, budgetLeads: bl,
     };
+    saveTargets(all);
+    closeModal();
+    renderTracker();
+    return;
+
+  } else if (modal.step === 'msMM') {
+    // ── Save per-model targets ──
+    if (!modal.brand) { alert('Brand is required.'); return; }
+    const models = MODELS[modal.brand] || [];
+    if (!models.length) { alert('No models found for this brand in the data.'); return; }
+    const si = ['impressions','both'].includes(modal.ttype);
+    const sl = ['leads','both'].includes(modal.ttype);
+    const all = loadTargets();
+
+    // Remove all old model entries for this brand (clean slate)
+    if (modal._editBrand) {
+      Object.keys(all).forEach(k => {
+        if (k.startsWith(`model::${modal._editBrand}::`) && all[k].groupMode === 'model') delete all[k];
+      });
+    }
+
+    let saved = 0;
+    models.forEach(m => {
+      const ti = si ? parseFloat(document.querySelector(`.mm-ti[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
+      const bi = si ? parseFloat(document.querySelector(`.mm-bi[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
+      const tl = sl ? parseFloat(document.querySelector(`.mm-tl[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
+      const bl = sl ? parseFloat(document.querySelector(`.mm-bl[data-model="${CSS.escape(m)}"]`)?.value) || null : null;
+      if (!ti && !bi && !tl && !bl) return; // skip blank rows
+      all[`model::${modal.brand}::${m}`] = {
+        level: 'model', brand: modal.brand, model: m, groupMode: 'model',
+        targetType: modal.ttype,
+        targetImpr: ti, budgetImpr: bi, targetLeads: tl, budgetLeads: bl,
+      };
+      saved++;
+    });
+
+    if (!saved) { alert('Please fill in at least one model row.'); return; }
+    saveTargets(all);
+    closeModal();
+    renderTracker();
+    return;
+
+  } else if (modal.step === 'msMX') {
+    // ── Save mixed: brand budget + per-model impression targets ──
+    if (!modal.brand) { alert('Brand is required.'); return; }
+    const models = MODELS[modal.brand] || [];
+    const brandBudget = parseFloat(document.getElementById('inBrandBudget').value) || null;
+    const all = loadTargets();
+
+    // Remove old mixed entries for this brand
+    if (modal._editBrand) {
+      const bk = `brand::${modal._editBrand}`;
+      if (all[bk] && all[bk].targetType === 'budget-only') delete all[bk];
+      Object.keys(all).forEach(k => {
+        if (k.startsWith(`model::${modal._editBrand}::`) && all[k].groupMode === 'mixed') delete all[k];
+      });
+    }
+
+    // Save brand-level budget entry
+    if (brandBudget) {
+      all[`brand::${modal.brand}`] = {
+        level: 'brand', brand: modal.brand, model: null, groupMode: 'mixed',
+        targetType: 'budget-only',
+        targetImpr: null, budgetImpr: brandBudget, targetLeads: null, budgetLeads: null,
+      };
+    }
+
+    // Save per-model impression targets
+    let saved = 0;
+    models.forEach(m => {
+      const ti = parseFloat(document.querySelector(`.mx-ti[data-model="${CSS.escape(m)}"]`)?.value) || null;
+      if (!ti) return;
+      all[`model::${modal.brand}::${m}`] = {
+        level: 'model', brand: modal.brand, model: m, groupMode: 'mixed',
+        targetType: 'impressions',
+        targetImpr: ti, budgetImpr: null, targetLeads: null, budgetLeads: null,
+      };
+      saved++;
+    });
+
+    if (!brandBudget && !saved) { alert('Please enter a budget and/or at least one model target.'); return; }
     saveTargets(all);
     closeModal();
     renderTracker();
@@ -1000,6 +1165,50 @@ function modalBack() {
   const seq = getStepSeq();
   const idx = seq.indexOf(modal.step);
   if (idx > 0) showStep(seq[idx - 1]);
+}
+
+function populateMultiModel(brand, ttype) {
+  const models = MODELS[brand] || [];
+  const saved  = loadTargets();
+  const si = ['impressions','both'].includes(ttype);
+  const sl = ['leads','both'].includes(ttype);
+
+  let thead = '<tr><th>Model</th>';
+  if (si) thead += '<th>Target Impr</th><th>Budget (₹)</th>';
+  if (sl) thead += `<th>Target Leads</th>${si ? '' : '<th>Budget (₹)</th>'}`;
+  thead += '</tr>';
+
+  const tbody = models.map(m => {
+    const existing = saved[`model::${brand}::${m}`] || {};
+    let cells = `<td>${m}</td>`;
+    if (si) cells += `<td><input class="mm-ti" data-model="${m}" type="number" value="${existing.targetImpr || ''}" placeholder="e.g. 5000000"></td>
+                     <td><input class="mm-bi" data-model="${m}" type="number" value="${existing.budgetImpr || ''}" placeholder="e.g. 150000"></td>`;
+    if (sl) cells += `<td><input class="mm-tl" data-model="${m}" type="number" value="${existing.targetLeads || ''}" placeholder="e.g. 500"></td>
+                     ${si ? '' : `<td><input class="mm-bl" data-model="${m}" type="number" value="${existing.budgetLeads || ''}" placeholder="e.g. 80000"></td>`}`;
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  document.getElementById('mmThead').innerHTML = thead;
+  document.getElementById('mmTbody').innerHTML = tbody;
+  document.getElementById('mmTableLabel').textContent =
+    `${brand} — set targets for each model (leave blank to skip)`;
+}
+
+function populateMixed(brand) {
+  const models = MODELS[brand] || [];
+  const saved  = loadTargets();
+  const brandEntry = saved[`brand::${brand}`];
+  if (brandEntry && brandEntry.targetType === 'budget-only') {
+    document.getElementById('inBrandBudget').value = brandEntry.budgetImpr || '';
+  }
+  const tbody = models.map(m => {
+    const existing = saved[`model::${brand}::${m}`] || {};
+    return `<tr>
+      <td>${m}</td>
+      <td><input class="mx-ti" data-model="${m}" type="number" value="${existing.targetImpr || ''}" placeholder="e.g. 5000000"></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('mxTbody').innerHTML = tbody;
 }
 
 function editTarget(key) {
