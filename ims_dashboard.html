@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMS Campaign Performance Dashboard</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --good: #3fb950;
+  --bad: #f85149;
+  --warn: #d29922;
+  --purple: #bc8cff;
+  --orange: #f0883e;
+  --teal: #39d3bb;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+/* ── Header ── */
+.hdr { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+.hdr-left { display: flex; align-items: center; gap: 12px; }
+.hdr-logo { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.hdr-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+.hdr-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.hdr-right { font-size: 12px; color: var(--muted); text-align: right; }
+.hdr-right strong { color: var(--accent); font-weight: 600; }
+
+/* ── Tab Nav ── */
+.tabs-nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 0; }
+.tab-btn { padding: 12px 20px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; letter-spacing: 0.2px; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Content ── */
+.content { padding: 20px 24px; max-width: 1800px; margin: 0 auto; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── Filters ── */
+.filters-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.fg { display: flex; align-items: center; gap: 8px; }
+.fg label { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; outline: none; }
+select:focus { border-color: var(--accent); }
+
+/* Platform pills */
+.plat-toggle { display: flex; gap: 4px; background: var(--surface2); padding: 3px; border-radius: 7px; border: 1px solid var(--border); }
+.plat-pill { padding: 4px 12px; background: none; border: none; color: var(--muted); border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
+.plat-pill.active { background: var(--accent); color: #fff; }
+.plat-pill:hover:not(.active) { color: var(--text); background: var(--border); }
+
+/* ── Metric Cards ── */
+.metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.metric-card .mc-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+.metric-card .mc-val { font-size: 22px; font-weight: 700; line-height: 1; }
+.metric-card .mc-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.c-blue   { color: var(--accent); }
+.c-green  { color: var(--good); }
+.c-orange { color: var(--orange); }
+.c-purple { color: var(--purple); }
+.c-teal   { color: var(--teal); }
+.c-warn   { color: var(--warn); }
+
+/* ── Table ── */
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.table-card-hdr { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.table-card-hdr span { font-size: 13px; font-weight: 600; }
+.table-card-hdr .tc-meta { font-size: 11px; color: var(--muted); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { padding: 9px 14px; text-align: right; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); background: var(--surface2); white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+thead th:first-child { text-align: left; }
+tbody td { padding: 9px 14px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; color: var(--text); }
+tbody td:first-child { text-align: left; font-weight: 500; }
+tbody tr:hover { background: rgba(255,255,255,0.03); }
+tfoot td { padding: 9px 14px; text-align: right; border-top: 2px solid var(--border); font-weight: 700; background: var(--surface2); white-space: nowrap; }
+tfoot td:first-child { text-align: left; }
+
+/* ── Tracker ── */
+.tracker-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.tracker-hdr h2 { font-size: 15px; font-weight: 600; }
+.tracker-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.btn-primary { background: var(--accent); color: #fff; border: none; padding: 8px 16px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; transition: opacity 0.15s; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 5px; }
+.btn-ghost { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all 0.15s; }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+/* Expected value badges */
+.exp-good { color: var(--good); font-weight: 700; }
+.exp-bad  { color: var(--bad); font-weight: 700; }
+.exp-na   { color: var(--muted); }
+
+/* Progress bar */
+.prog-bar { height: 4px; background: var(--surface2); border-radius: 2px; margin-top: 3px; overflow: hidden; min-width: 60px; }
+.prog-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+
+/* ── Modal ── */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; align-items: center; justify-content: center; }
+.overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 500px; max-width: 96vw; max-height: 90vh; overflow-y: auto; padding: 28px; position: relative; }
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.modal-step-ind { font-size: 11px; color: var(--muted); margin-bottom: 20px; }
+.modal-step { display: none; }
+.modal-step.active { display: block; }
+
+.mf { margin-bottom: 16px; }
+.mf label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 7px; font-weight: 500; }
+.mf input, .mf select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 7px; font-size: 14px; outline: none; }
+.mf input:focus, .mf select:focus { border-color: var(--accent); }
+
+.radio-row { display: flex; gap: 10px; }
+.radio-card { flex: 1; padding: 12px; background: var(--surface2); border: 2px solid var(--border); border-radius: 8px; cursor: pointer; text-align: center; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+.radio-card:hover { border-color: var(--muted); }
+.radio-card.sel { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.08); }
+.radio-card .rc-icon { font-size: 20px; margin-bottom: 4px; }
+.radio-card .rc-label { font-size: 12px; }
+
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* ── Loading / Empty ── */
+.loading { display: flex; align-items: center; justify-content: center; padding: 48px; color: var(--muted); gap: 10px; }
+.spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+.err { padding: 20px 24px; background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); border-radius: 8px; color: var(--bad); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+
+/* ── Setup Banner ── */
+.setup-banner { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 28px 32px; margin-bottom: 20px; }
+.setup-banner h2 { font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+.setup-banner p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+.setup-steps { counter-reset: step; list-style: none; margin-bottom: 20px; }
+.setup-steps li { counter-increment: step; padding: 8px 0 8px 36px; position: relative; font-size: 13px; color: var(--text); border-bottom: 1px solid var(--border); }
+.setup-steps li:last-child { border-bottom: none; }
+.setup-steps li::before { content: counter(step); position: absolute; left: 0; top: 8px; width: 22px; height: 22px; background: var(--accent); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+.setup-steps code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: monospace; color: var(--teal); }
+.setup-url-row { display: flex; gap: 8px; margin-top: 4px; }
+.setup-url-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 7px; font-size: 13px; outline: none; }
+.setup-url-row input:focus { border-color: var(--accent); }
+.setup-url-row input::placeholder { color: var(--muted); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .content { padding: 12px; }
+  .metric-row { grid-template-columns: repeat(2, 1fr); }
+  .hdr { padding: 12px; }
+  .tabs-nav { padding: 0 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-logo">📊</div>
+    <div>
+      <div class="hdr-title">IMS Campaign Performance</div>
+      <div class="hdr-sub">Impression & Spend Tracker</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div id="lastUpdated">Loading…</div>
+    <div id="dataRange" style="margin-top:2px;"></div>
+  </div>
+</div>
+
+<!-- Tab Nav -->
+<nav class="tabs-nav">
+  <button class="tab-btn active" data-tab="dashboard">📈 Dashboard</button>
+  <button class="tab-btn" data-tab="tracker">🎯 Tracker</button>
+</nav>
+
+<div class="content">
+
+  <!-- ═══════════════ SETUP BANNER (shown until GAS URL configured) ═══════════════ -->
+  <div id="setupBanner" style="display:none;">
+    <div class="setup-banner">
+      <h2>⚙️ One-time Setup Required</h2>
+      <p>This sheet is private. You need to deploy a Google Apps Script Web App once so the dashboard can securely read the data. It takes about 2 minutes.</p>
+      <ol class="setup-steps">
+        <li>Open your Google Sheet → click <strong>Extensions → Apps Script</strong></li>
+        <li>Paste the contents of <code>ims_data_server.gs</code> (in the same folder as this file)</li>
+        <li>Click <strong>Deploy → New deployment</strong> → Type: <strong>Web app</strong></li>
+        <li>Set <em>Execute as:</em> <strong>Me</strong> &nbsp;|&nbsp; <em>Who has access:</em> <strong>Anyone</strong></li>
+        <li>Click <strong>Deploy</strong> → copy the <strong>Web app URL</strong></li>
+        <li>Paste the URL below and click <strong>Connect</strong></li>
+      </ol>
+      <div class="setup-url-row">
+        <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/…/exec">
+        <button class="btn-primary" id="connectBtn">Connect →</button>
+        <button class="btn-ghost" id="resetUrlBtn" style="display:none">Reset URL</button>
+      </div>
+      <div id="setupError" style="margin-top:10px;font-size:12px;color:var(--bad);display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DASHBOARD TAB ═══════════════ -->
+  <div class="tab-pane active" id="tab-dashboard">
+
+    <div class="filters-bar">
+      <div class="fg">
+        <label>Brand</label>
+        <select id="brandFilter"><option value="all">All Brands</option></select>
+      </div>
+      <div class="fg">
+        <label>Model</label>
+        <select id="modelFilter"><option value="all">All Models</option></select>
+      </div>
+      <div class="fg" id="segmentFilterWrap" style="display:none;">
+        <label>Segment</label>
+        <select id="segmentFilter"><option value="all">All Segments</option></select>
+      </div>
+      <div class="fg" style="margin-left:auto;">
+        <label>Platform</label>
+        <div class="plat-toggle" id="platToggle">
+          <button class="plat-pill active" data-p="all">Combined</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="metric-row" id="summaryCards">
+      <div class="loading"><div class="spinner"></div> Fetching data…</div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-hdr">
+        <span>Day-wise Performance</span>
+        <span class="tc-meta" id="dashTableMeta"></span>
+      </div>
+      <div class="table-wrap" id="dashTable">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════ TRACKER TAB ═══════════════ -->
+  <div class="tab-pane" id="tab-tracker">
+
+    <div class="tracker-hdr">
+      <div>
+        <h2>Campaign Tracker</h2>
+        <div class="tracker-meta" id="trackerMeta"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-ghost" id="clearTargetsBtn">Clear All Targets</button>
+        <button class="btn-primary" id="setTargetsBtn">+ Set / Edit Target</button>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-wrap" id="trackerTable">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /content -->
+
+<!-- ═══════════════ TARGET MODAL ═══════════════ -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">Set Campaign Target</div>
+    <div class="modal-step-ind" id="stepInd">Step 1 of 4</div>
+
+    <!-- Step 1: Level -->
+    <div class="modal-step active" id="ms1">
+      <div class="mf">
+        <label>Is the target at Brand level or Brand + Model level?</label>
+        <div class="radio-row">
+          <div class="radio-card" data-level="brand">
+            <div class="rc-icon">🏷️</div>
+            <div class="rc-label">Brand Level</div>
+          </div>
+          <div class="radio-card" data-level="model">
+            <div class="rc-icon">🚗</div>
+            <div class="rc-label">Brand + Model Level</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Select Brand -->
+    <div class="modal-step" id="ms2">
+      <div class="mf">
+        <label>Select Brand</label>
+        <select id="mBrand"></select>
+      </div>
+    </div>
+
+    <!-- Step 3: Select Model (model-level only) -->
+    <div class="modal-step" id="ms3">
+      <div class="mf">
+        <label>Select Model</label>
+        <select id="mModel"></select>
+      </div>
+    </div>
+
+    <!-- Step 4: Target Type -->
+    <div class="modal-step" id="ms4">
+      <div class="mf">
+        <label>What are you targeting?</label>
+        <div class="radio-row">
+          <div class="radio-card" data-ttype="impressions">
+            <div class="rc-icon">👁️</div>
+            <div class="rc-label">Impressions Only</div>
+          </div>
+          <div class="radio-card" data-ttype="leads">
+            <div class="rc-icon">📋</div>
+            <div class="rc-label">Leads Only</div>
+          </div>
+          <div class="radio-card" data-ttype="both">
+            <div class="rc-icon">🎯</div>
+            <div class="rc-label">Both</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Values -->
+    <div class="modal-step" id="ms5">
+      <div id="imprFields">
+        <div class="mf">
+          <label>Target Impressions</label>
+          <input type="number" id="inTargetImpr" placeholder="e.g. 5000000" min="0">
+        </div>
+        <div class="mf">
+          <label>Budget for Impressions (₹)</label>
+          <input type="number" id="inBudgetImpr" placeholder="e.g. 150000" min="0">
+        </div>
+      </div>
+      <div id="leadFields">
+        <div class="mf">
+          <label>Target Leads</label>
+          <input type="number" id="inTargetLeads" placeholder="e.g. 500" min="0">
+        </div>
+        <div class="mf">
+          <label>Budget for Leads (₹)</label>
+          <input type="number" id="inBudgetLeads" placeholder="e.g. 80000" min="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-ghost" id="mBack" style="display:none">← Back</button>
+      <button class="btn-ghost" id="mCancel">Cancel</button>
+      <button class="btn-primary" id="mNext">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════════ */
+const LS_KEY     = 'ims_tracker_v1';
+const LS_GAS_URL = 'ims_gas_url';
+
+/* ═══════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════ */
+let RAW       = [];       // all rows parsed
+let BRANDS    = [];       // sorted unique brands
+let MODELS    = {};       // brand → [models]
+let PLATFORMS = [];       // sorted unique platforms
+let SEGMENTS  = [];       // sorted unique segments
+
+let activeBrand    = 'all';
+let activeModel    = 'all';
+let activePlatform = 'all';
+let activeSegment  = 'all';
+
+const modal = {
+  step: 1,
+  level: null,        // 'brand' | 'model'
+  brand: null,
+  model: null,
+  ttype: null,        // 'impressions' | 'leads' | 'both'
+};
+
+/* ═══════════════════════════════════════════════
+   FETCH  (GAS Web App)
+══════════════════════════════════════════════ */
+function getGasUrl() {
+  return localStorage.getItem(LS_GAS_URL) || '';
+}
+
+async function fetchSheet(gasUrl) {
+  const url = gasUrl || getGasUrl();
+  if (!url) throw new Error('NO_URL');
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  let json;
+  try { json = await res.json(); }
+  catch { throw new Error('Response was not valid JSON. Make sure the Web App URL is correct.'); }
+
+  if (json.status === 'error') throw new Error(json.message || 'GAS web app returned an error.');
+  if (!json.rows)              throw new Error('No rows in response.');
+  return json.rows;
+}
+
+/* ═══════════════════════════════════════════════
+   PARSE
+══════════════════════════════════════════════ */
+function parseDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  if (typeof v === 'string') {
+    // GAS now returns clean YYYY-MM-DD strings (e.g. "2026-08-07")
+    const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return new Date(+iso[1], +iso[2] - 1, +iso[3]);
+    // Legacy GViz "Date(year,month0,day)" format
+    const m = v.match(/Date\((\d+),(\d+),(\d+)\)/);
+    if (m) return new Date(+m[1], +m[2], +m[3]);
+    const d = new Date(v);
+    return isNaN(d) ? null : d;
+  }
+  return null;
+}
+
+function num(v) {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : n;
+}
+
+function processRows(rows) {
+  RAW = rows
+    .map(r => ({
+      date:        parseDate(r['Date']),
+      month:       r['Month'] || '',
+      campaign:    r['Campaign Name'] || '',
+      adGroup:     r['Ad Group'] || '',
+      spend:       num(r['Spend']),
+      impressions: num(r['Impressions']),
+      clicks:      num(r['Clicks']),
+      views:       num(r['Views']),
+      leads:       num(r['Leads']),
+      platform:    (r['Platform'] || '').trim(),
+      brand:       (r['Brand'] || '').trim(),
+      model:       (r['Model'] || '').trim(),
+      segment:     (r['Segment'] || '').trim(),
+    }))
+    .filter(r => r.date && !isNaN(r.date));
+
+  // Add YYYY-MM-DD string for keying (local date)
+  RAW.forEach(r => {
+    const d = r.date;
+    r.dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  });
+
+  // Discover dimensions
+  const bs = new Set(), ps = new Set(), ss = new Set(), ms = {};
+  RAW.forEach(r => {
+    if (r.brand)    bs.add(r.brand);
+    if (r.platform) ps.add(r.platform);
+    if (r.segment)  ss.add(r.segment);
+    if (r.brand && r.model) {
+      ms[r.brand] = ms[r.brand] || new Set();
+      ms[r.brand].add(r.model);
+    }
+  });
+
+  BRANDS    = [...bs].sort();
+  PLATFORMS = [...ps].sort();
+  SEGMENTS  = [...ss].sort();
+  MODELS    = {};
+  Object.keys(ms).forEach(b => { MODELS[b] = [...ms[b]].sort(); });
+}
+
+/* ═══════════════════════════════════════════════
+   FILTER
+══════════════════════════════════════════════ */
+function filterRows(brand = 'all', model = 'all', platform = 'all', segment = 'all') {
+  return RAW.filter(r => {
+    if (brand    !== 'all' && r.brand    !== brand)    return false;
+    if (model    !== 'all' && r.model    !== model)    return false;
+    if (platform !== 'all' && r.platform !== platform) return false;
+    if (segment  !== 'all' && r.segment  !== segment)  return false;
+    return true;
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   AGGREGATE
+══════════════════════════════════════════════ */
+function sumRows(arr) {
+  return arr.reduce((a, r) => ({
+    spend:       a.spend       + r.spend,
+    impressions: a.impressions + r.impressions,
+    clicks:      a.clicks      + r.clicks,
+    views:       a.views       + r.views,
+    leads:       a.leads       + r.leads,
+  }), { spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 });
+}
+
+function byDate(rows) {
+  const map = {};
+  rows.forEach(r => {
+    if (!map[r.dateStr]) map[r.dateStr] = { date: r.date, dateStr: r.dateStr, spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 };
+    const d = map[r.dateStr];
+    d.spend       += r.spend;
+    d.impressions += r.impressions;
+    d.clicks      += r.clicks;
+    d.views       += r.views;
+    d.leads       += r.leads;
+  });
+  return Object.values(map).sort((a, b) => a.date - b.date);
+}
+
+/* ═══════════════════════════════════════════════
+   FORMAT
+══════════════════════════════════════════════ */
+const F = {
+  cur: v => {
+    if (v == null) return '—';
+    if (v >= 1e5) return '₹' + (v/1e5).toFixed(2) + 'L';
+    if (v >= 1e3) return '₹' + (v/1e3).toFixed(2) + 'K';
+    return '₹' + v.toFixed(2);
+  },
+  num: v => {
+    if (v == null || v === 0) return '—';
+    if (v >= 1e6) return (v/1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return (v/1e3).toFixed(1) + 'K';
+    return Math.round(v).toLocaleString('en-IN');
+  },
+  bignum: v => v == null ? '—' : Math.round(v).toLocaleString('en-IN'),
+  pct:  v => v == null ? '—' : v.toFixed(2) + '%',
+  cpm:  (spend, impr) => impr > 0 ? '₹' + ((spend / impr) * 1000).toFixed(2) : '—',
+  ctr:  (clicks, impr) => impr > 0 ? ((clicks / impr) * 100).toFixed(2) + '%' : '—',
+  date: d => d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—',
+  dateL: d => d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+};
+
+/* ═══════════════════════════════════════════════
+   RENDER FILTERS
+══════════════════════════════════════════════ */
+function renderFilters() {
+  const bSel = document.getElementById('brandFilter');
+  bSel.innerHTML = '<option value="all">All Brands</option>' +
+    BRANDS.map(b => `<option value="${b}">${b}</option>`).join('');
+
+  const toggle = document.getElementById('platToggle');
+  toggle.innerHTML = '<button class="plat-pill active" data-p="all">Combined</button>' +
+    PLATFORMS.map(p => `<button class="plat-pill" data-p="${p}">${p}</button>`).join('');
+
+  toggle.querySelectorAll('.plat-pill').forEach(b => {
+    b.addEventListener('click', () => {
+      toggle.querySelectorAll('.plat-pill').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      activePlatform = b.dataset.p;
+      renderDashboard();
+    });
+  });
+
+  // Segment filter — only show if multiple segments exist
+  const segWrap = document.getElementById('segmentFilterWrap');
+  const segSel  = document.getElementById('segmentFilter');
+  if (SEGMENTS.length > 1) {
+    segSel.innerHTML = '<option value="all">All Segments</option>' +
+      SEGMENTS.map(s => `<option value="${s}">${s}</option>`).join('');
+    segWrap.style.display = '';
+    segSel.addEventListener('change', () => {
+      activeSegment = segSel.value;
+      renderDashboard();
+    });
+  }
+
+  bSel.addEventListener('change', () => {
+    activeBrand = bSel.value;
+    activeModel = 'all';
+    renderModelFilter();
+    renderDashboard();
+  });
+
+  document.getElementById('modelFilter').addEventListener('change', () => {
+    activeModel = document.getElementById('modelFilter').value;
+    renderDashboard();
+  });
+}
+
+function renderModelFilter() {
+  const mSel = document.getElementById('modelFilter');
+  const list = activeBrand === 'all'
+    ? [...new Set(Object.values(MODELS).flat())].sort()
+    : (MODELS[activeBrand] || []);
+  mSel.innerHTML = '<option value="all">All Models</option>' +
+    list.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER DASHBOARD
+══════════════════════════════════════════════ */
+function renderDashboard() {
+  const rows     = filterRows(activeBrand, activeModel, activePlatform, activeSegment);
+  const daily    = byDate(rows);
+  const totals   = sumRows(rows);
+  const hasLeads = rows.some(r => r.leads > 0);
+  const hasViews = rows.some(r => r.views > 0);
+
+  const avgCPM = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
+  const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+
+  /* Summary cards */
+  let cards = `
+    <div class="metric-card"><div class="mc-label">Total Spend</div><div class="mc-val c-orange">${F.cur(totals.spend)}</div><div class="mc-sub">${daily.length} days</div></div>
+    <div class="metric-card"><div class="mc-label">Total Impressions</div><div class="mc-val c-blue">${F.num(totals.impressions)}</div></div>
+    <div class="metric-card"><div class="mc-label">Total Clicks</div><div class="mc-val">${F.num(totals.clicks)}</div></div>
+    <div class="metric-card"><div class="mc-label">Avg CPM</div><div class="mc-val c-purple">${avgCPM > 0 ? '₹' + avgCPM.toFixed(2) : '—'}</div></div>
+    <div class="metric-card"><div class="mc-label">Avg CTR</div><div class="mc-val c-green">${avgCTR > 0 ? avgCTR.toFixed(2) + '%' : '—'}</div></div>
+  `;
+  if (hasLeads) cards += `<div class="metric-card"><div class="mc-label">Total Leads</div><div class="mc-val c-teal">${F.bignum(totals.leads)}</div></div>`;
+  if (hasViews) cards += `<div class="metric-card"><div class="mc-label">Total Views</div><div class="mc-val c-warn">${F.num(totals.views)}</div></div>`;
+
+  document.getElementById('summaryCards').innerHTML = cards;
+
+  /* Day-wise table */
+  const platLabel = activePlatform === 'all' ? 'Combined' : activePlatform;
+  document.getElementById('dashTableMeta').textContent =
+    `${platLabel} · ${activeBrand === 'all' ? 'All Brands' : activeBrand}${activeModel !== 'all' ? ' · ' + activeModel : ''}`;
+
+  if (daily.length === 0) {
+    document.getElementById('dashTable').innerHTML = '<div class="empty">No data for the selected filters.</div>';
+    return;
+  }
+
+  const thLeads = hasLeads ? '<th>Leads</th>' : '';
+  const thViews = hasViews ? '<th>Views</th>' : '';
+  const thead = `<tr><th>Date</th><th>Spend</th><th>Impressions</th><th>Clicks</th><th>CPM</th><th>CTR</th>${thViews}${thLeads}</tr>`;
+
+  const tbody = daily.map(r => {
+    const tdL = hasLeads ? `<td>${r.leads > 0 ? F.bignum(r.leads) : '—'}</td>` : '';
+    const tdV = hasViews ? `<td>${r.views > 0 ? F.num(r.views) : '—'}</td>` : '';
+    return `<tr>
+      <td>${F.date(r.date)}</td>
+      <td>${F.cur(r.spend)}</td>
+      <td>${F.num(r.impressions)}</td>
+      <td>${F.num(r.clicks)}</td>
+      <td>${F.cpm(r.spend, r.impressions)}</td>
+      <td>${F.ctr(r.clicks, r.impressions)}</td>
+      ${tdV}${tdL}
+    </tr>`;
+  }).join('');
+
+  const tf = sumRows(daily.map(d => d)); // same as totals
+  const tfL = hasLeads ? `<td>${F.bignum(totals.leads)}</td>` : '';
+  const tfV = hasViews ? `<td>${F.num(totals.views)}</td>` : '';
+  const tfoot = `<tr>
+    <td>Total / Avg</td>
+    <td>${F.cur(totals.spend)}</td>
+    <td>${F.num(totals.impressions)}</td>
+    <td>${F.num(totals.clicks)}</td>
+    <td>${F.cpm(totals.spend, totals.impressions)}</td>
+    <td>${F.ctr(totals.clicks, totals.impressions)}</td>
+    ${tfV}${tfL}
+  </tr>`;
+
+  document.getElementById('dashTable').innerHTML =
+    `<table><thead>${thead}</thead><tbody>${tbody}</tbody><tfoot>${tfoot}</tfoot></table>`;
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER TRACKER
+══════════════════════════════════════════════ */
+function renderTracker() {
+  const saved       = loadTargets();
+  const today       = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const remaining   = daysInMonth - today.getDate();
+
+  const latestDateStr = [...new Set(RAW.map(r => r.dateStr))].sort().pop() || '';
+  const latestDate    = latestDateStr ? new Date(latestDateStr) : null;
+
+  document.getElementById('trackerMeta').textContent =
+    `Last data: ${latestDate ? F.dateL(latestDate) : '—'} · Remaining days in month: ${remaining} · Projection = yesterday × ${remaining} + delivered`;
+
+  const entities = buildEntities(saved);
+  const hasLeads = RAW.some(r => r.leads > 0);
+
+  function prog(pct, cls) {
+    if (pct === null) return '';
+    const color = cls === 'exp-good' ? 'var(--good)' : cls === 'exp-bad' ? 'var(--bad)' : 'var(--muted)';
+    return `<div class="prog-bar"><div class="prog-fill" style="width:${Math.min(100,pct).toFixed(1)}%;background:${color}"></div></div>`;
+  }
+
+  const rows = entities.map(e => {
+    const eRows = RAW.filter(r => {
+      if (r.brand !== e.brand) return false;
+      if (e.level === 'model' && e.model && r.model !== e.model) return false;
+      return true;
+    });
+    const yRows = eRows.filter(r => r.dateStr === latestDateStr);
+
+    const total = sumRows(eRows);
+    const yest  = sumRows(yRows);
+    const t     = saved[e.key] || {};
+
+    const tImpr  = t.targetImpr  || null;
+    const tLeads = t.targetLeads || null;
+    const budget = (t.budgetImpr || 0) + (t.budgetLeads || 0);
+
+    const expImpr  = total.impressions + yest.impressions * remaining;
+    const expLeads = total.leads       + yest.leads       * remaining;
+    const expSpend = total.spend       + yest.spend       * remaining;
+
+    const expImprCls  = tImpr  ? (expImpr  >= tImpr  ? 'exp-good' : 'exp-bad') : 'exp-na';
+    const expLeadsCls = tLeads ? (expLeads >= tLeads ? 'exp-good' : 'exp-bad') : 'exp-na';
+    const expSpendCls = budget > 0 ? (expSpend <= budget ? 'exp-good' : 'exp-bad') : 'exp-na';
+
+    const imprPct  = tImpr  ? (total.impressions / tImpr)  * 100 : null;
+    const leadsPct = tLeads ? (total.leads / tLeads) * 100 : null;
+
+    const lbl = e.level === 'model' && e.model
+      ? `${e.brand}<br><small style="color:var(--muted);font-weight:400;">${e.model}</small>`
+      : e.brand;
+
+    const na = '<span class="exp-na">—</span>';
+    const editBtn = `<button class="btn-primary btn-sm" onclick="editTarget('${e.key}')">Edit</button>`;
+
+    // Columns match header exactly — 13 cells (14 with leads):
+    // Entity | Impr Del | [Leads Del] | Spend TTD | Yest Impr | [Yest Leads] | Yest Spend
+    // | Tgt Impr | [Tgt Leads] | Budget | Exp ME Impr | [Exp ME Leads] | Exp ME Spend | Edit
+    return `<tr>
+      <td>${lbl}</td>
+      <td>${F.bignum(total.impressions)}${prog(imprPct, expImprCls)}</td>
+      ${hasLeads ? `<td>${total.leads > 0 ? F.bignum(total.leads) : na}</td>` : ''}
+      <td>${F.cur(total.spend)}</td>
+      <td>${yest.impressions > 0 ? F.bignum(yest.impressions) : na}</td>
+      ${hasLeads ? `<td>${yest.leads > 0 ? F.bignum(yest.leads) : na}</td>` : ''}
+      <td>${F.cur(yest.spend)}</td>
+      <td>${tImpr ? F.bignum(tImpr) : '<span class="exp-na">Not set</span>'}</td>
+      ${hasLeads ? `<td>${tLeads ? F.bignum(tLeads) : '<span class="exp-na">Not set</span>'}</td>` : ''}
+      <td>${budget > 0 ? F.cur(budget) : '<span class="exp-na">Not set</span>'}</td>
+      <td class="${expImprCls}">${F.bignum(expImpr)}${prog(imprPct, expImprCls)}</td>
+      ${hasLeads ? `<td class="${expLeadsCls}">${expLeads > 0 ? F.bignum(expLeads) : na}${prog(leadsPct, expLeadsCls)}</td>` : ''}
+      <td class="${expSpendCls}">${F.cur(expSpend)}</td>
+      <td>${editBtn}</td>
+    </tr>`;
+  }).join('');
+
+  // Header columns match data rows exactly
+  document.getElementById('trackerTable').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left;min-width:140px;">Entity</th>
+          <th>Impr Delivered</th>
+          ${hasLeads ? '<th>Leads Delivered</th>' : ''}
+          <th>Spend Till Date</th>
+          <th>Yest Impressions</th>
+          ${hasLeads ? '<th>Yest Leads</th>' : ''}
+          <th>Yest Spend</th>
+          <th>Target Impressions</th>
+          ${hasLeads ? '<th>Target Leads</th>' : ''}
+          <th>Budget Assigned</th>
+          <th>Exp Month-End Impr</th>
+          ${hasLeads ? '<th>Exp Month-End Leads</th>' : ''}
+          <th>Exp Month-End Spend</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function buildEntities(saved) {
+  const list = [];
+  const coveredBrands = new Set();
+
+  // Saved targets first
+  for (const [key, t] of Object.entries(saved)) {
+    list.push({ level: t.level, brand: t.brand, model: t.model || null, key });
+    if (t.level === 'brand') coveredBrands.add(t.brand);
+  }
+
+  // Default brand rows for uncovered brands
+  BRANDS.forEach(b => {
+    if (!coveredBrands.has(b) && !list.find(e => e.brand === b && e.level === 'model')) {
+      // Check if this brand has model-level entries — if so, skip brand-level default
+      const hasModelEntries = list.some(e => e.brand === b && e.level === 'model');
+      if (!hasModelEntries) {
+        list.push({ level: 'brand', brand: b, model: null, key: 'default::' + b });
+      }
+    }
+  });
+
+  return list.sort((a, b) => {
+    if (a.brand !== b.brand) return a.brand.localeCompare(b.brand);
+    if (!a.model && b.model) return -1;
+    if (a.model && !b.model) return 1;
+    return (a.model || '').localeCompare(b.model || '');
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   LOCAL STORAGE
+══════════════════════════════════════════════ */
+function loadTargets() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+}
+function saveTargets(obj) {
+  localStorage.setItem(LS_KEY, JSON.stringify(obj));
+}
+
+/* ═══════════════════════════════════════════════
+   MODAL LOGIC
+══════════════════════════════════════════════ */
+function getStepSeq() {
+  return modal.level === 'model' ? [1,2,3,4,5] : [1,2,4,5];
+}
+
+function showStep(n) {
+  document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('ms' + n).classList.add('active');
+  modal.step = n;
+  const seq = getStepSeq();
+  const idx = seq.indexOf(n);
+  const total = seq.length;
+  document.getElementById('stepInd').textContent = `Step ${idx+1} of ${total}`;
+  document.getElementById('mBack').style.display = idx > 0 ? '' : 'none';
+  document.getElementById('mNext').textContent = idx === total - 1 ? 'Save' : 'Next →';
+}
+
+function openModal(existingKey) {
+  // Reset
+  modal.level = null; modal.brand = null; modal.model = null; modal.ttype = null;
+  document.querySelectorAll('[data-level],[data-ttype]').forEach(el => el.classList.remove('sel'));
+  ['inTargetImpr','inBudgetImpr','inTargetLeads','inBudgetLeads'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+
+  // Pre-fill brand dropdown
+  document.getElementById('mBrand').innerHTML = BRANDS.map(b => `<option value="${b}">${b}</option>`).join('');
+
+  // Load existing if editing
+  if (existingKey) {
+    const saved = loadTargets();
+    const t = saved[existingKey];
+    if (t) {
+      modal.level = t.level;
+      modal.brand = t.brand;
+      modal.model = t.model;
+      modal.ttype = t.targetType || (t.targetImpr && t.targetLeads ? 'both' : t.targetImpr ? 'impressions' : 'leads');
+
+      // Select radio
+      document.querySelector(`[data-level="${t.level}"]`)?.classList.add('sel');
+      document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
+      document.getElementById('mBrand').value = t.brand || '';
+
+      // Update model dropdown
+      const mSel = document.getElementById('mModel');
+      mSel.innerHTML = (MODELS[t.brand] || []).map(m => `<option value="${m}">${m}</option>`).join('');
+      if (t.model) mSel.value = t.model;
+
+      if (t.targetImpr)  document.getElementById('inTargetImpr').value  = t.targetImpr;
+      if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
+      if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
+      if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
+
+      // Store old key to overwrite
+      modal._editKey = existingKey;
+    }
+  } else {
+    modal._editKey = null;
+  }
+
+  showStep(1);
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function modalNext() {
+  const seq = getStepSeq();
+  const idx = seq.indexOf(modal.step);
+
+  // Validate
+  if (modal.step === 1) {
+    if (!modal.level) { alert('Please choose a level.'); return; }
+  } else if (modal.step === 2) {
+    modal.brand = document.getElementById('mBrand').value;
+    if (!modal.brand) { alert('Please select a brand.'); return; }
+    // Update model dropdown
+    const mSel = document.getElementById('mModel');
+    mSel.innerHTML = (MODELS[modal.brand] || []).map(m => `<option value="${m}">${m}</option>`).join('');
+  } else if (modal.step === 3) {
+    modal.model = document.getElementById('mModel').value;
+    if (!modal.model) { alert('Please select a model.'); return; }
+  } else if (modal.step === 4) {
+    if (!modal.ttype) { alert('Please choose what you are targeting.'); return; }
+    const si = ['impressions','both'].includes(modal.ttype);
+    const sl = ['leads','both'].includes(modal.ttype);
+    document.getElementById('imprFields').style.display = si ? '' : 'none';
+    document.getElementById('leadFields').style.display = sl ? '' : 'none';
+  } else if (modal.step === 5) {
+    // Save
+    if (!modal.brand) { alert('Brand is required.'); return; }
+    const si = ['impressions','both'].includes(modal.ttype);
+    const sl = ['leads','both'].includes(modal.ttype);
+    const ti = si ? parseFloat(document.getElementById('inTargetImpr').value)  || null : null;
+    const bi = si ? parseFloat(document.getElementById('inBudgetImpr').value)  || null : null;
+    const tl = sl ? parseFloat(document.getElementById('inTargetLeads').value) || null : null;
+    const bl = sl ? parseFloat(document.getElementById('inBudgetLeads').value) || null : null;
+
+    const key = modal.level === 'model' && modal.model
+      ? `model::${modal.brand}::${modal.model}`
+      : `brand::${modal.brand}`;
+
+    const all = loadTargets();
+    // Remove old key if editing and key changed
+    if (modal._editKey && modal._editKey !== key) delete all[modal._editKey];
+
+    all[key] = {
+      level: modal.level, brand: modal.brand,
+      model: modal.level === 'model' ? modal.model : null,
+      targetType: modal.ttype,
+      targetImpr: ti, budgetImpr: bi, targetLeads: tl, budgetLeads: bl,
+    };
+    saveTargets(all);
+    closeModal();
+    renderTracker();
+    return;
+  }
+
+  if (idx < seq.length - 1) showStep(seq[idx + 1]);
+}
+
+function modalBack() {
+  const seq = getStepSeq();
+  const idx = seq.indexOf(modal.step);
+  if (idx > 0) showStep(seq[idx - 1]);
+}
+
+function editTarget(key) {
+  // Switch to tracker tab if not already
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab="tracker"]').classList.add('active');
+  document.getElementById('tab-tracker').classList.add('active');
+  openModal(key);
+}
+
+/* ═══════════════════════════════════════════════
+   EVENT WIRING
+══════════════════════════════════════════════ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'tracker' && RAW.length) renderTracker();
+  });
+});
+
+document.getElementById('setTargetsBtn').addEventListener('click', () => openModal(null));
+document.getElementById('clearTargetsBtn').addEventListener('click', () => {
+  if (confirm('Clear all saved targets? This cannot be undone.')) {
+    saveTargets({});
+    renderTracker();
+  }
+});
+document.getElementById('mNext').addEventListener('click', modalNext);
+document.getElementById('mBack').addEventListener('click', modalBack);
+document.getElementById('mCancel').addEventListener('click', closeModal);
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+document.querySelectorAll('[data-level]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('[data-level]').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel');
+    modal.level = el.dataset.level;
+  });
+});
+
+document.querySelectorAll('[data-ttype]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('[data-ttype]').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel');
+    modal.ttype = el.dataset.ttype;
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   SETUP FLOW
+══════════════════════════════════════════════ */
+function showSetup() {
+  document.getElementById('setupBanner').style.display = '';
+  const saved = getGasUrl();
+  if (saved) {
+    document.getElementById('gasUrlInput').value = saved;
+    document.getElementById('resetUrlBtn').style.display = '';
+  }
+}
+
+function hideSetup() {
+  document.getElementById('setupBanner').style.display = 'none';
+}
+
+document.getElementById('connectBtn').addEventListener('click', async () => {
+  const url = document.getElementById('gasUrlInput').value.trim();
+  const errEl = document.getElementById('setupError');
+  errEl.style.display = 'none';
+
+  if (!url || !url.startsWith('https://script.google.com')) {
+    errEl.textContent = 'Please enter a valid Google Apps Script Web App URL (starts with https://script.google.com)';
+    errEl.style.display = '';
+    return;
+  }
+
+  document.getElementById('connectBtn').textContent = 'Testing…';
+  document.getElementById('connectBtn').disabled = true;
+
+  try {
+    const rows = await fetchSheet(url);
+    localStorage.setItem(LS_GAS_URL, url);
+    hideSetup();
+    await loadAndRender(rows);
+  } catch (err) {
+    errEl.textContent = '⚠️ ' + err.message;
+    errEl.style.display = '';
+  } finally {
+    document.getElementById('connectBtn').textContent = 'Connect →';
+    document.getElementById('connectBtn').disabled = false;
+  }
+});
+
+document.getElementById('resetUrlBtn').addEventListener('click', () => {
+  localStorage.removeItem(LS_GAS_URL);
+  document.getElementById('gasUrlInput').value = '';
+  document.getElementById('resetUrlBtn').style.display = 'none';
+  document.getElementById('setupError').style.display = 'none';
+});
+
+/* ═══════════════════════════════════════════════
+   LOAD & RENDER
+══════════════════════════════════════════════ */
+async function loadAndRender(rows) {
+  if (!rows || rows.length === 0) {
+    showError('Sheet returned no rows. Check the sheet name.');
+    return;
+  }
+  hideSetup();
+  processRows(rows);
+
+  const dates = RAW.map(r => r.date).sort((a, b) => a - b);
+  const first = dates[0], last = dates[dates.length - 1];
+  document.getElementById('lastUpdated').textContent = 'Latest data: ' + F.dateL(last);
+  document.getElementById('dataRange').textContent   = F.dateL(first) + ' → ' + F.dateL(last) + ' (' + RAW.length + ' rows)';
+
+  renderFilters();
+  renderModelFilter();
+  renderDashboard();
+
+  // Pre-warm tracker if it was the active tab
+  if (document.getElementById('tab-tracker').classList.contains('active')) {
+    renderTracker();
+  }
+}
+
+function showError(msg) {
+  const html = `<div class="err">⚠️ <strong>Could not load data:</strong> ${msg}</div>`;
+  document.getElementById('summaryCards').innerHTML = html;
+  document.getElementById('dashTable').innerHTML = '';
+  document.getElementById('trackerTable').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════ */
+async function init() {
+  const gasUrl = getGasUrl();
+  if (!gasUrl) {
+    showSetup();
+    document.getElementById('summaryCards').innerHTML = '<div class="empty">Configure the data connection above to get started.</div>';
+    document.getElementById('dashTable').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('resetUrlBtn') && (document.getElementById('setupBanner').style.display = 'none');
+
+  try {
+    const rows = await fetchSheet(gasUrl);
+    await loadAndRender(rows);
+  } catch (err) {
+    if (err.message === 'NO_URL') { showSetup(); return; }
+    // URL saved but fetch failed — show setup with error
+    showSetup();
+    const errEl = document.getElementById('setupError');
+    errEl.textContent = '⚠️ Previous connection failed: ' + err.message + ' — update the URL below or re-deploy the Web App.';
+    errEl.style.display = '';
+    showError(err.message);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
