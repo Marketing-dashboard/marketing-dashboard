@@ -489,7 +489,7 @@ function processRows(rows) {
       views:       num(r['Views']),
       leads:       num(r['Leads']),
       platform:    (r['Platform'] || '').trim(),
-      brand:       (r['Brand'] === 'Taigun-Imp' ? 'Taigun-Leads' : (r['Brand'] || '').trim()),
+      brand:       (r['Brand'] || '').trim(),
       model:       (r['Model'] || '').trim(),
       segment:     (r['Segment'] || '').trim(),
     }))
@@ -743,8 +743,26 @@ function renderTracker() {
     });
     const yRows = eRows.filter(r => r.dateStr === latestDateStr);
 
-    const total = sumRows(eRows);
-    const yest  = sumRows(yRows);
+    let total = sumRows(eRows);
+    let yest  = sumRows(yRows);
+
+    // Taigun cross-brand sharing:
+    //   Taigun-Imp  tracker row → impressions = combined (Imp + Leads)
+    //   Taigun-Leads tracker row → leads      = combined (Imp + Leads)
+    if (e.brand === 'Taigun-Imp' || e.brand === 'Taigun-Leads') {
+      const allTRows = RAW.filter(r => r.brand === 'Taigun-Imp' || r.brand === 'Taigun-Leads');
+      const yTRows   = allTRows.filter(r => r.dateStr === latestDateStr);
+      const tAll     = sumRows(allTRows);
+      const tYest    = sumRows(yTRows);
+      if (e.brand === 'Taigun-Imp') {
+        total = { ...total, impressions: tAll.impressions };
+        yest  = { ...yest,  impressions: tYest.impressions };
+      } else {
+        total = { ...total, leads: tAll.leads };
+        yest  = { ...yest,  leads: tYest.leads };
+      }
+    }
+
     const t     = saved[e.key] || {};
 
     const tImpr  = t.targetImpr  || null;
