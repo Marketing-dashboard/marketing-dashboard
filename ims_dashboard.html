@@ -258,7 +258,10 @@ tfoot .mp-date-col { background: var(--surface2); }
     <div class="table-card">
       <div class="table-card-hdr">
         <span>Day-wise Performance</span>
-        <span class="tc-meta" id="dashTableMeta"></span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="tc-meta" id="dashTableMeta"></span>
+          <button class="btn-ghost btn-sm" id="exportDashBtn">⬇ Export CSV</button>
+        </div>
       </div>
       <div class="table-wrap" id="dashTable">
         <div class="loading"><div class="spinner"></div> Loading…</div>
@@ -299,9 +302,17 @@ tfoot .mp-date-col { background: var(--surface2); }
       </div>
     </div>
 
+    <div class="filters-bar">
+      <div class="fg">
+        <label>Brand</label>
+        <select id="summaryBrandFilter"><option value="all">All Brands</option></select>
+      </div>
+    </div>
+
     <div class="table-card" style="margin-bottom:18px;">
       <div class="table-card-hdr">
         <span>Brand-wise KPIs</span>
+        <button class="btn-ghost btn-sm" id="exportSummaryBrandBtn">⬇ Export CSV</button>
       </div>
       <div class="table-wrap tv-scroll" id="summaryBrandTable">
         <div class="loading"><div class="spinner"></div> Loading…</div>
@@ -311,6 +322,7 @@ tfoot .mp-date-col { background: var(--surface2); }
     <div class="table-card">
       <div class="table-card-hdr">
         <span>Brand + Model KPIs</span>
+        <button class="btn-ghost btn-sm" id="exportSummaryModelBtn">⬇ Export CSV</button>
       </div>
       <div class="table-wrap tv-scroll" id="summaryModelTable">
         <div class="loading"><div class="spinner"></div> Loading…</div>
@@ -461,7 +473,8 @@ let SEGMENTS  = [];       // sorted unique segments
 let activeBrand    = 'all';
 let activeModel    = 'all';
 let activePlatform = 'all';
-let activeSegment  = 'all';
+let activeSegment       = 'all';
+let activeSummaryBrand  = 'all';
 
 const modal = {
   step: 1,
@@ -848,11 +861,23 @@ function renderSummary() {
     return;
   }
 
-  const hasLeads = RAW.some(r => r.leads > 0);
-  const hasViews = RAW.some(r => r.views > 0);
-  const dates    = [...new Set(RAW.map(r => r.dateStr))].sort();
+  /* Populate brand filter (once) */
+  const bSel = document.getElementById('summaryBrandFilter');
+  if (bSel.children.length <= 1) {
+    BRANDS.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b; opt.textContent = b;
+      bSel.appendChild(opt);
+    });
+  }
+  bSel.value = activeSummaryBrand;
+
+  const data     = activeSummaryBrand === 'all' ? RAW : RAW.filter(r => r.brand === activeSummaryBrand);
+  const hasLeads = data.some(r => r.leads > 0);
+  const hasViews = data.some(r => r.views > 0);
+  const dates    = [...new Set(data.map(r => r.dateStr))].sort();
   document.getElementById('summaryMeta').textContent =
-    `${dates.length} days · ${RAW.length} rows`;
+    `${activeSummaryBrand === 'all' ? 'All brands' : activeSummaryBrand} · ${dates.length} days · ${data.length} rows`;
 
   const metHead = `<th>Spend</th><th>Impr</th><th>Clicks</th><th>CPM</th><th>CTR</th>`
     + (hasViews ? '<th>Views</th>' : '')
@@ -870,7 +895,7 @@ function renderSummary() {
 
   /* Brand-wise */
   const brandMap = {};
-  RAW.forEach(r => {
+  data.forEach(r => {
     if (!brandMap[r.brand]) brandMap[r.brand] = zero();
     acc(brandMap[r.brand], r);
   });
@@ -885,7 +910,7 @@ function renderSummary() {
 
   /* Brand + Model-wise */
   const modelMap = {};
-  RAW.forEach(r => {
+  data.forEach(r => {
     const key = r.brand + '::' + r.model;
     if (!modelMap[key]) modelMap[key] = { brand: r.brand, model: r.model, ...zero() };
     acc(modelMap[key], r);
@@ -1489,6 +1514,110 @@ document.querySelectorAll('[data-ttype]').forEach(el => {
     modal.ttype = el.dataset.ttype;
   });
 });
+
+document.getElementById('summaryBrandFilter').addEventListener('change', () => {
+  activeSummaryBrand = document.getElementById('summaryBrandFilter').value;
+  if (RAW.length) renderSummary();
+});
+
+document.getElementById('exportDashBtn').addEventListener('click', exportDashboardCsv);
+document.getElementById('exportSummaryBrandBtn').addEventListener('click', () => exportSummaryCsv('brand'));
+document.getElementById('exportSummaryModelBtn').addEventListener('click', () => exportSummaryCsv('model'));
+
+/* ═══════════════════════════════════════════════
+   CSV EXPORT
+══════════════════════════════════════════════ */
+function downloadCsv(filename, rows) {
+  const csv = rows.map(r => r.map(cell => {
+    const s = String(cell ?? '');
+    return (s.includes(',') || s.includes('"') || s.includes('\n')) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportDashboardCsv() {
+  const rows     = filterRows(activeBrand, activeModel, 'all', activeSegment);
+  const hasLeads = rows.some(r => r.leads > 0);
+  const hasViews = rows.some(r => r.views > 0);
+  const plats    = [...new Set(rows.map(r => r.platform).filter(Boolean))].sort();
+  const metKeys  = ['Spend', 'Impr', 'Clicks', 'CPM', 'CTR',
+    ...(hasViews ? ['Views'] : []), ...(hasLeads ? ['Leads'] : [])];
+
+  const header = ['Date'];
+  [...plats, 'Combined'].forEach(g => metKeys.forEach(m => header.push(`${g} ${m}`)));
+
+  const zero = () => ({ spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 });
+  const dateMap = {};
+  rows.forEach(r => {
+    if (!dateMap[r.dateStr]) dateMap[r.dateStr] = { date: r.date, byPlat: {}, comb: zero() };
+    const d = dateMap[r.dateStr];
+    if (!d.byPlat[r.platform]) d.byPlat[r.platform] = zero();
+    const p = d.byPlat[r.platform];
+    p.spend += r.spend; p.impressions += r.impressions; p.clicks += r.clicks; p.views += r.views; p.leads += r.leads;
+    d.comb.spend += r.spend; d.comb.impressions += r.impressions; d.comb.clicks += r.clicks; d.comb.views += r.views; d.comb.leads += r.leads;
+  });
+  const daily  = Object.values(dateMap).sort((a, b) => a.date - b.date);
+  const emptyA = zero();
+
+  function aggVals(agg) {
+    return [agg.spend.toFixed(2), agg.impressions, agg.clicks,
+      agg.impressions > 0 ? ((agg.spend / agg.impressions) * 1000).toFixed(2) : '',
+      agg.impressions > 0 ? ((agg.clicks / agg.impressions) * 100).toFixed(4) : '',
+      ...(hasViews ? [agg.views] : []), ...(hasLeads ? [agg.leads] : [])];
+  }
+
+  const csvRows = [header, ...daily.map(row => {
+    const cells = [F.dateL(row.date)];
+    plats.forEach(p => aggVals(row.byPlat[p] || emptyA).forEach(v => cells.push(v)));
+    aggVals(row.comb).forEach(v => cells.push(v));
+    return cells;
+  })];
+
+  downloadCsv('dashboard_daywise.csv', csvRows);
+}
+
+function exportSummaryCsv(mode) {
+  const data     = activeSummaryBrand === 'all' ? RAW : RAW.filter(r => r.brand === activeSummaryBrand);
+  const hasLeads = data.some(r => r.leads > 0);
+  const hasViews = data.some(r => r.views > 0);
+  const zero     = () => ({ spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 });
+  const acc      = (t, r) => { t.spend += r.spend; t.impressions += r.impressions; t.clicks += r.clicks; t.views += r.views; t.leads += r.leads; };
+
+  function metVals(d) {
+    return [d.spend.toFixed(2), d.impressions, d.clicks,
+      d.impressions > 0 ? ((d.spend / d.impressions) * 1000).toFixed(2) : '',
+      d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(4) : '',
+      ...(hasViews ? [d.views] : []),
+      ...(hasLeads ? [d.leads, d.leads > 0 ? (d.spend / d.leads).toFixed(2) : ''] : [])];
+  }
+
+  const metCols = ['Spend', 'Impressions', 'Clicks', 'CPM', 'CTR',
+    ...(hasViews ? ['Views'] : []), ...(hasLeads ? ['Leads', 'CPL'] : [])];
+
+  if (mode === 'brand') {
+    const brandMap = {};
+    data.forEach(r => { if (!brandMap[r.brand]) brandMap[r.brand] = zero(); acc(brandMap[r.brand], r); });
+    const rows = [['Brand', ...metCols],
+      ...Object.entries(brandMap).sort(([a], [b]) => a.localeCompare(b)).map(([b, d]) => [b, ...metVals(d)])];
+    downloadCsv('summary_brand.csv', rows);
+  } else {
+    const modelMap = {};
+    data.forEach(r => {
+      const key = r.brand + '::' + r.model;
+      if (!modelMap[key]) modelMap[key] = { brand: r.brand, model: r.model, ...zero() };
+      acc(modelMap[key], r);
+    });
+    const rows = [['Brand', 'Model', ...metCols],
+      ...Object.values(modelMap)
+        .sort((a, b) => a.brand.localeCompare(b.brand) || (a.model || '').localeCompare(b.model || ''))
+        .map(d => [d.brand, d.model || '', ...metVals(d)])];
+    downloadCsv('summary_model.csv', rows);
+  }
+}
 
 /* ═══════════════════════════════════════════════
    SETUP FLOW
