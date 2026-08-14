@@ -826,6 +826,20 @@ function renderTracker() {
     const leadsPct = tLeads ? (total.leads / tLeads) * 100 : null;
     const budgetPct = budget > 0 ? (total.spend / budget) * 100 : null;
 
+    // DRR — daily run rate required to hit remaining target / stay within budget
+    const drrImpr  = tImpr  && remaining > 0 ? Math.max(0, (tImpr  - total.impressions) / remaining) : null;
+    const drrLeads = tLeads && remaining > 0 ? Math.max(0, (tLeads - total.leads)       / remaining) : null;
+    const drrSpend = budget > 0 && remaining > 0 ? Math.max(0, (budget - total.spend)   / remaining) : null;
+
+    // Build DRR cell — stack relevant lines (impr / leads / budget)
+    function buildDrrCell(showImpr, showLeads, showBudget) {
+      const lines = [];
+      if (showImpr  && drrImpr  !== null) lines.push(`<span style="color:var(--accent);font-size:12px;">${F.num(drrImpr)}/day</span>`);
+      if (showLeads && drrLeads !== null) lines.push(`<span style="color:var(--teal);font-size:12px;">${Math.ceil(drrLeads).toLocaleString('en-IN')}/day</span>`);
+      if (showBudget && drrSpend !== null) lines.push(`<span style="color:var(--orange);font-size:12px;">${F.cur(drrSpend)}/day</span>`);
+      return lines.length ? lines.join('<br>') : '<span class="exp-na">—</span>';
+    }
+
     // Label: model sub-label, or "(Total Budget)" hint for mixed brand rows
     let lbl;
     if (e.level === 'model' && e.model) {
@@ -853,6 +867,7 @@ function renderTracker() {
         <td>${na}</td>
         ${hasLeads ? `<td>${na}</td>` : ''}
         <td class="exp-warn" style="color:var(--warn);font-weight:700;">${F.cur(budget)}</td>
+        <td>${buildDrrCell(false, false, true)}</td>
         <td>${na}</td>
         ${hasLeads ? `<td>${na}</td>` : ''}
         <td class="${expSpendCls}">${F.cur(expSpend)}</td>
@@ -872,6 +887,7 @@ function renderTracker() {
       <td>${tImpr ? F.bignum(tImpr) : '<span class="exp-na">Not set</span>'}</td>
       ${hasLeads ? `<td>${tLeads ? F.bignum(tLeads) : '<span class="exp-na">Not set</span>'}</td>` : ''}
       <td>${budget > 0 ? F.cur(budget) : '<span class="exp-na">Not set</span>'}</td>
+      <td>${buildDrrCell(true, hasLeads, true)}</td>
       <td class="${expImprCls}">${F.bignum(expImpr)}${prog(imprPct, expImprCls)}</td>
       ${hasLeads ? `<td class="${expLeadsCls}">${expLeads > 0 ? F.bignum(expLeads) : na}${prog(leadsPct, expLeadsCls)}</td>` : ''}
       <td class="${expSpendCls}">${F.cur(expSpend)}</td>
@@ -894,6 +910,7 @@ function renderTracker() {
           <th>Target Impressions</th>
           ${hasLeads ? '<th>Target Leads</th>' : ''}
           <th>Budget Assigned</th>
+          <th>Req. Daily (DRR)</th>
           <th>Exp Month-End Impr</th>
           ${hasLeads ? '<th>Exp Month-End Leads</th>' : ''}
           <th>Exp Month-End Spend</th>
