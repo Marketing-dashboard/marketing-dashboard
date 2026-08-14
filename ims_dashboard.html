@@ -160,6 +160,22 @@ tfoot td:first-child { text-align: left; }
 .setup-url-row input:focus { border-color: var(--accent); }
 .setup-url-row input::placeholder { color: var(--muted); }
 
+/* ── Vertical-scrollable table wrapper ── */
+.tv-scroll { max-height: 520px; overflow-y: auto; }
+.table-wrap.tv-scroll thead th { position: sticky; top: 0; z-index: 2; }
+
+/* ── Multi-platform day-wise table ── */
+.mp-table { font-size: 12px; }
+.mp-table thead tr:first-child th { border-bottom: none; padding: 6px 10px; }
+.mp-table thead tr:last-child  th { padding: 5px 8px; font-size: 10px; }
+.mp-table .pt-sep { border-left: 2px solid var(--accent) !important; }
+.mp-table .pt-sep-dim { border-left: 2px solid var(--border) !important; }
+.mp-table .pt-head { text-align: center !important; font-weight: 700; letter-spacing: 0.5px; }
+.mp-table tbody td, .mp-table tfoot td { padding: 7px 8px; }
+.mp-date-col { position: sticky; left: 0; background: var(--surface); z-index: 1; text-align: left !important; font-weight: 500; min-width: 70px; }
+thead .mp-date-col { background: var(--surface2); z-index: 3; }
+tfoot .mp-date-col { background: var(--surface2); }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .content { padding: 12px; }
@@ -189,6 +205,7 @@ tfoot td:first-child { text-align: left; }
 <!-- Tab Nav -->
 <nav class="tabs-nav">
   <button class="tab-btn active" data-tab="dashboard">📈 Dashboard</button>
+  <button class="tab-btn" data-tab="summary">📊 Summary</button>
   <button class="tab-btn" data-tab="tracker">🎯 Tracker</button>
 </nav>
 
@@ -232,12 +249,6 @@ tfoot td:first-child { text-align: left; }
         <label>Segment</label>
         <select id="segmentFilter"><option value="all">All Segments</option></select>
       </div>
-      <div class="fg" style="margin-left:auto;">
-        <label>Platform</label>
-        <div class="plat-toggle" id="platToggle">
-          <button class="plat-pill active" data-p="all">Combined</button>
-        </div>
-      </div>
     </div>
 
     <div class="metric-row" id="summaryCards">
@@ -272,6 +283,36 @@ tfoot td:first-child { text-align: left; }
 
     <div class="table-card">
       <div class="table-wrap" id="trackerTable">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════ SUMMARY TAB ═══════════════ -->
+  <div class="tab-pane" id="tab-summary">
+
+    <div class="tracker-hdr">
+      <div>
+        <h2>Campaign Summary</h2>
+        <div class="tracker-meta" id="summaryMeta"></div>
+      </div>
+    </div>
+
+    <div class="table-card" style="margin-bottom:18px;">
+      <div class="table-card-hdr">
+        <span>Brand-wise KPIs</span>
+      </div>
+      <div class="table-wrap tv-scroll" id="summaryBrandTable">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-hdr">
+        <span>Brand + Model KPIs</span>
+      </div>
+      <div class="table-wrap tv-scroll" id="summaryModelTable">
         <div class="loading"><div class="spinner"></div> Loading…</div>
       </div>
     </div>
@@ -621,8 +662,16 @@ const F = {
   pct:  v => v == null ? '—' : v.toFixed(2) + '%',
   cpm:  (spend, impr) => impr > 0 ? '₹' + ((spend / impr) * 1000).toFixed(2) : '—',
   ctr:  (clicks, impr) => impr > 0 ? ((clicks / impr) * 100).toFixed(2) + '%' : '—',
-  date: d => d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—',
-  dateL: d => d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+  date: d => {
+    if (!d) return '—';
+    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${String(d.getDate()).padStart(2,'0')} ${M[d.getMonth()]}`;
+  },
+  dateL: d => {
+    if (!d) return '—';
+    const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${String(d.getDate()).padStart(2,'0')} ${M[d.getMonth()]} ${d.getFullYear()}`;
+  },
 };
 
 /* ═══════════════════════════════════════════════
@@ -632,19 +681,6 @@ function renderFilters() {
   const bSel = document.getElementById('brandFilter');
   bSel.innerHTML = '<option value="all">All Brands</option>' +
     BRANDS.map(b => `<option value="${b}">${b}</option>`).join('');
-
-  const toggle = document.getElementById('platToggle');
-  toggle.innerHTML = '<button class="plat-pill active" data-p="all">Combined</button>' +
-    PLATFORMS.map(p => `<button class="plat-pill" data-p="${p}">${p}</button>`).join('');
-
-  toggle.querySelectorAll('.plat-pill').forEach(b => {
-    b.addEventListener('click', () => {
-      toggle.querySelectorAll('.plat-pill').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      activePlatform = b.dataset.p;
-      renderDashboard();
-    });
-  });
 
   // Segment filter — only show if multiple segments exist
   const segWrap = document.getElementById('segmentFilterWrap');
@@ -685,18 +721,18 @@ function renderModelFilter() {
    RENDER DASHBOARD
 ══════════════════════════════════════════════ */
 function renderDashboard() {
-  const rows     = filterRows(activeBrand, activeModel, activePlatform, activeSegment);
-  const daily    = byDate(rows);
+  const rows     = filterRows(activeBrand, activeModel, 'all', activeSegment);
   const totals   = sumRows(rows);
   const hasLeads = rows.some(r => r.leads > 0);
   const hasViews = rows.some(r => r.views > 0);
+  const nDays    = new Set(rows.map(r => r.dateStr)).size;
 
   const avgCPM = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
   const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
 
   /* Summary cards */
   let cards = `
-    <div class="metric-card"><div class="mc-label">Total Spend</div><div class="mc-val c-orange">${F.cur(totals.spend)}</div><div class="mc-sub">${daily.length} days</div></div>
+    <div class="metric-card"><div class="mc-label">Total Spend</div><div class="mc-val c-orange">${F.cur(totals.spend)}</div><div class="mc-sub">${nDays} days</div></div>
     <div class="metric-card"><div class="mc-label">Total Impressions</div><div class="mc-val c-blue">${F.num(totals.impressions)}</div></div>
     <div class="metric-card"><div class="mc-label">Total Clicks</div><div class="mc-val">${F.num(totals.clicks)}</div></div>
     <div class="metric-card"><div class="mc-label">Avg CPM</div><div class="mc-val c-purple">${avgCPM > 0 ? '₹' + avgCPM.toFixed(2) : '—'}</div></div>
@@ -704,52 +740,168 @@ function renderDashboard() {
   `;
   if (hasLeads) cards += `<div class="metric-card"><div class="mc-label">Total Leads</div><div class="mc-val c-teal">${F.bignum(totals.leads)}</div></div>`;
   if (hasViews) cards += `<div class="metric-card"><div class="mc-label">Total Views</div><div class="mc-val c-warn">${F.num(totals.views)}</div></div>`;
-
   document.getElementById('summaryCards').innerHTML = cards;
 
-  /* Day-wise table */
-  const platLabel = activePlatform === 'all' ? 'Combined' : activePlatform;
   document.getElementById('dashTableMeta').textContent =
-    `${platLabel} · ${activeBrand === 'all' ? 'All Brands' : activeBrand}${activeModel !== 'all' ? ' · ' + activeModel : ''}`;
+    `${activeBrand === 'all' ? 'All Brands' : activeBrand}${activeModel !== 'all' ? ' · ' + activeModel : ''} · All Platforms`;
 
-  if (daily.length === 0) {
-    document.getElementById('dashTable').innerHTML = '<div class="empty">No data for the selected filters.</div>';
+  const tableEl = document.getElementById('dashTable');
+
+  if (rows.length === 0) {
+    tableEl.innerHTML = '<div class="empty">No data for the selected filters.</div>';
     return;
   }
 
-  const thLeads = hasLeads ? '<th>Leads</th>' : '';
-  const thViews = hasViews ? '<th>Views</th>' : '';
-  const thead = `<tr><th>Date</th><th>Spend</th><th>Impressions</th><th>Clicks</th><th>CPM</th><th>CTR</th>${thViews}${thLeads}</tr>`;
+  /* Discover platforms present in filtered data */
+  const plats = [...new Set(rows.map(r => r.platform).filter(Boolean))].sort();
 
-  const tbody = daily.map(r => {
-    const tdL = hasLeads ? `<td>${r.leads > 0 ? F.bignum(r.leads) : '—'}</td>` : '';
-    const tdV = hasViews ? `<td>${r.views > 0 ? F.num(r.views) : '—'}</td>` : '';
-    return `<tr>
-      <td>${F.date(r.date)}</td>
-      <td>${F.cur(r.spend)}</td>
-      <td>${F.num(r.impressions)}</td>
-      <td>${F.num(r.clicks)}</td>
-      <td>${F.cpm(r.spend, r.impressions)}</td>
-      <td>${F.ctr(r.clicks, r.impressions)}</td>
-      ${tdV}${tdL}
-    </tr>`;
+  /* Build date × platform aggregation */
+  const zero = () => ({ spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 });
+  const dateMap = {};
+  rows.forEach(r => {
+    if (!dateMap[r.dateStr]) dateMap[r.dateStr] = { date: r.date, byPlat: {}, comb: zero() };
+    const d = dateMap[r.dateStr];
+    if (!d.byPlat[r.platform]) d.byPlat[r.platform] = zero();
+    const p = d.byPlat[r.platform];
+    p.spend += r.spend; p.impressions += r.impressions; p.clicks += r.clicks;
+    p.views += r.views; p.leads += r.leads;
+    d.comb.spend += r.spend; d.comb.impressions += r.impressions; d.comb.clicks += r.clicks;
+    d.comb.views += r.views; d.comb.leads += r.leads;
+  });
+  const daily = Object.values(dateMap).sort((a, b) => a.date - b.date);
+
+  /* Metric column definitions */
+  const metLabels = ['Spend', 'Impr', 'Clicks', 'CPM', 'CTR',
+    ...(hasViews ? ['Views'] : []), ...(hasLeads ? ['Leads'] : [])];
+  const nCols = metLabels.length;
+
+  function metCells(agg, firstGroup) {
+    const vals = [
+      F.cur(agg.spend), F.num(agg.impressions), F.num(agg.clicks),
+      F.cpm(agg.spend, agg.impressions), F.ctr(agg.clicks, agg.impressions),
+      ...(hasViews ? [agg.views > 0 ? F.num(agg.views) : '—'] : []),
+      ...(hasLeads ? [agg.leads > 0 ? F.bignum(agg.leads) : '—'] : []),
+    ];
+    return vals.map((v, j) => {
+      const cls = j === 0 && !firstGroup ? ' class="pt-sep"' : '';
+      return `<td${cls}>${v}</td>`;
+    }).join('');
+  }
+
+  /* Platform totals */
+  const platTotals = {};
+  plats.forEach(p => { platTotals[p] = zero(); });
+  const combTotal = zero();
+  rows.forEach(r => {
+    if (r.platform && platTotals[r.platform]) {
+      const t = platTotals[r.platform];
+      t.spend += r.spend; t.impressions += r.impressions; t.clicks += r.clicks;
+      t.views += r.views; t.leads += r.leads;
+    }
+    combTotal.spend += r.spend; combTotal.impressions += r.impressions; combTotal.clicks += r.clicks;
+    combTotal.views += r.views; combTotal.leads += r.leads;
+  });
+
+  /* Build two-row header */
+  let headR1 = '<th class="mp-date-col" rowspan="2">Date</th>';
+  [...plats, 'Combined'].forEach((g, i) => {
+    const cls = i === 0 ? 'pt-head' : 'pt-head pt-sep';
+    headR1 += `<th colspan="${nCols}" class="${cls}">${g}</th>`;
+  });
+
+  let headR2 = '';
+  [...plats, 'Combined'].forEach((g, i) => {
+    metLabels.forEach((lbl, j) => {
+      const cls = j === 0 && i > 0 ? ' class="pt-sep"' : '';
+      headR2 += `<th${cls}>${lbl}</th>`;
+    });
+  });
+
+  /* Build body rows */
+  const emptyAgg = zero();
+  const tbody = daily.map(row => {
+    let tds = `<td class="mp-date-col">${F.date(row.date)}</td>`;
+    plats.forEach((p, i) => {
+      tds += metCells(row.byPlat[p] || emptyAgg, i === 0);
+    });
+    tds += metCells(row.comb, plats.length === 0);
+    return `<tr>${tds}</tr>`;
   }).join('');
 
-  const tf = sumRows(daily.map(d => d)); // same as totals
-  const tfL = hasLeads ? `<td>${F.bignum(totals.leads)}</td>` : '';
-  const tfV = hasViews ? `<td>${F.num(totals.views)}</td>` : '';
-  const tfoot = `<tr>
-    <td>Total / Avg</td>
-    <td>${F.cur(totals.spend)}</td>
-    <td>${F.num(totals.impressions)}</td>
-    <td>${F.num(totals.clicks)}</td>
-    <td>${F.cpm(totals.spend, totals.impressions)}</td>
-    <td>${F.ctr(totals.clicks, totals.impressions)}</td>
-    ${tfV}${tfL}
-  </tr>`;
+  /* Footer */
+  let ftds = `<td class="mp-date-col">Total / Avg</td>`;
+  plats.forEach((p, i) => { ftds += metCells(platTotals[p], i === 0); });
+  ftds += metCells(combTotal, plats.length === 0);
 
-  document.getElementById('dashTable').innerHTML =
-    `<table><thead>${thead}</thead><tbody>${tbody}</tbody><tfoot>${tfoot}</tfoot></table>`;
+  tableEl.classList.add('tv-scroll');
+  tableEl.innerHTML =
+    `<table class="mp-table"><thead><tr>${headR1}</tr><tr>${headR2}</tr></thead><tbody>${tbody}</tbody><tfoot><tr>${ftds}</tr></tfoot></table>`;
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER SUMMARY
+══════════════════════════════════════════════ */
+function renderSummary() {
+  if (!RAW.length) {
+    document.getElementById('summaryBrandTable').innerHTML = '<div class="empty">No data loaded.</div>';
+    document.getElementById('summaryModelTable').innerHTML = '<div class="empty">No data loaded.</div>';
+    return;
+  }
+
+  const hasLeads = RAW.some(r => r.leads > 0);
+  const hasViews = RAW.some(r => r.views > 0);
+  const dates    = [...new Set(RAW.map(r => r.dateStr))].sort();
+  document.getElementById('summaryMeta').textContent =
+    `${dates.length} days · ${RAW.length} rows`;
+
+  const metHead = `<th>Spend</th><th>Impr</th><th>Clicks</th><th>CPM</th><th>CTR</th>`
+    + (hasViews ? '<th>Views</th>' : '')
+    + (hasLeads ? '<th>Leads</th><th>CPL</th>' : '');
+
+  function metCells(d) {
+    return `<td>${F.cur(d.spend)}</td><td>${F.num(d.impressions)}</td><td>${F.num(d.clicks)}</td>`
+      + `<td>${F.cpm(d.spend, d.impressions)}</td><td>${F.ctr(d.clicks, d.impressions)}</td>`
+      + (hasViews ? `<td>${d.views > 0 ? F.num(d.views) : '—'}</td>` : '')
+      + (hasLeads ? `<td>${d.leads > 0 ? F.bignum(d.leads) : '—'}</td><td>${d.leads > 0 ? F.cur(d.spend / d.leads) : '—'}</td>` : '');
+  }
+
+  const zero = () => ({ spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 });
+  const acc  = (t, r) => { t.spend += r.spend; t.impressions += r.impressions; t.clicks += r.clicks; t.views += r.views; t.leads += r.leads; };
+
+  /* Brand-wise */
+  const brandMap = {};
+  RAW.forEach(r => {
+    if (!brandMap[r.brand]) brandMap[r.brand] = zero();
+    acc(brandMap[r.brand], r);
+  });
+  const brandRows = Object.entries(brandMap).sort(([a], [b]) => a.localeCompare(b));
+  const bTotal = brandRows.reduce((t, [, d]) => { acc(t, d); return t; }, zero());
+
+  const bHtml = `<table>
+    <thead><tr><th>Brand</th>${metHead}</tr></thead>
+    <tbody>${brandRows.map(([b, d]) => `<tr><td>${b}</td>${metCells(d)}</tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td>${metCells(bTotal)}</tr></tfoot>
+  </table>`;
+
+  /* Brand + Model-wise */
+  const modelMap = {};
+  RAW.forEach(r => {
+    const key = r.brand + '::' + r.model;
+    if (!modelMap[key]) modelMap[key] = { brand: r.brand, model: r.model, ...zero() };
+    acc(modelMap[key], r);
+  });
+  const modelRows = Object.values(modelMap)
+    .sort((a, b) => a.brand.localeCompare(b.brand) || (a.model || '').localeCompare(b.model || ''));
+  const mTotal = modelRows.reduce((t, d) => { acc(t, d); return t; }, zero());
+
+  const mHtml = `<table>
+    <thead><tr><th>Brand</th><th style="text-align:left">Model</th>${metHead}</tr></thead>
+    <tbody>${modelRows.map(d => `<tr><td>${d.brand}</td><td style="text-align:left">${d.model || '—'}</td>${metCells(d)}</tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="2">Total</td>${metCells(mTotal)}</tr></tfoot>
+  </table>`;
+
+  document.getElementById('summaryBrandTable').innerHTML = bHtml;
+  document.getElementById('summaryModelTable').innerHTML = mHtml;
 }
 
 /* ═══════════════════════════════════════════════
@@ -1306,6 +1458,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'tracker' && RAW.length) renderTracker();
+    if (btn.dataset.tab === 'summary' && RAW.length) renderSummary();
   });
 });
 
