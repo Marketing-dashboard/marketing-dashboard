@@ -6,19 +6,19 @@
 <title>IMS Campaign Performance Dashboard</title>
 <style>
 :root {
-  --bg: #0d1117;
-  --surface: #161b22;
-  --surface2: #21262d;
-  --border: #30363d;
-  --text: #e6edf3;
-  --muted: #8b949e;
-  --accent: #58a6ff;
-  --good: #3fb950;
-  --bad: #f85149;
-  --warn: #d29922;
-  --purple: #bc8cff;
-  --orange: #f0883e;
-  --teal: #39d3bb;
+  --bg:      #f0e8da;
+  --surface: #faf6ef;
+  --surface2:#ece4d8;
+  --border:  #cdbfad;
+  --text:    #2a1a0e;
+  --muted:   #7a6452;
+  --accent:  #7c4a2b;
+  --good:    #3d7a4f;
+  --bad:     #b54040;
+  --warn:    #a96f28;
+  --purple:  #6a4d8f;
+  --orange:  #b85e30;
+  --teal:    #2e7a76;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
@@ -58,7 +58,7 @@ select:focus { border-color: var(--accent); }
 
 /* ── Metric Cards ── */
 .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-bottom: 18px; }
-.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(44,27,14,0.07); }
 .metric-card .mc-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
 .metric-card .mc-val { font-size: 22px; font-weight: 700; line-height: 1; }
 .metric-card .mc-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
@@ -70,7 +70,7 @@ select:focus { border-color: var(--accent); }
 .c-warn   { color: var(--warn); }
 
 /* ── Table ── */
-.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(44,27,14,0.08); }
 .table-card-hdr { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 .table-card-hdr span { font-size: 13px; font-weight: 600; }
 .table-card-hdr .tc-meta { font-size: 11px; color: var(--muted); }
@@ -80,7 +80,7 @@ thead th { padding: 9px 14px; text-align: right; font-weight: 600; font-size: 10
 thead th:first-child { text-align: left; }
 tbody td { padding: 9px 14px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; color: var(--text); }
 tbody td:first-child { text-align: left; font-weight: 500; }
-tbody tr:hover { background: rgba(255,255,255,0.03); }
+tbody tr:hover { background: rgba(44,27,14,0.04); }
 tfoot td { padding: 9px 14px; text-align: right; border-top: 2px solid var(--border); font-weight: 700; background: var(--surface2); white-space: nowrap; }
 tfoot td:first-child { text-align: left; }
 
@@ -105,7 +105,7 @@ tfoot td:first-child { text-align: left; }
 .prog-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
 
 /* ── Modal ── */
-.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999; align-items: center; justify-content: center; }
+.overlay { display: none; position: fixed; inset: 0; background: rgba(30,12,4,0.60); z-index: 999; align-items: center; justify-content: center; }
 .overlay.open { display: flex; }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 500px; max-width: 96vw; max-height: 90vh; overflow-y: auto; padding: 28px; position: relative; }
 .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
@@ -121,7 +121,7 @@ tfoot td:first-child { text-align: left; }
 .radio-row { display: flex; gap: 10px; }
 .radio-card { flex: 1; padding: 12px; background: var(--surface2); border: 2px solid var(--border); border-radius: 8px; cursor: pointer; text-align: center; font-size: 13px; font-weight: 500; transition: all 0.15s; }
 .radio-card:hover { border-color: var(--muted); }
-.radio-card.sel { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.08); }
+.radio-card.sel { border-color: var(--accent); color: var(--accent); background: rgba(124,74,43,0.08); }
 .radio-card .rc-icon { font-size: 20px; margin-bottom: 4px; }
 .radio-card .rc-label { font-size: 12px; }
 
@@ -144,7 +144,7 @@ tfoot td:first-child { text-align: left; }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
-.err { padding: 20px 24px; background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); border-radius: 8px; color: var(--bad); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+.err { padding: 20px 24px; background: rgba(181,64,64,0.08); border: 1px solid rgba(181,64,64,0.35); border-radius: 8px; color: var(--bad); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
 
 /* ── Setup Banner ── */
 .setup-banner { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 28px 32px; margin-bottom: 20px; }
@@ -1033,7 +1033,7 @@ function renderTracker() {
     if (isBudgetOnly) {
       // Budget-only brand row (mixed mode): show spend vs budget prominently, no impr target
       const spendPctDisp = budgetPct !== null ? `<div class="prog-bar"><div class="prog-fill" style="width:${Math.min(100,budgetPct).toFixed(1)}%;background:${budgetPct > 100 ? 'var(--bad)' : 'var(--warn)'}"></div></div>` : '';
-      return `<tr style="background:rgba(210,153,34,0.05);">
+      return `<tr style="background:rgba(169,111,40,0.07);">
         <td>${lbl}</td>
         <td>${F.bignum(total.impressions)}</td>
         ${hasLeads ? `<td>${total.leads > 0 ? F.bignum(total.leads) : na}</td>` : ''}
