@@ -621,6 +621,8 @@ if (fbAuth) {
     /* Admin-only tracker controls */
     document.getElementById('setTargetsBtn').style.display   = currentIsAdmin ? '' : 'none';
     document.getElementById('clearTargetsBtn').style.display = currentIsAdmin ? '' : 'none';
+    /* One-time migration: copy localStorage targets → Firestore if Firestore is empty */
+    if (currentIsAdmin) await migrateLocalTargets();
     /* Load data */
     try {
       const rows = await fetchSheet();
@@ -1334,6 +1336,18 @@ function buildEntities(saved) {
 /* ═══════════════════════════════════════════════
    FIRESTORE TARGETS  (shared across all users)
 ══════════════════════════════════════════════ */
+async function migrateLocalTargets() {
+  try {
+    const doc = await fbDb.collection('ims_targets').doc('shared').get();
+    if (doc.exists) return; // Firestore already has data — nothing to do
+    const local = localStorage.getItem(LS_KEY);
+    if (!local) return;
+    const parsed = JSON.parse(local);
+    if (!Object.keys(parsed).length) return;
+    await fbDb.collection('ims_targets').doc('shared').set({ data: local });
+  } catch (e) { console.warn('Target migration failed:', e.message); }
+}
+
 async function loadTargets() {
   try {
     const doc = await fbDb.collection('ims_targets').doc('shared').get();
