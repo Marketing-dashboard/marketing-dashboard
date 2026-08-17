@@ -1108,8 +1108,8 @@ function renderSummary() {
 /* ═══════════════════════════════════════════════
    RENDER TRACKER
 ══════════════════════════════════════════════ */
-function renderTracker() {
-  const saved         = loadTargets();
+async function renderTracker() {
+  const saved         = await loadTargets();
   const today         = new Date();
 
   // Compute remaining days from the last data date, not today.
@@ -1332,13 +1332,16 @@ function buildEntities(saved) {
 }
 
 /* ═══════════════════════════════════════════════
-   LOCAL STORAGE
+   FIRESTORE TARGETS  (shared across all users)
 ══════════════════════════════════════════════ */
-function loadTargets() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+async function loadTargets() {
+  try {
+    const doc = await fbDb.collection('ims_targets').doc('shared').get();
+    return doc.exists ? JSON.parse(doc.data().data || '{}') : {};
+  } catch { return {}; }
 }
-function saveTargets(obj) {
-  localStorage.setItem(LS_KEY, JSON.stringify(obj));
+async function saveTargets(obj) {
+  await fbDb.collection('ims_targets').doc('shared').set({ data: JSON.stringify(obj) });
 }
 
 /* ═══════════════════════════════════════════════
@@ -1362,7 +1365,7 @@ function showStep(stepId) {
   document.getElementById('mNext').textContent = idx === total - 1 ? 'Save' : 'Next →';
 }
 
-function openModal(existingKey) {
+async function openModal(existingKey) {
   // Reset
   modal.level = null; modal.brand = null; modal.model = null; modal.ttype = null;
   modal._editKey = null; modal._editBrand = null;
@@ -1376,7 +1379,7 @@ function openModal(existingKey) {
 
   // Load existing if editing
   if (existingKey) {
-    const saved = loadTargets();
+    const saved = await loadTargets();
 
     // Auto-added row (no explicit saved entry) — detect mode from the brand's existing data
     if (existingKey.startsWith('default-model::') || existingKey.startsWith('default::')) {
@@ -1437,7 +1440,7 @@ function openModal(existingKey) {
 
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
-function modalNext() {
+async function modalNext() {
   const seq = getStepSeq();
   const idx = seq.indexOf(modal.step);
 
@@ -1452,7 +1455,7 @@ function modalNext() {
     if (modal.level === 'model') {
       // ms4 (target type) comes next — nothing extra needed here
     } else if (modal.level === 'mixed') {
-      populateMixed(modal.brand);
+      populateMixed(modal.brand, await loadTargets());
     }
 
   } else if (modal.step === 'ms4') {
@@ -1462,7 +1465,7 @@ function modalNext() {
     document.getElementById('imprFields').style.display = si ? '' : 'none';
     document.getElementById('leadFields').style.display = sl ? '' : 'none';
     if (modal.level === 'model') {
-      populateMultiModel(modal.brand, modal.ttype);
+      populateMultiModel(modal.brand, modal.ttype, await loadTargets());
     }
 
   } else if (modal.step === 'ms5') {
@@ -1476,14 +1479,14 @@ function modalNext() {
     const bl = sl ? parseFloat(document.getElementById('inBudgetLeads').value) || null : null;
 
     const key = `brand::${modal.brand}`;
-    const all = loadTargets();
+    const all = await loadTargets();
     if (modal._editKey && modal._editKey !== key) delete all[modal._editKey];
     all[key] = {
       level: 'brand', brand: modal.brand, model: null, groupMode: 'brand',
       targetType: modal.ttype,
       targetImpr: ti, budgetImpr: bi, targetLeads: tl, budgetLeads: bl,
     };
-    saveTargets(all);
+    await saveTargets(all);
     closeModal();
     renderTracker();
     return;
@@ -1495,7 +1498,7 @@ function modalNext() {
     if (!models.length) { alert('No models found for this brand in the data.'); return; }
     const si = ['impressions','both'].includes(modal.ttype);
     const sl = ['leads','both'].includes(modal.ttype);
-    const all = loadTargets();
+    const all = await loadTargets();
 
     // Remove all old model entries for this brand (clean slate)
     if (modal._editBrand) {
@@ -1533,7 +1536,7 @@ function modalNext() {
     });
 
     if (!saved) { alert('Please fill in at least one model row.'); return; }
-    saveTargets(all);
+    await saveTargets(all);
     closeModal();
     renderTracker();
     return;
@@ -1542,7 +1545,7 @@ function modalNext() {
     // ── Save mixed: brand budget + per-model impression targets ──
     if (!modal.brand) { alert('Brand is required.'); return; }
     const brandBudget = parseFloat(document.getElementById('inBrandBudget').value) || null;
-    const all = loadTargets();
+    const all = await loadTargets();
 
     // Remove old mixed entries for this brand
     if (modal._editBrand) {
@@ -1581,7 +1584,7 @@ function modalNext() {
     });
 
     if (!brandBudget && !saved) { alert('Please enter a budget and/or at least one model target.'); return; }
-    saveTargets(all);
+    await saveTargets(all);
     closeModal();
     renderTracker();
     return;
@@ -1596,9 +1599,9 @@ function modalBack() {
   if (idx > 0) showStep(seq[idx - 1]);
 }
 
-function populateMultiModel(brand, ttype) {
+function populateMultiModel(brand, ttype, saved) {
   const models = MODELS[brand] || [];
-  const saved  = loadTargets();
+  saved = saved || {};
   const si = ['impressions','both'].includes(ttype);
   const sl = ['leads','both'].includes(ttype);
 
@@ -1623,9 +1626,9 @@ function populateMultiModel(brand, ttype) {
     `${brand} — set targets for each model (leave blank to skip)`;
 }
 
-function populateMixed(brand) {
+function populateMixed(brand, saved) {
   const models = MODELS[brand] || [];
-  const saved  = loadTargets();
+  saved = saved || {};
   const brandEntry = saved[`brand::${brand}`];
   if (brandEntry && brandEntry.targetType === 'budget-only') {
     document.getElementById('inBrandBudget').value = brandEntry.budgetImpr || '';
@@ -1669,9 +1672,9 @@ document.getElementById('headerSignOutBtn').addEventListener('click', signOutUse
 document.getElementById('accessModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeAccessModal(); });
 
 document.getElementById('setTargetsBtn').addEventListener('click', () => openModal(null));
-document.getElementById('clearTargetsBtn').addEventListener('click', () => {
+document.getElementById('clearTargetsBtn').addEventListener('click', async () => {
   if (confirm('Clear all saved targets? This cannot be undone.')) {
-    saveTargets({});
+    await saveTargets({});
     renderTracker();
   }
 });
