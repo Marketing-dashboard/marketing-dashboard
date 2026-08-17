@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketing Performance Dashboard</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F5F7FA;
+  --surface: #FFFFFF;
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  --primary: #2563EB;
+  --primary-light: #EFF6FF;
+  --text: #111827;
+  --text-muted: #6B7280;
+  --text-light: #9CA3AF;
+  --tbl-head: #F9FAFB;
+  --tbl-hover: #F0F5FF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow: 0 4px 12px rgba(0,0,0,.08);
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 32px 0;
+  position: sticky; top: 0; z-index: 100;
+}
+.header-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.3px;
+}
+.header-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 16px;
+}
+.tab-btn {
+  padding: 10px 22px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+  letter-spacing: .1px;
+}
+.tab-btn:hover { color: var(--primary); }
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ── LAYOUT ── */
+.page { max-width: 1440px; margin: 0 auto; padding: 24px 32px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── FILTERS ── */
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  background: var(--surface);
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+.filter-group label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+}
+.filter-group select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+}
+.filter-group select:focus { border-color: var(--primary); }
+.filter-reset {
+  align-self: flex-end;
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.filter-reset:hover { background: var(--bg); color: var(--text); }
+
+/* ── KPI CARDS ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.5px;
+  line-height: 1;
+}
+.kpi-card.primary { border-left: 3px solid var(--primary); }
+.kpi-card.green  { border-left: 3px solid #16A34A; }
+.kpi-card.amber  { border-left: 3px solid #D97706; }
+.kpi-card.purple { border-left: 3px solid #7C3AED; }
+.kpi-card.teal   { border-left: 3px solid #0D9488; }
+.kpi-card.rose   { border-left: 3px solid #E11D48; }
+
+/* ── TABLE ── */
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-light);
+}
+.table-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.record-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead th {
+  background: var(--tbl-head);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+thead th:hover { color: var(--primary); }
+thead th.sorted-asc::after  { content: ' ↑'; color: var(--primary); }
+thead th.sorted-desc::after { content: ' ↓'; color: var(--primary); }
+tbody tr { border-bottom: 1px solid var(--border-light); transition: background .1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--tbl-hover); }
+td { padding: 10px 14px; vertical-align: middle; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.model-cell { max-width: 200px; }
+
+/* ── BRAND PILLS ── */
+.brand-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  white-space: nowrap;
+}
+
+/* ── MTD SPECIFIC ── */
+.brand-row td {
+  font-weight: 600;
+  cursor: pointer;
+}
+.brand-row:hover td { background: #EFF6FF; }
+.brand-row td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.expand-icon {
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 12px;
+  display: inline-block;
+}
+.model-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.model-row { background: #FAFBFF; }
+.model-row:hover td { background: #F0F5FF; }
+.model-indent { padding-left: 38px !important; color: var(--text); }
+.grand-total-row { background: #F9FAFB; }
+.grand-total-row td { font-weight: 700; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); }
+
+/* ── TRIGGER % COLORS ── */
+.trig-high { color: #16A34A; font-weight: 600; }
+.trig-med  { color: #D97706; font-weight: 600; }
+.trig-low  { color: var(--text-muted); }
+.trig-zero { color: var(--text-light); }
+
+/* ── PAGINATION ── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-light);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.pag-btns { display: flex; gap: 4px; }
+.pag-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  transition: all .15s;
+}
+.pag-btn:disabled { opacity: .4; cursor: default; }
+.pag-btn:not(:disabled):hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+.pag-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* ── LOADING ── */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  color: var(--text-muted);
+  font-size: 15px;
+  gap: 12px;
+}
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── EMPTY STATE ── */
+.empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted);
+}
+.empty-icon { font-size: 36px; margin-bottom: 8px; }
+.empty-msg { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.empty-sub { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div>
+      <h1>Marketing Performance Dashboard</h1>
+      <div class="header-meta">Google Sheets · <span id="date-range">Loading…</span></div>
+    </div>
+    <div class="header-badge">
+      <span>●</span> August 2026 MTD
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="daywise">Daywise Analysis</button>
+    <button class="tab-btn" data-tab="mtd">MTD Summary</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="page">
+
+  <!-- Loading -->
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    Loading dashboard data…
+  </div>
+
+  <!-- DAYWISE TAB -->
+  <div id="panel-daywise" class="tab-panel">
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="filter-group">
+        <label>Brand</label>
+        <select id="brand-select">
+          <option value="">All Brands</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Model</label>
+        <select id="model-select">
+          <option value="">All Models</option>
+        </select>
+      </div>
+      <button class="filter-reset" id="reset-btn">Reset Filters</button>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card primary">
+        <div class="kpi-label">Total Spends</div>
+        <div class="kpi-value" id="kpi-spends">—</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Total Leads</div>
+        <div class="kpi-value" id="kpi-leads">—</div>
+      </div>
+      <div class="kpi-card teal">
+        <div class="kpi-label">Triggered Leads</div>
+        <div class="kpi-value" id="kpi-triggered">—</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">CPL</div>
+        <div class="kpi-value" id="kpi-cpl">—</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">TCPL</div>
+        <div class="kpi-value" id="kpi-tcpl">—</div>
+      </div>
+      <div class="kpi-card rose">
+        <div class="kpi-label">Trigger %</div>
+        <div class="kpi-value" id="kpi-tpct">—</div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Daywise Breakdown</div>
+        <div class="record-count" id="record-count">—</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="date">Date</th>
+              <th data-col="brand">Brand</th>
+              <th data-col="model">Model</th>
+              <th data-col="spends" style="text-align:right">Spends (₹)</th>
+              <th data-col="leads" style="text-align:right">Leads</th>
+              <th data-col="triggered_leads" style="text-align:right">Triggered</th>
+              <th data-col="cpl" style="text-align:right">CPL (₹)</th>
+              <th data-col="tcpl" style="text-align:right">TCPL (₹)</th>
+              <th data-col="trigger_pct" style="text-align:right">Trigger %</th>
+            </tr>
+          </thead>
+          <tbody id="daywise-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pag">
+        <div id="pag-info">—</div>
+        <div class="pag-btns" id="pag-btns"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MTD TAB -->
+  <div id="panel-mtd" class="tab-panel">
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Month-to-Date Summary · August 2026</div>
+        <div class="record-count">Click a brand row to expand models</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Brand / Model</th>
+              <th style="text-align:right">MTD Spends (₹)</th>
+              <th style="text-align:right">MTD Leads</th>
+              <th style="text-align:right">Triggered Leads</th>
+              <th style="text-align:right">CPL (₹)</th>
+              <th style="text-align:right">TCPL (₹)</th>
+              <th style="text-align:right">Trigger %</th>
+            </tr>
+          </thead>
+          <tbody id="mtd-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let DATA = null;
+let selectedBrand = '';
+let selectedModel = '';
+let expandedBrands = new Set();
+let sortCol = 'date';
+let sortDir = 1; // 1=asc, -1=desc
+let currentPage = 1;
+const PAGE_SIZE = 30;
+
+// ── Brand Colors ───────────────────────────────────────────────────────────
+const BRAND_FG = {
+  'Bajaj':        '#1D4ED8',
+  'TVS':          '#15803D',
+  'Jawa':         '#B91C1C',
+  'KTM':          '#C2410C',
+  'Triumph':      '#6D28D9',
+  'Ampere':       '#0369A1',
+  'BGauss':       '#92400E',
+  'Bajaj Chetak': '#7E22CE',
+  'Ather':        '#0F766E',
+};
+const BRAND_BG = {
+  'Bajaj':        '#DBEAFE',
+  'TVS':          '#DCFCE7',
+  'Jawa':         '#FEE2E2',
+  'KTM':          '#FFEDD5',
+  'Triumph':      '#EDE9FE',
+  'Ampere':       '#E0F2FE',
+  'BGauss':       '#FEF3C7',
+  'Bajaj Chetak': '#F3E8FF',
+  'Ather':        '#CCFBF1',
+};
+
+function brandFg(b)  { return BRAND_FG[b] || '#374151'; }
+function brandBg(b)  { return BRAND_BG[b] || '#F3F4F6'; }
+
+// ── Formatters ─────────────────────────────────────────────────────────────
+function fmtINR(n) {
+  if (n == null || isNaN(n)) return '—';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+function fmtNum(n, dec = 0) {
+  if (n == null || isNaN(n)) return '—';
+  return parseFloat(n.toFixed(dec)).toLocaleString('en-IN');
+}
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '—';
+  return n.toFixed(1) + '%';
+}
+function fmtDate(s) {
+  const d = new Date(s + 'T00:00:00');
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+}
+function trigClass(pct) {
+  if (pct == null || isNaN(pct)) return 'trig-zero';
+  if (pct === 0) return 'trig-zero';
+  if (pct >= 60) return 'trig-high';
+  if (pct >= 20) return 'trig-med';
+  return 'trig-low';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch('./dashboard_data.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    DATA = await res.json();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('date-range').textContent =
+      fmtDate(DATA.date_range.min) + ' – ' + fmtDate(DATA.date_range.max) + ', 2026';
+
+    // Show first tab
+    document.getElementById('panel-daywise').classList.add('active');
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Populate brand dropdown
+    const brands = [...new Set(DATA.daywise.map(r => r.brand))].sort();
+    const brandSel = document.getElementById('brand-select');
+    brands.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b; opt.textContent = b;
+      brandSel.appendChild(opt);
+    });
+
+    brandSel.addEventListener('change', () => {
+      selectedBrand = brandSel.value;
+      selectedModel = '';
+      document.getElementById('model-select').value = '';
+      updateModelDropdown();
+      currentPage = 1;
+      renderDaywise();
+    });
+
+    document.getElementById('model-select').addEventListener('change', e => {
+      selectedModel = e.target.value;
+      currentPage = 1;
+      renderDaywise();
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      selectedBrand = ''; selectedModel = '';
+      brandSel.value = '';
+      document.getElementById('model-select').value = '';
+      updateModelDropdown();
+      currentPage = 1;
+      renderDaywise();
+    });
+
+    // Column sort
+    document.querySelectorAll('thead th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) { sortDir *= -1; }
+        else { sortCol = col; sortDir = 1; }
+        document.querySelectorAll('thead th').forEach(h => {
+          h.classList.remove('sorted-asc', 'sorted-desc');
+        });
+        th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+        currentPage = 1;
+        renderDaywise();
+      });
+    });
+
+    renderDaywise();
+    renderMTD();
+
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      '<div style="color:#B91C1C">Failed to load data: ' + e.message +
+      '<br><small>Make sure dashboard_data.json is in the same folder.</small></div>';
+  }
+}
+
+// ── Dropdown ───────────────────────────────────────────────────────────────
+function updateModelDropdown() {
+  const sel = document.getElementById('model-select');
+  const prev = selectedModel;
+  sel.innerHTML = '<option value="">All Models</option>';
+  const models = [...new Set(
+    DATA.daywise.filter(r => !selectedBrand || r.brand === selectedBrand).map(r => r.model)
+  )].sort();
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    if (m === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// ── Daywise ────────────────────────────────────────────────────────────────
+function getFiltered() {
+  return DATA.daywise.filter(r => {
+    if (selectedBrand && r.brand !== selectedBrand) return false;
+    if (selectedModel && r.model !== selectedModel) return false;
+    return true;
+  });
+}
+
+function renderDaywise() {
+  const rows = getFiltered();
+
+  // KPIs
+  const T = rows.reduce((a, r) => ({
+    spends: a.spends + (r.spends || 0),
+    leads:  a.leads  + (r.leads  || 0),
+    trig:   a.trig   + (r.triggered_leads || 0),
+  }), { spends: 0, leads: 0, trig: 0 });
+  const cpl   = T.leads  > 0 ? T.spends / T.leads  : null;
+  const tcpl  = T.trig   > 0 ? T.spends / T.trig   : null;
+  const tpct  = T.leads  > 0 ? T.trig   / T.leads * 100 : null;
+
+  document.getElementById('kpi-spends').textContent    = fmtINR(T.spends);
+  document.getElementById('kpi-leads').textContent     = fmtNum(T.leads, 0);
+  document.getElementById('kpi-triggered').textContent = fmtNum(T.trig, 0);
+  document.getElementById('kpi-cpl').textContent       = fmtINR(cpl);
+  document.getElementById('kpi-tcpl').textContent      = fmtINR(tcpl);
+  document.getElementById('kpi-tpct').textContent      = fmtPct(tpct);
+
+  // Sort
+  const colMap = { date: 'date', brand: 'brand', model: 'model', spends: 'spends',
+    leads: 'leads', triggered_leads: 'triggered_leads', cpl: 'cpl', tcpl: 'tcpl', trigger_pct: 'trigger_pct' };
+  const key = colMap[sortCol] || 'date';
+  const sorted = [...rows].sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (av == null) av = sortDir > 0 ? Infinity : -Infinity;
+    if (bv == null) bv = sortDir > 0 ? Infinity : -Infinity;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
+  });
+
+  // Pagination
+  const total = sorted.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(currentPage, pages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = sorted.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('record-count').textContent =
+    total + ' record' + (total !== 1 ? 's' : '');
+
+  // Table body
+  const tbody = document.getElementById('daywise-tbody');
+  if (slice.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">🔍</div><div class="empty-msg">No records match</div><div class="empty-sub">Try changing the filters above</div></div></td></tr>';
+  } else {
+    tbody.innerHTML = slice.map(r => `
+      <tr>
+        <td style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
+        <td><span class="brand-pill" style="background:${brandBg(r.brand)};color:${brandFg(r.brand)}">${r.brand}</span></td>
+        <td class="model-cell">${r.model}</td>
+        <td class="num">${fmtINR(r.spends)}</td>
+        <td class="num">${fmtNum(r.leads, 0)}</td>
+        <td class="num">${fmtNum(r.triggered_leads, 0)}</td>
+        <td class="num">${r.cpl  != null ? fmtINR(r.cpl)  : '—'}</td>
+        <td class="num">${r.tcpl != null ? fmtINR(r.tcpl) : '—'}</td>
+        <td class="num ${trigClass(r.trigger_pct)}">${fmtPct(r.trigger_pct)}</td>
+      </tr>`).join('');
+  }
+
+  // Pagination controls
+  const info = document.getElementById('pag-info');
+  const btns = document.getElementById('pag-btns');
+  info.textContent = `Page ${currentPage} of ${pages} · showing ${start + 1}–${Math.min(start + PAGE_SIZE, total)} of ${total}`;
+
+  const maxVisible = 7;
+  let pageNums = [];
+  if (pages <= maxVisible) {
+    pageNums = Array.from({ length: pages }, (_, i) => i + 1);
+  } else {
+    let lo = Math.max(1, currentPage - 2);
+    let hi = Math.min(pages, lo + maxVisible - 1);
+    lo = Math.max(1, hi - maxVisible + 1);
+    pageNums = Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
+  }
+
+  btns.innerHTML =
+    `<button class="pag-btn" ${currentPage <= 1 ? 'disabled' : ''} onclick="goPage(${currentPage - 1})">‹</button>` +
+    pageNums.map(p => `<button class="pag-btn ${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`).join('') +
+    `<button class="pag-btn" ${currentPage >= pages ? 'disabled' : ''} onclick="goPage(${currentPage + 1})">›</button>`;
+}
+
+function goPage(p) { currentPage = p; renderDaywise(); }
+
+// ── MTD Summary ────────────────────────────────────────────────────────────
+function computeTotals(rows) {
+  const T = rows.reduce((a, r) => ({
+    spends: a.spends + (r.spends || 0),
+    leads:  a.leads  + (r.leads  || 0),
+    trig:   a.trig   + (r.triggered_leads || 0),
+  }), { spends: 0, leads: 0, trig: 0 });
+  return {
+    ...T,
+    cpl:  T.leads > 0 ? T.spends / T.leads  : null,
+    tcpl: T.trig  > 0 ? T.spends / T.trig   : null,
+    tpct: T.leads > 0 ? T.trig   / T.leads * 100 : null,
+  };
+}
+
+function mtdRow(spends, leads, trig, cpl, tcpl, tpct) {
+  return `
+    <td class="num">${fmtINR(spends)}</td>
+    <td class="num">${fmtNum(leads, 0)}</td>
+    <td class="num">${fmtNum(trig, 0)}</td>
+    <td class="num">${cpl  != null ? fmtINR(cpl)  : '—'}</td>
+    <td class="num">${tcpl != null ? fmtINR(tcpl) : '—'}</td>
+    <td class="num ${trigClass(tpct)}">${fmtPct(tpct)}</td>`;
+}
+
+function renderMTD() {
+  // Group by brand
+  const brandMap = {};
+  DATA.mtd_summary.forEach(r => {
+    if (!brandMap[r.brand]) brandMap[r.brand] = [];
+    brandMap[r.brand].push(r);
+  });
+
+  const brands = Object.keys(brandMap).sort();
+  const grand = computeTotals(DATA.mtd_summary);
+
+  let html = `
+    <tr class="grand-total-row">
+      <td>Grand Total</td>
+      ${mtdRow(grand.spends, grand.leads, grand.trig, grand.cpl, grand.tcpl, grand.tpct)}
+    </tr>`;
+
+  brands.forEach(brand => {
+    const models = brandMap[brand].sort((a, b) => b.spends - a.spends);
+    const T = computeTotals(models);
+    const expanded = expandedBrands.has(brand);
+    const safeB = brand.replace(/'/g, "\\'");
+
+    html += `
+      <tr class="brand-row ${expanded ? 'expanded' : ''}" onclick="toggleBrand('${safeB}')">
+        <td>
+          <span class="expand-icon">${expanded ? '▼' : '▶'}</span>
+          <span class="brand-pill" style="background:${brandBg(brand)};color:${brandFg(brand)}">${brand}</span>
+          <span class="model-count">${models.length} model${models.length > 1 ? 's' : ''}</span>
+        </td>
+        ${mtdRow(T.spends, T.leads, T.trig, T.cpl, T.tcpl, T.tpct)}
+      </tr>`;
+
+    if (expanded) {
+      models.forEach(m => {
+        html += `
+          <tr class="model-row">
+            <td class="model-indent">${m.model}</td>
+            ${mtdRow(m.spends, m.leads, m.triggered_leads, m.cpl, m.tcpl, m.trigger_pct)}
+          </tr>`;
+      });
+    }
+  });
+
+  document.getElementById('mtd-tbody').innerHTML = html;
+}
+
+function toggleBrand(brand) {
+  if (expandedBrands.has(brand)) expandedBrands.delete(brand);
+  else expandedBrands.add(brand);
+  renderMTD();
+}
+
+init();
+</script>
+</body>
+</html>
