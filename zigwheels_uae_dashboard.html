@@ -444,7 +444,8 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
           <th class="num">Impressions</th>
           <th class="num">Clicks</th>
           <th class="num">CTR %</th>
-          <th class="num">CPM</th>
+          <th class="num">CTL %</th>
+          <th class="num">CPC</th>
         </tr>
       </thead>
       <tbody id="camptype-body"></tbody>
@@ -696,7 +697,8 @@ function renderSummary() {
     ctTotS+=v.spends; ctTotL+=v.leads; ctTotI+=v.impr; ctTotClk+=v.clicks;
     var cpl = (v.spends>0 && v.leads>0) ? fmt(v.spends/v.leads) : '—';
     var ctr = v.impr>0 ? fmt(v.clicks/v.impr*100,2) : '—';
-    var cpm = v.impr>0 ? fmt(v.spends/v.impr*1000,2) : '—';
+    var ctl = v.clicks>0 ? fmt(v.leads/v.clicks*100,2) + '%' : '—';
+    var cpc = v.clicks>0 ? fmt(v.spends/v.clicks,2) : '—';
     var cls = CT_CLASS[ct] || 'ct-other';
     ctRows += '<tr>' +
       '<td><span class="ct-chip ' + cls + '">' + ct + '</span></td>' +
@@ -706,13 +708,15 @@ function renderSummary() {
       '<td class="num">' + fmt(v.impr) + '</td>' +
       '<td class="num">' + fmt(v.clicks) + '</td>' +
       '<td class="num">' + ctr + '</td>' +
-      '<td class="num">' + cpm + '</td>' +
+      '<td class="num">' + ctl + '</td>' +
+      '<td class="num">' + cpc + '</td>' +
       '</tr>';
   });
 
   if (ctRows) {
     var ctCtr = ctTotI>0 ? fmt(ctTotClk/ctTotI*100,2) : '—';
-    var ctCpm = ctTotI>0 ? fmt(ctTotS/ctTotI*1000,2) : '—';
+    var ctCtl = ctTotClk>0 ? fmt(ctTotL/ctTotClk*100,2) + '%' : '—';
+    var ctCpc = ctTotClk>0 ? fmt(ctTotS/ctTotClk,2) : '—';
     ctRows += '<tr class="total-row">' +
       '<td>TOTAL</td>' +
       '<td class="num">' + fmt(ctTotS) + '</td>' +
@@ -721,11 +725,12 @@ function renderSummary() {
       '<td class="num">' + fmt(ctTotI) + '</td>' +
       '<td class="num">' + fmt(ctTotClk) + '</td>' +
       '<td class="num">' + ctCtr + '</td>' +
-      '<td class="num">' + ctCpm + '</td>' +
+      '<td class="num">' + ctCtl + '</td>' +
+      '<td class="num">' + ctCpc + '</td>' +
       '</tr>';
   }
 
-  document.getElementById('camptype-body').innerHTML = ctRows || '<tr><td colspan="8" class="empty">No data for selected filters</td></tr>';
+  document.getElementById('camptype-body').innerHTML = ctRows || '<tr><td colspan="9" class="empty">No data for selected filters</td></tr>';
 }
 
 initFilters();
