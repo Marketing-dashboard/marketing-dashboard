@@ -22,34 +22,22 @@
   --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
   --radius: 10px;
   --radius-sm: 6px;
-  --grp-paid: #1D4ED8;
-  --grp-paid-bg: #EFF6FF;
-  --grp-wa: #059669;
-  --grp-wa-bg: #ECFDF5;
-  --grp-comb: #6B7280;
-  --grp-comb-bg: #F9FAFB;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-  min-height: 100vh;
+  background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh;
 }
 
-/* ── HEADER ── */
 .header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 18px 32px 0;
-  position: sticky; top: 0; z-index: 100;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 18px 32px 0; position: sticky; top: 0; z-index: 100;
 }
 .header-inner {
-  max-width: 1600px; margin: 0 auto;
+  max-width: 1700px; margin: 0 auto;
   display: flex; align-items: flex-start; justify-content: space-between;
 }
-.header h1 { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+.header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
 .header-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .header-badge {
   display: inline-flex; align-items: center; gap: 5px;
@@ -65,50 +53,38 @@ body {
 .tab-btn:hover { color: var(--primary); }
 .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-/* ── LAYOUT ── */
-.page { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
+.page { max-width: 1700px; margin: 0 auto; padding: 24px 32px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-/* ── FILTERS ── */
 .filters {
   display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
   background: var(--surface); padding: 14px 18px;
-  border-radius: var(--radius); border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-sm);
 }
 .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
-.filter-group label {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .6px; color: var(--text-muted);
-}
+.filter-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); }
 .filter-group select {
   padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--bg); font-size: 13px; color: var(--text); cursor: pointer;
-  outline: none; transition: border-color .15s;
+  background: var(--bg); font-size: 13px; color: var(--text); cursor: pointer; outline: none; transition: border-color .15s;
 }
 .filter-group select:focus { border-color: var(--primary); }
 .filter-reset {
   align-self: flex-end; padding: 7px 14px; background: transparent;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
-  font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer;
-  transition: all .15s;
+  font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all .15s;
 }
 .filter-reset:hover { background: var(--bg); color: var(--text); }
 
-/* ── KPI CARDS ── */
-.kpi-grid {
-  display: grid; grid-template-columns: repeat(6, 1fr);
-  gap: 12px; margin-bottom: 20px;
-}
+.kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
 @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
 .kpi-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-sm);
 }
 .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 6px; }
-.kpi-value { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -.5px; line-height: 1; }
-.kpi-sub  { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.kpi-value { font-size: 22px; font-weight: 700; letter-spacing: -.5px; line-height: 1; }
+.kpi-sub   { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 .kpi-card.primary { border-left: 3px solid #2563EB; }
 .kpi-card.green   { border-left: 3px solid #16A34A; }
 .kpi-card.teal    { border-left: 3px solid #0D9488; }
@@ -116,7 +92,6 @@ body {
 .kpi-card.purple  { border-left: 3px solid #7C3AED; }
 .kpi-card.rose    { border-left: 3px solid #E11D48; }
 
-/* ── TABLE ── */
 .table-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden;
@@ -128,55 +103,56 @@ body {
 .table-title { font-size: 13px; font-weight: 700; }
 .record-count { font-size: 12px; color: var(--text-muted); }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
 
-/* Group header rows */
+/* ── Group header row ── */
 thead tr.grp-row th {
-  padding: 8px 12px; text-align: center;
+  padding: 8px 10px; text-align: center;
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
-  border-bottom: none;
+  border-bottom: none; white-space: nowrap;
 }
-thead tr.grp-row th.grp-paid   { background: var(--grp-paid-bg); color: var(--grp-paid); border-left: 2px solid var(--grp-paid); }
-thead tr.grp-row th.grp-wa     { background: var(--grp-wa-bg);   color: var(--grp-wa);   border-left: 2px solid var(--grp-wa); }
-thead tr.grp-row th.grp-comb   { background: var(--grp-comb-bg); color: var(--grp-comb); border-left: 2px solid var(--grp-comb); }
-thead tr.grp-row th.grp-dim    { background: var(--tbl-head); }
+thead tr.grp-row th.grp-dim  { background: var(--tbl-head); }
+thead tr.grp-row th.grp-fb   { background: #EFF6FF; color: #1D4ED8; border-left: 2px solid #93C5FD; }
+thead tr.grp-row th.grp-ga   { background: #FFF7ED; color: #C2410C; border-left: 2px solid #FCA5A1; }
+thead tr.grp-row th.grp-wa   { background: #F0FDF4; color: #15803D; border-left: 2px solid #86EFAC; }
+thead tr.grp-row th.grp-comb { background: #F9FAFB; color: #4B5563; border-left: 2px solid #D1D5DB; }
 
-/* Sub-header row */
+/* ── Sub-header row ── */
 thead tr.sub-row th {
-  background: var(--tbl-head); padding: 9px 10px; text-align: left;
-  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  padding: 8px 9px; text-align: right;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
   color: var(--text-muted); border-bottom: 1px solid var(--border);
   white-space: nowrap; cursor: pointer; user-select: none;
 }
+thead tr.sub-row th.sub-dim  { background: var(--tbl-head); text-align: left; }
+thead tr.sub-row th.sub-fb   { background: #F5F9FF; border-left: 2px solid #BFDBFE; }
+thead tr.sub-row th.sub-ga   { background: #FFFAF5; border-left: 2px solid #FED7AA; }
+thead tr.sub-row th.sub-wa   { background: #F5FFF9; border-left: 2px solid #BBF7D0; }
+thead tr.sub-row th.sub-comb { background: var(--tbl-head); border-left: 2px solid #E5E7EB; }
 thead tr.sub-row th:hover { color: var(--primary); }
 thead tr.sub-row th.sorted-asc::after  { content: ' ↑'; color: var(--primary); }
 thead tr.sub-row th.sorted-desc::after { content: ' ↓'; color: var(--primary); }
-thead tr.sub-row th.sub-paid  { background: #F0F5FF; border-left: 2px solid #BFDBFE; }
-thead tr.sub-row th.sub-wa    { background: #F0FDF4; border-left: 2px solid #A7F3D0; }
-thead tr.sub-row th.sub-comb  { background: #F9FAFB; border-left: 2px solid #E5E7EB; }
 
 tbody tr { border-bottom: 1px solid var(--border-light); transition: background .1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--tbl-hover); }
-td { padding: 8px 10px; vertical-align: middle; }
+td { padding: 8px 9px; vertical-align: middle; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-td.sep-paid { border-left: 2px solid #BFDBFE; }
-td.sep-wa   { border-left: 2px solid #A7F3D0; }
+td.sep-fb   { border-left: 2px solid #BFDBFE; }
+td.sep-ga   { border-left: 2px solid #FED7AA; }
+td.sep-wa   { border-left: 2px solid #BBF7D0; }
 td.sep-comb { border-left: 2px solid #E5E7EB; }
 
-/* ── BRAND PILLS ── */
 .brand-pill {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  display: inline-block; padding: 2px 7px; border-radius: 10px;
   font-size: 11px; font-weight: 700; letter-spacing: .2px; white-space: nowrap;
 }
-
-/* ── TRIGGER % COLORS ── */
 .trig-high { color: #16A34A; font-weight: 600; }
 .trig-med  { color: #D97706; font-weight: 600; }
 .trig-low  { color: var(--text-muted); }
 .trig-zero { color: var(--text-light); }
 
-/* ── MTD SPECIFIC ── */
+/* MTD */
 .brand-row { cursor: pointer; }
 .brand-row td { font-weight: 600; }
 .brand-row:hover td { background: #EFF6FF !important; }
@@ -185,10 +161,9 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
 .model-count { font-size: 11px; color: var(--text-muted); font-weight: 400; }
 .model-row { background: #FAFBFF; }
 .model-row:hover td { background: #F0F5FF; }
-.model-indent { padding-left: 38px !important; }
+.model-indent { padding-left: 36px !important; }
 .grand-total-row td { font-weight: 700; background: #F9FAFB; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border); }
 
-/* ── PAGINATION ── */
 .pagination {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 18px; border-top: 1px solid var(--border-light);
@@ -196,7 +171,7 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
 }
 .pag-btns { display: flex; gap: 4px; }
 .pag-btn {
-  padding: 5px 12px; border: 1px solid var(--border); background: var(--surface);
+  padding: 5px 11px; border: 1px solid var(--border); background: var(--surface);
   border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
   cursor: pointer; color: var(--text); transition: all .15s;
 }
@@ -204,15 +179,13 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
 .pag-btn:not(:disabled):hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 .pag-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-/* ── LOADING ── */
 .loading {
   display: flex; align-items: center; justify-content: center;
   padding: 60px; color: var(--text-muted); font-size: 15px; gap: 12px;
 }
 .spinner {
   width: 20px; height: 20px; border: 2px solid var(--border);
-  border-top-color: var(--primary); border-radius: 50%;
-  animation: spin .7s linear infinite;
+  border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -234,9 +207,7 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
 </div>
 
 <div class="page">
-  <div id="loading" class="loading">
-    <div class="spinner"></div>Loading dashboard data…
-  </div>
+  <div id="loading" class="loading"><div class="spinner"></div>Loading dashboard data…</div>
 
   <!-- DAYWISE TAB -->
   <div id="panel-daywise" class="tab-panel">
@@ -253,36 +224,12 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
     </div>
 
     <div class="kpi-grid">
-      <div class="kpi-card primary">
-        <div class="kpi-label">Total Spends</div>
-        <div class="kpi-value" id="kpi-spends">—</div>
-        <div class="kpi-sub">FB + Adwords (Google)</div>
-      </div>
-      <div class="kpi-card green">
-        <div class="kpi-label">Total Leads</div>
-        <div class="kpi-value" id="kpi-leads">—</div>
-        <div class="kpi-sub">FB + Adwords (Google)</div>
-      </div>
-      <div class="kpi-card teal">
-        <div class="kpi-label">Triggered Leads</div>
-        <div class="kpi-value" id="kpi-triggered">—</div>
-        <div class="kpi-sub">FB + Adwords + WhatsApp</div>
-      </div>
-      <div class="kpi-card amber">
-        <div class="kpi-label">CPL</div>
-        <div class="kpi-value" id="kpi-cpl">—</div>
-        <div class="kpi-sub">Spends / Leads</div>
-      </div>
-      <div class="kpi-card purple">
-        <div class="kpi-label">TCPL</div>
-        <div class="kpi-value" id="kpi-tcpl">—</div>
-        <div class="kpi-sub">Spends / Triggered (all)</div>
-      </div>
-      <div class="kpi-card rose">
-        <div class="kpi-label">Trigger %</div>
-        <div class="kpi-value" id="kpi-tpct">—</div>
-        <div class="kpi-sub">Triggered / Leads (all)</div>
-      </div>
+      <div class="kpi-card primary"><div class="kpi-label">Total Spends</div><div class="kpi-value" id="kpi-spends">—</div><div class="kpi-sub">FB + Google combined</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Total Leads</div><div class="kpi-value" id="kpi-leads">—</div><div class="kpi-sub">FB + Google combined</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">Triggered Leads</div><div class="kpi-value" id="kpi-triggered">—</div><div class="kpi-sub">FB + Google + WhatsApp</div></div>
+      <div class="kpi-card amber"><div class="kpi-label">CPL</div><div class="kpi-value" id="kpi-cpl">—</div><div class="kpi-sub">Spends / Leads</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">TCPL</div><div class="kpi-value" id="kpi-tcpl">—</div><div class="kpi-sub">Spends / All Triggered</div></div>
+      <div class="kpi-card rose"><div class="kpi-label">Trigger %</div><div class="kpi-value" id="kpi-tpct">—</div><div class="kpi-sub">Triggered / Leads</div></div>
     </div>
 
     <div class="table-card">
@@ -294,20 +241,27 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
         <table>
           <thead>
             <tr class="grp-row">
-              <th class="grp-dim" rowspan="2" data-col="date" style="text-align:left">Date</th>
-              <th class="grp-dim" rowspan="2" data-col="brand" style="text-align:left">Brand</th>
-              <th class="grp-dim" rowspan="2" data-col="model" style="text-align:left">Model</th>
-              <th class="grp-paid" colspan="6">Facebook + Adwords (Google)</th>
+              <th class="grp-dim" rowspan="2" style="text-align:left">Date</th>
+              <th class="grp-dim" rowspan="2" style="text-align:left">Brand</th>
+              <th class="grp-dim" rowspan="2" style="text-align:left">Model</th>
+              <th class="grp-fb"   colspan="6">Facebook</th>
+              <th class="grp-ga"   colspan="6">Google / Adwords</th>
               <th class="grp-wa"   colspan="1">WhatsApp</th>
               <th class="grp-comb" colspan="6">Combined</th>
             </tr>
             <tr class="sub-row">
-              <th class="sub-paid" data-col="paid_spends">Spends (₹)</th>
-              <th class="sub-paid" data-col="paid_leads">Leads</th>
-              <th class="sub-paid" data-col="paid_triggered">Triggered</th>
-              <th class="sub-paid" data-col="paid_cpl">CPL (₹)</th>
-              <th class="sub-paid" data-col="paid_tcpl">TCPL (₹)</th>
-              <th class="sub-paid" data-col="paid_trigger_pct">Trigger %</th>
+              <th class="sub-fb"   data-col="fb_spends">Spends (₹)</th>
+              <th class="sub-fb"   data-col="fb_leads">Leads</th>
+              <th class="sub-fb"   data-col="fb_triggered">Triggered</th>
+              <th class="sub-fb"   data-col="fb_cpl">CPL (₹)</th>
+              <th class="sub-fb"   data-col="fb_tcpl">TCPL (₹)</th>
+              <th class="sub-fb"   data-col="fb_trigger_pct">Trigger %</th>
+              <th class="sub-ga"   data-col="ga_spends">Spends (₹)</th>
+              <th class="sub-ga"   data-col="ga_leads">Leads</th>
+              <th class="sub-ga"   data-col="ga_triggered">Triggered</th>
+              <th class="sub-ga"   data-col="ga_cpl">CPL (₹)</th>
+              <th class="sub-ga"   data-col="ga_tcpl">TCPL (₹)</th>
+              <th class="sub-ga"   data-col="ga_trigger_pct">Trigger %</th>
               <th class="sub-wa"   data-col="wa_triggered">Triggered</th>
               <th class="sub-comb" data-col="combined_spends">Spends (₹)</th>
               <th class="sub-comb" data-col="combined_leads">Leads</th>
@@ -339,24 +293,16 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
           <thead>
             <tr class="grp-row">
               <th class="grp-dim" rowspan="2" style="text-align:left">Brand / Model</th>
-              <th class="grp-paid" colspan="6">Facebook + Adwords (Google)</th>
+              <th class="grp-fb"   colspan="6">Facebook</th>
+              <th class="grp-ga"   colspan="6">Google / Adwords</th>
               <th class="grp-wa"   colspan="1">WhatsApp</th>
               <th class="grp-comb" colspan="6">Combined</th>
             </tr>
             <tr class="sub-row">
-              <th class="sub-paid">Spends (₹)</th>
-              <th class="sub-paid">Leads</th>
-              <th class="sub-paid">Triggered</th>
-              <th class="sub-paid">CPL (₹)</th>
-              <th class="sub-paid">TCPL (₹)</th>
-              <th class="sub-paid">Trigger %</th>
+              <th class="sub-fb">Spends (₹)</th><th class="sub-fb">Leads</th><th class="sub-fb">Triggered</th><th class="sub-fb">CPL (₹)</th><th class="sub-fb">TCPL (₹)</th><th class="sub-fb">Trigger %</th>
+              <th class="sub-ga">Spends (₹)</th><th class="sub-ga">Leads</th><th class="sub-ga">Triggered</th><th class="sub-ga">CPL (₹)</th><th class="sub-ga">TCPL (₹)</th><th class="sub-ga">Trigger %</th>
               <th class="sub-wa">Triggered</th>
-              <th class="sub-comb">Spends (₹)</th>
-              <th class="sub-comb">Leads</th>
-              <th class="sub-comb">Triggered</th>
-              <th class="sub-comb">CPL (₹)</th>
-              <th class="sub-comb">TCPL (₹)</th>
-              <th class="sub-comb">Trigger %</th>
+              <th class="sub-comb">Spends (₹)</th><th class="sub-comb">Leads</th><th class="sub-comb">Triggered</th><th class="sub-comb">CPL (₹)</th><th class="sub-comb">TCPL (₹)</th><th class="sub-comb">Trigger %</th>
             </tr>
           </thead>
           <tbody id="mtd-tbody"></tbody>
@@ -367,17 +313,10 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
 </div>
 
 <script>
-// ── State ─────────────────────────────────────────
-let DATA = null;
-let selectedBrand = '';
-let selectedModel = '';
-let expandedBrands = new Set();
-let sortCol = 'date';
-let sortDir = 1;
-let currentPage = 1;
+let DATA = null, selectedBrand = '', selectedModel = '';
+let expandedBrands = new Set(), sortCol = 'date', sortDir = 1, currentPage = 1;
 const PAGE_SIZE = 30;
 
-// ── Brand Colors ───────────────────────────────────
 const BRAND_FG = { 'Bajaj':'#1D4ED8','TVS':'#15803D','Jawa':'#B91C1C','KTM':'#C2410C',
   'Triumph':'#6D28D9','Ampere':'#0369A1','BGauss':'#92400E','Bajaj Chetak':'#7E22CE','Ather':'#0F766E' };
 const BRAND_BG = { 'Bajaj':'#DBEAFE','TVS':'#DCFCE7','Jawa':'#FEE2E2','KTM':'#FFEDD5',
@@ -385,20 +324,18 @@ const BRAND_BG = { 'Bajaj':'#DBEAFE','TVS':'#DCFCE7','Jawa':'#FEE2E2','KTM':'#FF
 const brandFg = b => BRAND_FG[b] || '#374151';
 const brandBg = b => BRAND_BG[b] || '#F3F4F6';
 
-// ── Formatters ─────────────────────────────────────
-const fmtINR  = n => (n == null || isNaN(n) || n === 0) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
-const fmtNum  = (n, d=0) => (n == null || isNaN(n)) ? '—' : parseFloat(n.toFixed(d)).toLocaleString('en-IN');
-const fmtPct  = n => (n == null || isNaN(n)) ? '—' : n.toFixed(1) + '%';
+const fmtINR = n => (!n || isNaN(n)) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
+const fmtNum = (n, d=0) => (n == null || isNaN(n)) ? '—' : parseFloat(n.toFixed(d)).toLocaleString('en-IN');
+const fmtPct = n => (n == null || isNaN(n)) ? '—' : n.toFixed(1) + '%';
 const fmtDate = s => { const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); };
 
 function trigClass(p) {
-  if (p == null || isNaN(p) || p === 0) return 'trig-zero';
+  if (!p || isNaN(p)) return 'trig-zero';
   if (p >= 60) return 'trig-high';
   if (p >= 20) return 'trig-med';
   return 'trig-low';
 }
 
-// ── Init ───────────────────────────────────────────
 async function init() {
   try {
     const res = await fetch('./dashboard_data.json');
@@ -408,11 +345,9 @@ async function init() {
     document.getElementById('loading').style.display = 'none';
     const _dates = DATA.daywise.map(r => r.date).sort();
     document.getElementById('date-range').textContent =
-      fmtDate(_dates[0]) + ' – ' + fmtDate(_dates[_dates.length - 1]) + ', 2026';
-
+      fmtDate(_dates[0]) + ' – ' + fmtDate(_dates[_dates.length-1]) + ', 2026';
     document.getElementById('panel-daywise').classList.add('active');
 
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
@@ -420,7 +355,6 @@ async function init() {
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     }));
 
-    // Brand dropdown
     const brands = [...new Set(DATA.daywise.map(r => r.brand))].sort();
     const bSel = document.getElementById('brand-select');
     brands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; bSel.appendChild(o); });
@@ -439,7 +373,6 @@ async function init() {
       updateModelDropdown(); currentPage = 1; renderDaywise();
     });
 
-    // Column sort on both header rows
     document.querySelectorAll('#panel-daywise thead th[data-col]').forEach(th => {
       th.addEventListener('click', () => {
         const col = th.dataset.col;
@@ -459,17 +392,13 @@ async function init() {
   }
 }
 
-// ── Dropdown ───────────────────────────────────────
 function updateModelDropdown() {
   const sel = document.getElementById('model-select');
   sel.innerHTML = '<option value="">All Models</option>';
-  const models = [...new Set(
-    DATA.daywise.filter(r => !selectedBrand || r.brand === selectedBrand).map(r => r.model)
-  )].sort();
-  models.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; sel.appendChild(o); });
+  [...new Set(DATA.daywise.filter(r => !selectedBrand || r.brand === selectedBrand).map(r => r.model))].sort()
+    .forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; sel.appendChild(o); });
 }
 
-// ── Daywise ────────────────────────────────────────
 function getFiltered() {
   return DATA.daywise.filter(r => {
     if (selectedBrand && r.brand !== selectedBrand) return false;
@@ -481,7 +410,7 @@ function getFiltered() {
 function renderDaywise() {
   const rows = getFiltered();
 
-  // KPIs from combined fields (avoids double-counting, WA triggers included)
+  // KPIs from combined fields
   const T = rows.reduce((a, r) => ({
     spends: a.spends + (r.combined_spends    || 0),
     leads:  a.leads  + (r.combined_leads     || 0),
@@ -498,13 +427,10 @@ function renderDaywise() {
   document.getElementById('kpi-tcpl').textContent      = fmtINR(tcpl);
   document.getElementById('kpi-tpct').textContent      = fmtPct(tpct);
 
-  // Sort
   const sorted = [...rows].sort((a, b) => {
     if (sortCol === 'date') {
-      const dc = a.date.localeCompare(b.date) * sortDir;
-      if (dc !== 0) return dc;
-      const bc = (a.brand||'').localeCompare(b.brand||'');
-      if (bc !== 0) return bc;
+      const dc = a.date.localeCompare(b.date) * sortDir; if (dc) return dc;
+      const bc = (a.brand||'').localeCompare(b.brand||''); if (bc) return bc;
       return (a.model||'').localeCompare(b.model||'');
     }
     if (sortCol === 'brand') return (a.brand||'').localeCompare(b.brand||'') * sortDir;
@@ -515,9 +441,7 @@ function renderDaywise() {
     return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
   });
 
-  // Pagination
-  const total = sorted.length;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const total = sorted.length, pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   currentPage = Math.min(currentPage, pages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const slice = sorted.slice(start, start + PAGE_SIZE);
@@ -526,110 +450,101 @@ function renderDaywise() {
 
   const tbody = document.getElementById('daywise-tbody');
   if (!slice.length) {
-    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="22" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
   } else {
     tbody.innerHTML = slice.map(r => `
       <tr>
         <td style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
         <td><span class="brand-pill" style="background:${brandBg(r.brand)};color:${brandFg(r.brand)}">${r.brand}</span></td>
         <td style="white-space:nowrap">${r.model}</td>
-        <td class="num sep-paid">${fmtINR(r.paid_spends)}</td>
-        <td class="num">${fmtNum(r.paid_leads, 0)}</td>
-        <td class="num">${fmtNum(r.paid_triggered, 0)}</td>
-        <td class="num">${r.paid_cpl  != null ? fmtINR(r.paid_cpl)  : '—'}</td>
-        <td class="num">${r.paid_tcpl != null ? fmtINR(r.paid_tcpl) : '—'}</td>
-        <td class="num ${trigClass(r.paid_trigger_pct)}">${fmtPct(r.paid_trigger_pct)}</td>
+        <td class="num sep-fb">${fmtINR(r.fb_spends)}</td>
+        <td class="num">${fmtNum(r.fb_leads, 0)}</td>
+        <td class="num">${fmtNum(r.fb_triggered, 0)}</td>
+        <td class="num">${fmtINR(r.fb_cpl)}</td>
+        <td class="num">${fmtINR(r.fb_tcpl)}</td>
+        <td class="num ${trigClass(r.fb_trigger_pct)}">${fmtPct(r.fb_trigger_pct)}</td>
+        <td class="num sep-ga">${fmtINR(r.ga_spends)}</td>
+        <td class="num">${fmtNum(r.ga_leads, 0)}</td>
+        <td class="num">${fmtNum(r.ga_triggered, 0)}</td>
+        <td class="num">${fmtINR(r.ga_cpl)}</td>
+        <td class="num">${fmtINR(r.ga_tcpl)}</td>
+        <td class="num ${trigClass(r.ga_trigger_pct)}">${fmtPct(r.ga_trigger_pct)}</td>
         <td class="num sep-wa">${r.wa_triggered > 0 ? fmtNum(r.wa_triggered, 0) : '—'}</td>
         <td class="num sep-comb">${fmtINR(r.combined_spends)}</td>
         <td class="num">${fmtNum(r.combined_leads, 0)}</td>
         <td class="num">${fmtNum(r.combined_triggered, 0)}</td>
-        <td class="num">${r.combined_cpl  != null ? fmtINR(r.combined_cpl)  : '—'}</td>
-        <td class="num">${r.combined_tcpl != null ? fmtINR(r.combined_tcpl) : '—'}</td>
+        <td class="num">${fmtINR(r.combined_cpl)}</td>
+        <td class="num">${fmtINR(r.combined_tcpl)}</td>
         <td class="num ${trigClass(r.combined_trigger_pct)}">${fmtPct(r.combined_trigger_pct)}</td>
       </tr>`).join('');
   }
 
-  // Pagination controls
   document.getElementById('pag-info').textContent =
-    `Page ${currentPage} of ${pages} · ${start+1}–${Math.min(start+PAGE_SIZE, total)} of ${total}`;
+    `Page ${currentPage} of ${pages} · ${start+1}–${Math.min(start+PAGE_SIZE,total)} of ${total}`;
 
-  let pageNums = [];
-  if (pages <= 7) {
-    pageNums = Array.from({length: pages}, (_, i) => i + 1);
-  } else {
-    let lo = Math.max(1, Math.min(currentPage - 2, pages - 6));
-    pageNums = Array.from({length: Math.min(7, pages)}, (_, i) => lo + i);
-  }
+  let pnums = pages <= 7 ? Array.from({length:pages},(_,i)=>i+1)
+    : Array.from({length:Math.min(7,pages)},(_,i)=>Math.max(1,Math.min(currentPage-2,pages-6))+i);
   document.getElementById('pag-btns').innerHTML =
     `<button class="pag-btn" ${currentPage<=1?'disabled':''} onclick="goPage(${currentPage-1})">‹</button>` +
-    pageNums.map(p => `<button class="pag-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`).join('') +
+    pnums.map(p=>`<button class="pag-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`).join('') +
     `<button class="pag-btn" ${currentPage>=pages?'disabled':''} onclick="goPage(${currentPage+1})">›</button>`;
 }
 
 function goPage(p) { currentPage = p; renderDaywise(); }
 
-// ── MTD Summary ────────────────────────────────────
+// ── MTD ────────────────────────────────────────────
 function computeTotals(rows) {
   const T = rows.reduce((a, r) => ({
-    paidS: a.paidS + (r.paid_spends       || 0),
-    paidL: a.paidL + (r.paid_leads        || 0),
-    paidT: a.paidT + (r.paid_triggered    || 0),
-    waT:   a.waT   + (r.wa_triggered      || 0),
-    combT: a.combT + (r.combined_triggered|| 0),
-  }), { paidS: 0, paidL: 0, paidT: 0, waT: 0, combT: 0 });
+    fS: a.fS+(r.fb_spends||0), fL: a.fL+(r.fb_leads||0), fT: a.fT+(r.fb_triggered||0),
+    gS: a.gS+(r.ga_spends||0), gL: a.gL+(r.ga_leads||0), gT: a.gT+(r.ga_triggered||0),
+    wT: a.wT+(r.wa_triggered||0), cT: a.cT+(r.combined_triggered||0),
+  }), {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wT:0,cT:0});
 
-  return {
-    paidS: T.paidS, paidL: T.paidL, paidT: T.paidT, waT: T.waT, combT: T.combT,
-    paid_cpl:            T.paidL > 0 ? T.paidS / T.paidL : null,
-    paid_tcpl:           T.paidT > 0 ? T.paidS / T.paidT : null,
-    paid_trigger_pct:    T.paidL > 0 ? T.paidT / T.paidL * 100 : null,
-    combined_tcpl:       T.combT > 0 ? T.paidS / T.combT : null,
-    combined_trigger_pct: T.paidL > 0 ? T.combT / T.paidL * 100 : null,
+  const cS = T.fS + T.gS, cL = T.fL + T.gL;
+  return { ...T, cS, cL,
+    fb_cpl:   T.fL>0 ? T.fS/T.fL : null,
+    fb_tcpl:  T.fT>0&&T.fS>0 ? T.fS/T.fT : null,
+    fb_tpct:  T.fL>0 ? T.fT/T.fL*100 : null,
+    ga_cpl:   T.gL>0 ? T.gS/T.gL : null,
+    ga_tcpl:  T.gT>0&&T.gS>0 ? T.gS/T.gT : null,
+    ga_tpct:  T.gL>0 ? T.gT/T.gL*100 : null,
+    c_cpl:    cL>0 ? cS/cL : null,
+    c_tcpl:   T.cT>0&&cS>0 ? cS/T.cT : null,
+    c_tpct:   cL>0 ? T.cT/cL*100 : null,
   };
 }
 
 function mtdCells(T) {
   return `
-    <td class="num sep-paid">${fmtINR(T.paidS)}</td>
-    <td class="num">${fmtNum(T.paidL, 0)}</td>
-    <td class="num">${fmtNum(T.paidT, 0)}</td>
-    <td class="num">${T.paid_cpl  != null ? fmtINR(T.paid_cpl)  : '—'}</td>
-    <td class="num">${T.paid_tcpl != null ? fmtINR(T.paid_tcpl) : '—'}</td>
-    <td class="num ${trigClass(T.paid_trigger_pct)}">${fmtPct(T.paid_trigger_pct)}</td>
-    <td class="num sep-wa">${T.waT > 0 ? fmtNum(T.waT, 0) : '—'}</td>
-    <td class="num sep-comb">${fmtINR(T.paidS)}</td>
-    <td class="num">${fmtNum(T.paidL, 0)}</td>
-    <td class="num">${fmtNum(T.combT, 0)}</td>
-    <td class="num">${T.paid_cpl  != null ? fmtINR(T.paid_cpl)  : '—'}</td>
-    <td class="num">${T.combined_tcpl != null ? fmtINR(T.combined_tcpl) : '—'}</td>
-    <td class="num ${trigClass(T.combined_trigger_pct)}">${fmtPct(T.combined_trigger_pct)}</td>`;
+    <td class="num sep-fb">${fmtINR(T.fS)}</td><td class="num">${fmtNum(T.fL,0)}</td>
+    <td class="num">${fmtNum(T.fT,0)}</td><td class="num">${fmtINR(T.fb_cpl)}</td>
+    <td class="num">${fmtINR(T.fb_tcpl)}</td><td class="num ${trigClass(T.fb_tpct)}">${fmtPct(T.fb_tpct)}</td>
+    <td class="num sep-ga">${fmtINR(T.gS)}</td><td class="num">${fmtNum(T.gL,0)}</td>
+    <td class="num">${fmtNum(T.gT,0)}</td><td class="num">${fmtINR(T.ga_cpl)}</td>
+    <td class="num">${fmtINR(T.ga_tcpl)}</td><td class="num ${trigClass(T.ga_tpct)}">${fmtPct(T.ga_tpct)}</td>
+    <td class="num sep-wa">${T.wT>0?fmtNum(T.wT,0):'—'}</td>
+    <td class="num sep-comb">${fmtINR(T.cS)}</td><td class="num">${fmtNum(T.cL,0)}</td>
+    <td class="num">${fmtNum(T.cT,0)}</td><td class="num">${fmtINR(T.c_cpl)}</td>
+    <td class="num">${fmtINR(T.c_tcpl)}</td><td class="num ${trigClass(T.c_tpct)}">${fmtPct(T.c_tpct)}</td>`;
 }
 
 function renderMTD() {
-  const allRows = DATA.mtd_summary;
-
-  // Group by brand
   const brandMap = {};
-  allRows.forEach(r => {
-    if (!brandMap[r.brand]) brandMap[r.brand] = [];
-    brandMap[r.brand].push(r);
-  });
-
+  DATA.mtd_summary.forEach(r => { if (!brandMap[r.brand]) brandMap[r.brand]=[]; brandMap[r.brand].push(r); });
   const brands = Object.keys(brandMap).sort();
-  const grand  = computeTotals(allRows);
+  const grand  = computeTotals(DATA.mtd_summary);
 
-  let html = `<tr class="grand-total-row">
-    <td>Grand Total</td>${mtdCells(grand)}</tr>`;
+  let html = `<tr class="grand-total-row"><td>Grand Total</td>${mtdCells(grand)}</tr>`;
 
   brands.forEach(brand => {
-    const models   = brandMap[brand].sort((a, b) => b.paid_spends - a.paid_spends);
+    const models   = brandMap[brand].sort((a,b) => (b.combined_spends||0)-(a.combined_spends||0));
     const T        = computeTotals(models);
     const expanded = expandedBrands.has(brand);
-    const sb       = brand.replace(/'/g, "\\'");
+    const sb       = brand.replace(/'/g,"\\'");
 
     html += `<tr class="brand-row ${expanded?'expanded':''}" onclick="toggleBrand('${sb}')">
       <td><div class="brand-row-inner">
-        <span class="expand-icon">${expanded ? '▼' : '▶'}</span>
+        <span class="expand-icon">${expanded?'▼':'▶'}</span>
         <span class="brand-pill" style="background:${brandBg(brand)};color:${brandFg(brand)}">${brand}</span>
         <span class="model-count">${models.length} model${models.length>1?'s':''}</span>
       </div></td>${mtdCells(T)}</tr>`;
@@ -637,13 +552,15 @@ function renderMTD() {
     if (expanded) {
       models.forEach(m => {
         const mT = {
-          paidS: m.paid_spends, paidL: m.paid_leads, paidT: m.paid_triggered,
-          waT: m.wa_triggered, combT: m.combined_triggered,
-          paid_cpl: m.paid_cpl, paid_tcpl: m.paid_tcpl, paid_trigger_pct: m.paid_trigger_pct,
-          combined_tcpl: m.combined_tcpl, combined_trigger_pct: m.combined_trigger_pct,
+          fS: m.fb_spends, fL: m.fb_leads, fT: m.fb_triggered,
+          gS: m.ga_spends, gL: m.ga_leads, gT: m.ga_triggered,
+          wT: m.wa_triggered, cT: m.combined_triggered,
+          cS: m.combined_spends, cL: m.combined_leads,
+          fb_cpl: m.fb_cpl, fb_tcpl: m.fb_tcpl, fb_tpct: m.fb_trigger_pct,
+          ga_cpl: m.ga_cpl, ga_tcpl: m.ga_tcpl, ga_tpct: m.ga_trigger_pct,
+          c_cpl: m.combined_cpl, c_tcpl: m.combined_tcpl, c_tpct: m.combined_trigger_pct,
         };
-        html += `<tr class="model-row">
-          <td class="model-indent">${m.model}</td>${mtdCells(mT)}</tr>`;
+        html += `<tr class="model-row"><td class="model-indent">${m.model}</td>${mtdCells(mT)}</tr>`;
       });
     }
   });

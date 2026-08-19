@@ -97,18 +97,18 @@ function testRun() {
   // Log brand-level MTD totals
   var brandTotals = {};
   mtdSummary.forEach(function(r) {
-    if (!brandTotals[r.brand]) brandTotals[r.brand] = {paidS:0, paidL:0, paidT:0, waT:0, combT:0};
-    brandTotals[r.brand].paidS += r.paid_spends;
-    brandTotals[r.brand].paidL += r.paid_leads;
-    brandTotals[r.brand].paidT += r.paid_triggered;
-    brandTotals[r.brand].waT   += r.wa_triggered;
-    brandTotals[r.brand].combT += r.combined_triggered;
+    if (!brandTotals[r.brand]) brandTotals[r.brand] = {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wT:0,cT:0};
+    var b = brandTotals[r.brand];
+    b.fS += r.fb_spends; b.fL += r.fb_leads; b.fT += r.fb_triggered;
+    b.gS += r.ga_spends; b.gL += r.ga_leads; b.gT += r.ga_triggered;
+    b.wT += r.wa_triggered; b.cT += r.combined_triggered;
   });
   Logger.log('=== MTD Brand Totals ===');
   Object.keys(brandTotals).sort().forEach(function(b) {
     var t = brandTotals[b];
-    Logger.log(b + ': spends='+Math.round(t.paidS)+' leads='+Math.round(t.paidL)+
-      ' paid_trig='+t.paidT+' wa_trig='+t.waT+' comb_trig='+t.combT);
+    Logger.log(b + ': fb_s='+Math.round(t.fS)+' fb_l='+Math.round(t.fL)+' fb_t='+t.fT+
+      ' ga_s='+Math.round(t.gS)+' ga_l='+Math.round(t.gL)+' ga_t='+t.gT+
+      ' wa_t='+t.wT+' comb_t='+t.cT);
   });
 }
 
@@ -291,13 +291,12 @@ function processFBSpends(fbData) {
 }
 
 // ── BUILD DAYWISE RECORDS ─────────────────────────────────────
-// One row per date+brand+model with paid (FB+GA), WA, and combined fields.
+// One row per date+brand+model with FB, GA, WA, and combined fields.
 function buildDaywise(fbSpends, gaSpends, triggers) {
   var allKeys = {};
   Object.keys(fbSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(gaSpends).forEach(function(k) { allKeys[k] = true; });
 
-  // Add trigger-only date+model keys for all three medium buckets
   function addTrigKeys(tMap) {
     Object.keys(tMap).forEach(function(dk) {
       var parts   = dk.split('||');
@@ -315,23 +314,14 @@ function buildDaywise(fbSpends, gaSpends, triggers) {
   Object.keys(allKeys).forEach(function(key) {
     var parts   = key.split('||');
     var dateStr = parts[0], brand = parts[1], model = parts[2];
-
     var fb = fbSpends[key] || {spends: 0, leads: 0};
     var ga = gaSpends[key] || {spends: 0, leads: 0};
     var dk = dateStr + '||' + model;
-
     var fbTrig = triggers.fbByDateModel[dk] || 0;
     var waTrig = triggers.waByDateModel[dk] || 0;
     var gaTrig = triggers.gaByDateModel[dk] || 0;
-
-    var paidS    = fb.spends + ga.spends;
-    var paidL    = fb.leads  + ga.leads;
-    var paidTrig = fbTrig + gaTrig;
-    var combTrig = fbTrig + waTrig + gaTrig;
-
-    if (!paidS && !paidL && !combTrig) return;
-
-    rows.push(makeRow(dateStr, brand, model, paidS, paidL, paidTrig, waTrig, combTrig));
+    if (!fb.spends && !fb.leads && !fbTrig && !ga.spends && !ga.leads && !gaTrig && !waTrig) return;
+    rows.push(makeRow(dateStr, brand, model, fb.spends, fb.leads, fbTrig, ga.spends, ga.leads, gaTrig, waTrig));
   });
 
   return rows;
@@ -355,7 +345,6 @@ function buildMTD(fbSpends, gaSpends, triggers) {
     var r = gaSpends[k]; addBM(gaBM, r.brand, r.model, r.spends, r.leads);
   });
 
-  // All brand+model keys from spend + trigger data
   var allBMKeys = {};
   Object.keys(fbBM).forEach(function(k) { allBMKeys[k] = true; });
   Object.keys(gaBM).forEach(function(k) { allBMKeys[k] = true; });
@@ -371,58 +360,52 @@ function buildMTD(fbSpends, gaSpends, triggers) {
   Object.keys(allBMKeys).forEach(function(bmKey) {
     var parts = bmKey.split('||');
     var brand = parts[0], model = parts[1];
-
     var fb = fbBM[bmKey] || {spends: 0, leads: 0};
     var ga = gaBM[bmKey] || {spends: 0, leads: 0};
-
     var fbTrig = triggers.fbByModel[model] || 0;
     var waTrig = triggers.waByModel[model] || 0;
     var gaTrig = triggers.gaByModel[model] || 0;
-
-    var paidS    = fb.spends + ga.spends;
-    var paidL    = fb.leads  + ga.leads;
-    var paidTrig = fbTrig + gaTrig;
-    var combTrig = fbTrig + waTrig + gaTrig;
-
-    if (!paidS && !paidL && !combTrig) return;
-
-    rows.push(makeRow(null, brand, model, paidS, paidL, paidTrig, waTrig, combTrig));
+    if (!fb.spends && !fb.leads && !fbTrig && !ga.spends && !ga.leads && !gaTrig && !waTrig) return;
+    rows.push(makeRow(null, brand, model, fb.spends, fb.leads, fbTrig, ga.spends, ga.leads, gaTrig, waTrig));
   });
 
   return rows;
 }
 
 // ── ROW BUILDER ───────────────────────────────────────────────
-function makeRow(date, brand, model, paidSpends, paidLeads, paidTriggered, waTriggered, combTriggered) {
-  var ps = Math.round(paidSpends    * 100) / 100;
-  var pl = Math.round(paidLeads     * 100) / 100;
-  var pt = Math.round(paidTriggered) || 0;
-  var wt = Math.round(waTriggered)   || 0;
-  var ct = Math.round(combTriggered) || 0;
+function makeRow(date, brand, model, fbSpends, fbLeads, fbTriggered, gaSpends, gaLeads, gaTriggered, waTriggered) {
+  var fS = Math.round(fbSpends    * 100) / 100;
+  var fL = Math.round(fbLeads     * 100) / 100;
+  var fT = Math.round(fbTriggered) || 0;
+  var gS = Math.round(gaSpends    * 100) / 100;
+  var gL = Math.round(gaLeads     * 100) / 100;
+  var gT = Math.round(gaTriggered) || 0;
+  var wT = Math.round(waTriggered) || 0;
 
-  var paidCpl  = (pl > 0) ? Math.round(ps / pl * 100) / 100 : null;
-  var paidTcpl = (pt > 0 && ps > 0) ? Math.round(ps / pt * 100) / 100 : null;
-  var paidTpct = (pl > 0) ? Math.round(pt / pl * 10000) / 100 : null;
-  var combTcpl = (ct > 0 && ps > 0) ? Math.round(ps / ct * 100) / 100 : null;
-  var combTpct = (pl > 0) ? Math.round(ct / pl * 10000) / 100 : null;
+  var cS = fS + gS;
+  var cL = fL + gL;
+  var cT = fT + gT + wT;
+
+  function kpi(spends, leads, trig) {
+    return {
+      cpl:  leads > 0 ? Math.round(spends / leads * 100) / 100 : null,
+      tcpl: trig  > 0 && spends > 0 ? Math.round(spends / trig * 100) / 100 : null,
+      tpct: leads > 0 ? Math.round(trig / leads * 10000) / 100 : null
+    };
+  }
+  var fk = kpi(fS, fL, fT), gk = kpi(gS, gL, gT), ck = kpi(cS, cL, cT);
 
   var row = {};
   if (date) row.date = date;
-  row.brand                = brand;
-  row.model                = model;
-  row.paid_spends          = ps;
-  row.paid_leads           = pl;
-  row.paid_triggered       = pt;
-  row.paid_cpl             = paidCpl;
-  row.paid_tcpl            = paidTcpl;
-  row.paid_trigger_pct     = paidTpct;
-  row.wa_triggered         = wt;
-  row.combined_spends      = ps;
-  row.combined_leads       = pl;
-  row.combined_triggered   = ct;
-  row.combined_cpl         = paidCpl;
-  row.combined_tcpl        = combTcpl;
-  row.combined_trigger_pct = combTpct;
+  row.brand = brand;
+  row.model = model;
+  row.fb_spends       = fS;  row.fb_leads       = fL;  row.fb_triggered       = fT;
+  row.fb_cpl          = fk.cpl;  row.fb_tcpl    = fk.tcpl;  row.fb_trigger_pct = fk.tpct;
+  row.ga_spends       = gS;  row.ga_leads       = gL;  row.ga_triggered       = gT;
+  row.ga_cpl          = gk.cpl;  row.ga_tcpl    = gk.tcpl;  row.ga_trigger_pct = gk.tpct;
+  row.wa_triggered    = wT;
+  row.combined_spends = cS;  row.combined_leads = cL;  row.combined_triggered = cT;
+  row.combined_cpl    = ck.cpl;  row.combined_tcpl = ck.tcpl; row.combined_trigger_pct = ck.tpct;
   return row;
 }
 
