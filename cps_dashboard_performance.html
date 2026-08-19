@@ -429,7 +429,7 @@ function renderDaywise() {
 
   const sorted = [...rows].sort((a, b) => {
     if (sortCol === 'date') {
-      const dc = a.date.localeCompare(b.date) * sortDir; if (dc) return dc;
+      const dc = (a.date||'').localeCompare(b.date||'') * sortDir; if (dc) return dc;
       const bc = (a.brand||'').localeCompare(b.brand||''); if (bc) return bc;
       return (a.model||'').localeCompare(b.model||'');
     }
