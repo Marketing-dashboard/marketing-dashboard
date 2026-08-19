@@ -40,13 +40,11 @@ function updateCPSDashboard() {
   var daywise    = buildDaywise(fbSpends, gaSpends, triggers);
   var mtdSummary = buildMTD(fbSpends, gaSpends, triggers);
 
-  // Sort daywise: date → brand → model → FB/GA/Combined
-  var srcOrder = {FB: 1, GA: 2, Combined: 3};
+  // Sort daywise: date → brand → model
   daywise.sort(function(a, b) {
-    var d = a.date.localeCompare(b.date);   if (d) return d;
-    var b_ = (a.brand||'').localeCompare(b.brand||''); if (b_) return b_;
-    var m = (a.model||'').localeCompare(b.model||''); if (m) return m;
-    return (srcOrder[a.source]||9) - (srcOrder[b.source]||9);
+    var d = a.date.localeCompare(b.date);          if (d) return d;
+    var br = (a.brand||'').localeCompare(b.brand||''); if (br) return br;
+    return (a.model||'').localeCompare(b.model||'');
   });
 
   var allDates = daywise.map(function(r) { return r.date; }).sort();
@@ -62,13 +60,10 @@ function updateCPSDashboard() {
       fb_raw:   fbData.length  - 1
     },
     summary: {
-      date_min:         dateMin,
-      date_max:         dateMax,
-      daywise_total:    daywise.length,
-      daywise_FB:       daywise.filter(function(r){return r.source==='FB';}).length,
-      daywise_GA:       daywise.filter(function(r){return r.source==='GA';}).length,
-      daywise_Combined: daywise.filter(function(r){return r.source==='Combined';}).length,
-      mtd_total:        mtdSummary.length
+      date_min:      dateMin,
+      date_max:      dateMax,
+      daywise_total: daywise.length,
+      mtd_total:     mtdSummary.length
     },
     daywise:     daywise,
     mtd_summary: mtdSummary
@@ -97,77 +92,116 @@ function testRun() {
   Logger.log('=== TEST RUN ===');
   Logger.log('Raw rows: ' + (rawData.length-1) + ', GA rows: ' + (gaData.length-1) + ', TVS rows: ' + (tvsData.length-1) + ', FB rows: ' + (fbData.length-1));
   Logger.log('Date range: ' + allDates[0] + ' → ' + allDates[allDates.length-1]);
-  Logger.log('Daywise records: ' + daywise.length + ' (FB:' +
-    daywise.filter(function(r){return r.source==='FB';}).length + ' GA:' +
-    daywise.filter(function(r){return r.source==='GA';}).length + ' Combined:' +
-    daywise.filter(function(r){return r.source==='Combined';}).length + ')');
-  Logger.log('MTD records: ' + mtdSummary.length);
+  Logger.log('Daywise records: ' + daywise.length + ', MTD records: ' + mtdSummary.length);
 
-  // Log brand-level MTD triggers
+  // Log brand-level MTD totals
   var brandTotals = {};
-  mtdSummary.filter(function(r){return r.source==='Combined';}).forEach(function(r) {
-    if (!brandTotals[r.brand]) brandTotals[r.brand] = {spends:0, leads:0, triggered:0};
-    brandTotals[r.brand].spends    += r.spends;
-    brandTotals[r.brand].leads     += r.leads;
-    brandTotals[r.brand].triggered += r.triggered_leads;
+  mtdSummary.forEach(function(r) {
+    if (!brandTotals[r.brand]) brandTotals[r.brand] = {paidS:0, paidL:0, paidT:0, waT:0, combT:0};
+    brandTotals[r.brand].paidS += r.paid_spends;
+    brandTotals[r.brand].paidL += r.paid_leads;
+    brandTotals[r.brand].paidT += r.paid_triggered;
+    brandTotals[r.brand].waT   += r.wa_triggered;
+    brandTotals[r.brand].combT += r.combined_triggered;
   });
-  Logger.log('=== MTD Brand Totals (Combined) ===');
+  Logger.log('=== MTD Brand Totals ===');
   Object.keys(brandTotals).sort().forEach(function(b) {
     var t = brandTotals[b];
-    Logger.log(b + ': spends=' + Math.round(t.spends) + ' leads=' + Math.round(t.leads) + ' triggered=' + t.triggered);
+    Logger.log(b + ': spends='+Math.round(t.paidS)+' leads='+Math.round(t.paidL)+
+      ' paid_trig='+t.paidT+' wa_trig='+t.waT+' comb_trig='+t.combT);
   });
 }
 
-// ── PROCESS RAW TAB (triggered leads) ────────────────────────
-// Cols: Date(0)|Model(1)|brand(2)|Medium(3)|LeadType(4)|ModelType(5)|Trigger(6)|Total(7)|Process(8)
+// ── FIND COLUMN INDEX BY HEADER NAME ─────────────────────────
+function findCol(headers, candidates) {
+  var cl = candidates.map(function(c) { return c.toLowerCase().trim(); });
+  for (var i = 0; i < headers.length; i++) {
+    var h = String(headers[i] || '').toLowerCase().trim();
+    if (cl.indexOf(h) !== -1) return i;
+  }
+  return -1;
+}
+
+// ── DIAGNOSE: log column headers of all sheets (run once to verify) ──
+function diagnoseSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ['Raw','Raw_TVS_Jawa','GA_Raw','FB_Raw'].forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) { Logger.log(name + ': NOT FOUND'); return; }
+    var first2 = sheet.getRange(1, 1, 2, sheet.getLastColumn()).getValues();
+    Logger.log('=== ' + name + ' headers ===');
+    Logger.log(first2[0].join(' | '));
+    Logger.log('Row 2: ' + first2[1].join(' | '));
+  });
+}
+
+// ── PROCESS RAW TAB (triggered leads only) ────────────────────
+// Only maps Facebook, Adwords/Google, and Whatsapp mediums.
+// Non-MS, Organic, and all other mediums are excluded.
 function processTriggers(rawData) {
-  var fbByModel      = {};   // model → FB+WA trigger total (for MTD)
-  var gaByModel      = {};   // model → Google trigger total (for MTD)
-  var allByModel     = {};   // model → all-medium trigger total (for MTD)
-  var fbByDateModel  = {};   // "date||model" → FB+WA count (for daywise)
-  var gaByDateModel  = {};   // "date||model" → Google count (for daywise)
-  var allByDateModel = {};   // "date||model" → all-medium count (for daywise)
-  var modelToBrand   = {};   // model → normalized brand (Process col)
+  var fbByModel = {}, waByModel = {}, gaByModel = {};
+  var fbByDateModel = {}, waByDateModel = {}, gaByDateModel = {};
+  var modelToBrand = {};
+
+  if (rawData.length === 0) return {
+    fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel,
+    fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel,
+    modelToBrand: modelToBrand
+  };
+
+  var h = rawData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
+  var iDate    = findCol(h, ['date','day']);
+  var iModel   = findCol(h, ['model']);
+  var iMedium  = findCol(h, ['medium']);
+  var iTrigCol = findCol(h, ['trigger']);
+  var iTotal   = findCol(h, ['total','count','leads']);
+  var iProcess = findCol(h, ['process','brand name','brandname']);
+  if (iProcess < 0) iProcess = findCol(h, ['brand']);
+  Logger.log('Raw idx — date:'+iDate+' model:'+iModel+' medium:'+iMedium+' trigcol:'+iTrigCol+' total:'+iTotal+' process:'+iProcess);
 
   for (var i = 1; i < rawData.length; i++) {
     var row = rawData[i];
-    if (String(row[6] || '').trim() !== 'Trigger') continue;
+    if (iTrigCol >= 0 && String(row[iTrigCol] || '').trim() !== 'Trigger') continue;
 
-    var model   = String(row[1] || '').trim();
-    var medium  = String(row[3] || '').trim();
-    var brand   = String(row[8] || '').trim(); // Process column = normalized brand
-    var count   = parseInt(row[7]) || 0;
-    var dateStr = fmtDate(row[0]);
+    var model   = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
+    var medium  = iMedium  >= 0 ? String(row[iMedium]  || '').trim() : '';
+    var brand   = iProcess >= 0 ? String(row[iProcess] || '').trim() : '';
+    var count   = iTotal   >= 0 ? (parseInt(row[iTotal]) || 0) : 0;
+    var dateStr = iDate    >= 0 ? fmtDate(row[iDate]) : '';
 
     if (!model || count <= 0 || !dateStr) continue;
 
-    var isFB = (medium === 'Facebook' || medium === 'Whatsapp');
-    var isGA = (medium === 'Google');
+    var isFB = (medium === 'Facebook');
+    var isWA = (medium === 'Whatsapp');
+    var isGA = (medium === 'Google' || medium === 'Adwords');
+    // Skip Non-MS, Organic, and any unrecognised medium
+    if (!isFB && !isWA && !isGA) continue;
 
     if (brand && !modelToBrand[model]) modelToBrand[model] = brand;
 
-    // MTD-level aggregation (by model only)
-    allByModel[model] = (allByModel[model] || 0) + count;
-    if (isFB) fbByModel[model] = (fbByModel[model] || 0) + count;
-    if (isGA) gaByModel[model] = (gaByModel[model] || 0) + count;
-
-    // Daywise aggregation (by date + model)
     var dk = dateStr + '||' + model;
-    allByDateModel[dk] = (allByDateModel[dk] || 0) + count;
-    if (isFB) fbByDateModel[dk] = (fbByDateModel[dk] || 0) + count;
-    if (isGA) gaByDateModel[dk] = (gaByDateModel[dk] || 0) + count;
+    if (isFB) {
+      fbByModel[model]    = (fbByModel[model]    || 0) + count;
+      fbByDateModel[dk]   = (fbByDateModel[dk]   || 0) + count;
+    }
+    if (isWA) {
+      waByModel[model]    = (waByModel[model]    || 0) + count;
+      waByDateModel[dk]   = (waByDateModel[dk]   || 0) + count;
+    }
+    if (isGA) {
+      gaByModel[model]    = (gaByModel[model]    || 0) + count;
+      gaByDateModel[dk]   = (gaByDateModel[dk]   || 0) + count;
+    }
   }
 
   return {
-    fbByModel: fbByModel,   gaByModel: gaByModel,   allByModel: allByModel,
-    fbByDateModel: fbByDateModel, gaByDateModel: gaByDateModel, allByDateModel: allByDateModel,
+    fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel,
+    fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel,
     modelToBrand: modelToBrand
   };
 }
 
 // ── PROCESS GA SPENDS (GA_Raw + Raw_TVS_Jawa) ─────────────────
-// GA_Raw:      Month(0)|Day(1)|AdGroup(2)|Campaign(3)|Cost(4)|Conv(5)|Platform(6)|Brand(7)|Model(8)
-// Raw_TVS_Jawa: Month(0)|Day(1)|Campaign(2)|Cost(3)|Conv(4)|Platform(5)|Brand(6)|Model(7)
 function processGASpends(gaData, tvsData) {
   var map = {};
 
@@ -180,33 +214,75 @@ function processGASpends(gaData, tvsData) {
     map[k].leads  += leads;
   }
 
-  for (var i = 1; i < gaData.length; i++) {
-    var r = gaData[i];
-    add(fmtDate(r[1]), String(r[7]||'').trim(), String(r[8]||'').trim(), parseFloat(r[4])||0, parseFloat(r[5])||0);
+  // ── GA_Raw ──
+  if (gaData.length > 0) {
+    var gh = gaData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
+    var gDate  = findCol(gh, ['day','date']);
+    var gCost  = findCol(gh, ['cost','spend','spends','amount spent','amount_spent']);
+    var gConv  = findCol(gh, ['conv','conversions','leads','lead','results','result']);
+    var gBrand = findCol(gh, ['brand']);
+    var gModel = findCol(gh, ['model']);
+    Logger.log('GA_Raw headers: ' + gh.join(' | '));
+    Logger.log('GA_Raw idx — date:'+gDate+' cost:'+gCost+' conv:'+gConv+' brand:'+gBrand+' model:'+gModel);
+    for (var i = 1; i < gaData.length; i++) {
+      var r = gaData[i];
+      var d = gDate  >= 0 ? fmtDate(r[gDate])               : '';
+      var b = gBrand >= 0 ? String(r[gBrand]||'').trim()    : '';
+      var m = gModel >= 0 ? String(r[gModel]||'').trim()    : '';
+      var s = gCost  >= 0 ? (parseFloat(r[gCost])  || 0)   : 0;
+      var l = gConv  >= 0 ? (parseFloat(r[gConv])  || 0)   : 0;
+      add(d, b, m, s, l);
+    }
   }
-  for (var j = 1; j < tvsData.length; j++) {
-    var r = tvsData[j];
-    add(fmtDate(r[1]), String(r[6]||'').trim(), String(r[7]||'').trim(), parseFloat(r[3])||0, parseFloat(r[4])||0);
+
+  // ── Raw_TVS_Jawa ──
+  if (tvsData.length > 0) {
+    var th = tvsData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
+    var tDate  = findCol(th, ['day','date']);
+    var tCost  = findCol(th, ['cost','spend','spends','amount spent','amount_spent']);
+    var tConv  = findCol(th, ['conv','conversions','leads','lead','results','result']);
+    var tBrand = findCol(th, ['brand']);
+    var tModel = findCol(th, ['model']);
+    Logger.log('TVS_Jawa headers: ' + th.join(' | '));
+    Logger.log('TVS_Jawa idx — date:'+tDate+' cost:'+tCost+' conv:'+tConv+' brand:'+tBrand+' model:'+tModel);
+    for (var j = 1; j < tvsData.length; j++) {
+      var r = tvsData[j];
+      var d = tDate  >= 0 ? fmtDate(r[tDate])               : '';
+      var b = tBrand >= 0 ? String(r[tBrand]||'').trim()    : '';
+      var m = tModel >= 0 ? String(r[tModel]||'').trim()    : '';
+      var s = tCost  >= 0 ? (parseFloat(r[tCost])  || 0)   : 0;
+      var l = tConv  >= 0 ? (parseFloat(r[tConv])  || 0)   : 0;
+      add(d, b, m, s, l);
+    }
   }
 
   return map;
 }
 
 // ── PROCESS FB SPENDS (FB_Raw) ────────────────────────────────
-// Cols: Month(0)|Date(1)|CampaignName(2)|AdSet(3)|AdName(4)|Spends(5)|Leads(6)|Platform(7)|Brand(8)|Model(9)
 function processFBSpends(fbData) {
   var map = {};
+  if (fbData.length === 0) return map;
+
+  var fh = fbData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
+  var fDate  = findCol(fh, ['date','day']);
+  var fSpend = findCol(fh, ['spend','spends','cost','amount spent','amount_spent']);
+  var fLead  = findCol(fh, ['lead','leads','result','results','conv','conversions']);
+  var fBrand = findCol(fh, ['brand']);
+  var fModel = findCol(fh, ['model']);
+  Logger.log('FB_Raw headers: ' + fh.join(' | '));
+  Logger.log('FB_Raw idx — date:'+fDate+' spend:'+fSpend+' lead:'+fLead+' brand:'+fBrand+' model:'+fModel);
 
   for (var i = 1; i < fbData.length; i++) {
-    var r       = fbData[i];
-    var dateStr = fmtDate(r[1]);
-    var brand   = String(r[8] || '').trim();
-    var model   = String(r[9] || '').trim();
-    var spends  = parseFloat(r[5]) || 0;
-    var leads   = parseFloat(r[6]) || 0;
-    if (!dateStr || !brand || !model || (!spends && !leads)) continue;
-    var k = dateStr + '||' + brand + '||' + model;
-    if (!map[k]) map[k] = {date: dateStr, brand: brand, model: model, spends: 0, leads: 0};
+    var r      = fbData[i];
+    var d      = fDate  >= 0 ? fmtDate(r[fDate])              : '';
+    var brand  = fBrand >= 0 ? String(r[fBrand]||'').trim()   : '';
+    var model  = fModel >= 0 ? String(r[fModel]||'').trim()   : '';
+    var spends = fSpend >= 0 ? (parseFloat(r[fSpend]) || 0)   : 0;
+    var leads  = fLead  >= 0 ? (parseFloat(r[fLead])  || 0)   : 0;
+    if (!d || !brand || !model || (!spends && !leads)) continue;
+    var k = d + '||' + brand + '||' + model;
+    if (!map[k]) map[k] = {date: d, brand: brand, model: model, spends: 0, leads: 0};
     map[k].spends += spends;
     map[k].leads  += leads;
   }
@@ -215,19 +291,24 @@ function processFBSpends(fbData) {
 }
 
 // ── BUILD DAYWISE RECORDS ─────────────────────────────────────
+// One row per date+brand+model with paid (FB+GA), WA, and combined fields.
 function buildDaywise(fbSpends, gaSpends, triggers) {
-  // Collect all unique date||brand||model keys
   var allKeys = {};
   Object.keys(fbSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(gaSpends).forEach(function(k) { allKeys[k] = true; });
 
-  // Add trigger-only date+model keys (if we know the brand)
-  Object.keys(triggers.allByDateModel).forEach(function(dk) {
-    var parts   = dk.split('||');
-    var dateStr = parts[0], model = parts[1];
-    var brand   = triggers.modelToBrand[model];
-    if (brand) allKeys[dateStr + '||' + brand + '||' + model] = true;
-  });
+  // Add trigger-only date+model keys for all three medium buckets
+  function addTrigKeys(tMap) {
+    Object.keys(tMap).forEach(function(dk) {
+      var parts   = dk.split('||');
+      var dateStr = parts[0], model = parts[1];
+      var brand   = triggers.modelToBrand[model];
+      if (brand) allKeys[dateStr + '||' + brand + '||' + model] = true;
+    });
+  }
+  addTrigKeys(triggers.fbByDateModel);
+  addTrigKeys(triggers.waByDateModel);
+  addTrigKeys(triggers.gaByDateModel);
 
   var rows = [];
 
@@ -239,20 +320,18 @@ function buildDaywise(fbSpends, gaSpends, triggers) {
     var ga = gaSpends[key] || {spends: 0, leads: 0};
     var dk = dateStr + '||' + model;
 
-    var fbTrig  = triggers.fbByDateModel[dk]  || 0;
-    var gaTrig  = triggers.gaByDateModel[dk]  || 0;
-    var allTrig = triggers.allByDateModel[dk] || 0;
+    var fbTrig = triggers.fbByDateModel[dk] || 0;
+    var waTrig = triggers.waByDateModel[dk] || 0;
+    var gaTrig = triggers.gaByDateModel[dk] || 0;
 
-    if (fb.spends > 0 || fb.leads > 0 || fbTrig > 0)
-      rows.push(makeRow(dateStr, brand, model, 'FB', fb.spends, fb.leads, fbTrig));
+    var paidS    = fb.spends + ga.spends;
+    var paidL    = fb.leads  + ga.leads;
+    var paidTrig = fbTrig + gaTrig;
+    var combTrig = fbTrig + waTrig + gaTrig;
 
-    if (ga.spends > 0 || ga.leads > 0 || gaTrig > 0)
-      rows.push(makeRow(dateStr, brand, model, 'GA', ga.spends, ga.leads, gaTrig));
+    if (!paidS && !paidL && !combTrig) return;
 
-    var totS = fb.spends + ga.spends;
-    var totL = fb.leads  + ga.leads;
-    if (totS > 0 || totL > 0 || allTrig > 0)
-      rows.push(makeRow(dateStr, brand, model, 'Combined', totS, totL, allTrig));
+    rows.push(makeRow(dateStr, brand, model, paidS, paidL, paidTrig, waTrig, combTrig));
   });
 
   return rows;
@@ -260,7 +339,6 @@ function buildDaywise(fbSpends, gaSpends, triggers) {
 
 // ── BUILD MTD SUMMARY ─────────────────────────────────────────
 function buildMTD(fbSpends, gaSpends, triggers) {
-  // Aggregate all spend dates into brand+model totals
   var fbBM = {}, gaBM = {};
 
   function addBM(map, brand, model, spends, leads) {
@@ -281,9 +359,11 @@ function buildMTD(fbSpends, gaSpends, triggers) {
   var allBMKeys = {};
   Object.keys(fbBM).forEach(function(k) { allBMKeys[k] = true; });
   Object.keys(gaBM).forEach(function(k) { allBMKeys[k] = true; });
-  Object.keys(triggers.allByModel).forEach(function(model) {
-    var brand = triggers.modelToBrand[model];
-    if (brand) allBMKeys[brand + '||' + model] = true;
+  ['fbByModel','waByModel','gaByModel'].forEach(function(bucket) {
+    Object.keys(triggers[bucket]).forEach(function(model) {
+      var brand = triggers.modelToBrand[model];
+      if (brand) allBMKeys[brand + '||' + model] = true;
+    });
   });
 
   var rows = [];
@@ -295,45 +375,54 @@ function buildMTD(fbSpends, gaSpends, triggers) {
     var fb = fbBM[bmKey] || {spends: 0, leads: 0};
     var ga = gaBM[bmKey] || {spends: 0, leads: 0};
 
-    var fbTrig  = triggers.fbByModel[model]  || 0;
-    var gaTrig  = triggers.gaByModel[model]  || 0;
-    var allTrig = triggers.allByModel[model] || 0;
+    var fbTrig = triggers.fbByModel[model] || 0;
+    var waTrig = triggers.waByModel[model] || 0;
+    var gaTrig = triggers.gaByModel[model] || 0;
 
-    if (fb.spends > 0 || fb.leads > 0 || fbTrig > 0)
-      rows.push(makeRow(null, brand, model, 'FB', fb.spends, fb.leads, fbTrig));
+    var paidS    = fb.spends + ga.spends;
+    var paidL    = fb.leads  + ga.leads;
+    var paidTrig = fbTrig + gaTrig;
+    var combTrig = fbTrig + waTrig + gaTrig;
 
-    if (ga.spends > 0 || ga.leads > 0 || gaTrig > 0)
-      rows.push(makeRow(null, brand, model, 'GA', ga.spends, ga.leads, gaTrig));
+    if (!paidS && !paidL && !combTrig) return;
 
-    var totS = fb.spends + ga.spends;
-    var totL = fb.leads  + ga.leads;
-    if (totS > 0 || totL > 0 || allTrig > 0)
-      rows.push(makeRow(null, brand, model, 'Combined', totS, totL, allTrig));
+    rows.push(makeRow(null, brand, model, paidS, paidL, paidTrig, waTrig, combTrig));
   });
 
   return rows;
 }
 
 // ── ROW BUILDER ───────────────────────────────────────────────
-function makeRow(date, brand, model, source, spends, leads, triggered) {
-  var s = Math.round(spends    * 100) / 100;
-  var l = Math.round(leads     * 100) / 100;
-  var t = Math.round(triggered) || 0;
-  var cpl  = (l > 0) ? Math.round(s / l * 100) / 100 : null;
-  var tcpl = (t > 0 && s > 0) ? Math.round(s / t * 100) / 100 : null;
-  var tpct = (l > 0) ? Math.round(t / l * 10000) / 100 : null;
+function makeRow(date, brand, model, paidSpends, paidLeads, paidTriggered, waTriggered, combTriggered) {
+  var ps = Math.round(paidSpends    * 100) / 100;
+  var pl = Math.round(paidLeads     * 100) / 100;
+  var pt = Math.round(paidTriggered) || 0;
+  var wt = Math.round(waTriggered)   || 0;
+  var ct = Math.round(combTriggered) || 0;
+
+  var paidCpl  = (pl > 0) ? Math.round(ps / pl * 100) / 100 : null;
+  var paidTcpl = (pt > 0 && ps > 0) ? Math.round(ps / pt * 100) / 100 : null;
+  var paidTpct = (pl > 0) ? Math.round(pt / pl * 10000) / 100 : null;
+  var combTcpl = (ct > 0 && ps > 0) ? Math.round(ps / ct * 100) / 100 : null;
+  var combTpct = (pl > 0) ? Math.round(ct / pl * 10000) / 100 : null;
 
   var row = {};
   if (date) row.date = date;
-  row.brand          = brand;
-  row.model          = model;
-  row.source         = source;
-  row.spends         = s;
-  row.leads          = l;
-  row.triggered_leads = t;
-  row.cpl            = cpl;
-  row.tcpl           = tcpl;
-  row.trigger_pct    = tpct;
+  row.brand                = brand;
+  row.model                = model;
+  row.paid_spends          = ps;
+  row.paid_leads           = pl;
+  row.paid_triggered       = pt;
+  row.paid_cpl             = paidCpl;
+  row.paid_tcpl            = paidTcpl;
+  row.paid_trigger_pct     = paidTpct;
+  row.wa_triggered         = wt;
+  row.combined_spends      = ps;
+  row.combined_leads       = pl;
+  row.combined_triggered   = ct;
+  row.combined_cpl         = paidCpl;
+  row.combined_tcpl        = combTcpl;
+  row.combined_trigger_pct = combTpct;
   return row;
 }
 

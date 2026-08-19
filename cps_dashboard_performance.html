@@ -19,10 +19,15 @@
   --text-light: #9CA3AF;
   --tbl-head: #F9FAFB;
   --tbl-hover: #F0F5FF;
-  --combined-bg: #FAFBFF;
   --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
   --radius: 10px;
   --radius-sm: 6px;
+  --grp-paid: #1D4ED8;
+  --grp-paid-bg: #EFF6FF;
+  --grp-wa: #059669;
+  --grp-wa-bg: #ECFDF5;
+  --grp-comb: #6B7280;
+  --grp-comb-bg: #F9FAFB;
 }
 
 body {
@@ -41,7 +46,7 @@ body {
   position: sticky; top: 0; z-index: 100;
 }
 .header-inner {
-  max-width: 1500px; margin: 0 auto;
+  max-width: 1600px; margin: 0 auto;
   display: flex; align-items: flex-start; justify-content: space-between;
 }
 .header h1 { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
@@ -61,7 +66,7 @@ body {
 .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
 
 /* ── LAYOUT ── */
-.page { max-width: 1500px; margin: 0 auto; padding: 24px 32px; }
+.page { max-width: 1600px; margin: 0 auto; padding: 24px 32px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
@@ -124,34 +129,40 @@ body {
 .record-count { font-size: 12px; color: var(--text-muted); }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-thead th {
-  background: var(--tbl-head); padding: 10px 12px; text-align: left;
+
+/* Group header rows */
+thead tr.grp-row th {
+  padding: 8px 12px; text-align: center;
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: none;
+}
+thead tr.grp-row th.grp-paid   { background: var(--grp-paid-bg); color: var(--grp-paid); border-left: 2px solid var(--grp-paid); }
+thead tr.grp-row th.grp-wa     { background: var(--grp-wa-bg);   color: var(--grp-wa);   border-left: 2px solid var(--grp-wa); }
+thead tr.grp-row th.grp-comb   { background: var(--grp-comb-bg); color: var(--grp-comb); border-left: 2px solid var(--grp-comb); }
+thead tr.grp-row th.grp-dim    { background: var(--tbl-head); }
+
+/* Sub-header row */
+thead tr.sub-row th {
+  background: var(--tbl-head); padding: 9px 10px; text-align: left;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
   color: var(--text-muted); border-bottom: 1px solid var(--border);
   white-space: nowrap; cursor: pointer; user-select: none;
 }
-thead th:hover { color: var(--primary); }
-thead th.sorted-asc::after  { content: ' ↑'; color: var(--primary); }
-thead th.sorted-desc::after { content: ' ↓'; color: var(--primary); }
+thead tr.sub-row th:hover { color: var(--primary); }
+thead tr.sub-row th.sorted-asc::after  { content: ' ↑'; color: var(--primary); }
+thead tr.sub-row th.sorted-desc::after { content: ' ↓'; color: var(--primary); }
+thead tr.sub-row th.sub-paid  { background: #F0F5FF; border-left: 2px solid #BFDBFE; }
+thead tr.sub-row th.sub-wa    { background: #F0FDF4; border-left: 2px solid #A7F3D0; }
+thead tr.sub-row th.sub-comb  { background: #F9FAFB; border-left: 2px solid #E5E7EB; }
+
 tbody tr { border-bottom: 1px solid var(--border-light); transition: background .1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--tbl-hover); }
-td { padding: 9px 12px; vertical-align: middle; }
+td { padding: 8px 10px; vertical-align: middle; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-/* ── COMBINED ROWS ── */
-tr.row-combined { background: var(--combined-bg); }
-tr.row-combined td { font-weight: 500; }
-tr.row-combined:hover td { background: #EEF2FF; }
-
-/* ── SOURCE BADGES ── */
-.src-badge {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 11px; font-weight: 700; letter-spacing: .2px; white-space: nowrap;
-}
-.src-fb       { background: #DBEAFE; color: #1D4ED8; }
-.src-ga       { background: #DCFCE7; color: #15803D; }
-.src-combined { background: #F3F4F6; color: #374151; }
+td.sep-paid { border-left: 2px solid #BFDBFE; }
+td.sep-wa   { border-left: 2px solid #A7F3D0; }
+td.sep-comb { border-left: 2px solid #E5E7EB; }
 
 /* ── BRAND PILLS ── */
 .brand-pill {
@@ -245,17 +256,17 @@ tr.row-combined:hover td { background: #EEF2FF; }
       <div class="kpi-card primary">
         <div class="kpi-label">Total Spends</div>
         <div class="kpi-value" id="kpi-spends">—</div>
-        <div class="kpi-sub">FB + GA combined</div>
+        <div class="kpi-sub">FB + Adwords (Google)</div>
       </div>
       <div class="kpi-card green">
         <div class="kpi-label">Total Leads</div>
         <div class="kpi-value" id="kpi-leads">—</div>
-        <div class="kpi-sub">FB + GA combined</div>
+        <div class="kpi-sub">FB + Adwords (Google)</div>
       </div>
       <div class="kpi-card teal">
         <div class="kpi-label">Triggered Leads</div>
         <div class="kpi-value" id="kpi-triggered">—</div>
-        <div class="kpi-sub">All sources</div>
+        <div class="kpi-sub">FB + Adwords + WhatsApp</div>
       </div>
       <div class="kpi-card amber">
         <div class="kpi-label">CPL</div>
@@ -265,12 +276,12 @@ tr.row-combined:hover td { background: #EEF2FF; }
       <div class="kpi-card purple">
         <div class="kpi-label">TCPL</div>
         <div class="kpi-value" id="kpi-tcpl">—</div>
-        <div class="kpi-sub">Spends / Triggered</div>
+        <div class="kpi-sub">Spends / Triggered (all)</div>
       </div>
       <div class="kpi-card rose">
         <div class="kpi-label">Trigger %</div>
         <div class="kpi-value" id="kpi-tpct">—</div>
-        <div class="kpi-sub">Triggered / Leads</div>
+        <div class="kpi-sub">Triggered / Leads (all)</div>
       </div>
     </div>
 
@@ -282,17 +293,28 @@ tr.row-combined:hover td { background: #EEF2FF; }
       <div class="table-wrap">
         <table>
           <thead>
-            <tr>
-              <th data-col="date">Date</th>
-              <th data-col="source">Source</th>
-              <th data-col="brand">Brand</th>
-              <th data-col="model">Model</th>
-              <th data-col="spends" style="text-align:right">Spends (₹)</th>
-              <th data-col="leads" style="text-align:right">Leads</th>
-              <th data-col="triggered_leads" style="text-align:right">Triggered</th>
-              <th data-col="cpl" style="text-align:right">CPL (₹)</th>
-              <th data-col="tcpl" style="text-align:right">TCPL (₹)</th>
-              <th data-col="trigger_pct" style="text-align:right">Trigger %</th>
+            <tr class="grp-row">
+              <th class="grp-dim" rowspan="2" data-col="date" style="text-align:left">Date</th>
+              <th class="grp-dim" rowspan="2" data-col="brand" style="text-align:left">Brand</th>
+              <th class="grp-dim" rowspan="2" data-col="model" style="text-align:left">Model</th>
+              <th class="grp-paid" colspan="6">Facebook + Adwords (Google)</th>
+              <th class="grp-wa"   colspan="1">WhatsApp</th>
+              <th class="grp-comb" colspan="6">Combined</th>
+            </tr>
+            <tr class="sub-row">
+              <th class="sub-paid" data-col="paid_spends">Spends (₹)</th>
+              <th class="sub-paid" data-col="paid_leads">Leads</th>
+              <th class="sub-paid" data-col="paid_triggered">Triggered</th>
+              <th class="sub-paid" data-col="paid_cpl">CPL (₹)</th>
+              <th class="sub-paid" data-col="paid_tcpl">TCPL (₹)</th>
+              <th class="sub-paid" data-col="paid_trigger_pct">Trigger %</th>
+              <th class="sub-wa"   data-col="wa_triggered">Triggered</th>
+              <th class="sub-comb" data-col="combined_spends">Spends (₹)</th>
+              <th class="sub-comb" data-col="combined_leads">Leads</th>
+              <th class="sub-comb" data-col="combined_triggered">Triggered</th>
+              <th class="sub-comb" data-col="combined_cpl">CPL (₹)</th>
+              <th class="sub-comb" data-col="combined_tcpl">TCPL (₹)</th>
+              <th class="sub-comb" data-col="combined_trigger_pct">Trigger %</th>
             </tr>
           </thead>
           <tbody id="daywise-tbody"></tbody>
@@ -315,14 +337,26 @@ tr.row-combined:hover td { background: #EEF2FF; }
       <div class="table-wrap">
         <table>
           <thead>
-            <tr>
-              <th>Brand / Model</th>
-              <th style="text-align:right">MTD Spends (₹)</th>
-              <th style="text-align:right">MTD Leads</th>
-              <th style="text-align:right">Triggered Leads</th>
-              <th style="text-align:right">CPL (₹)</th>
-              <th style="text-align:right">TCPL (₹)</th>
-              <th style="text-align:right">Trigger %</th>
+            <tr class="grp-row">
+              <th class="grp-dim" rowspan="2" style="text-align:left">Brand / Model</th>
+              <th class="grp-paid" colspan="6">Facebook + Adwords (Google)</th>
+              <th class="grp-wa"   colspan="1">WhatsApp</th>
+              <th class="grp-comb" colspan="6">Combined</th>
+            </tr>
+            <tr class="sub-row">
+              <th class="sub-paid">Spends (₹)</th>
+              <th class="sub-paid">Leads</th>
+              <th class="sub-paid">Triggered</th>
+              <th class="sub-paid">CPL (₹)</th>
+              <th class="sub-paid">TCPL (₹)</th>
+              <th class="sub-paid">Trigger %</th>
+              <th class="sub-wa">Triggered</th>
+              <th class="sub-comb">Spends (₹)</th>
+              <th class="sub-comb">Leads</th>
+              <th class="sub-comb">Triggered</th>
+              <th class="sub-comb">CPL (₹)</th>
+              <th class="sub-comb">TCPL (₹)</th>
+              <th class="sub-comb">Trigger %</th>
             </tr>
           </thead>
           <tbody id="mtd-tbody"></tbody>
@@ -343,9 +377,6 @@ let sortDir = 1;
 let currentPage = 1;
 const PAGE_SIZE = 30;
 
-// Source sort order: FB first, then GA, then Combined
-const SRC_ORDER = { 'FB': 1, 'GA': 2, 'Combined': 3 };
-
 // ── Brand Colors ───────────────────────────────────
 const BRAND_FG = { 'Bajaj':'#1D4ED8','TVS':'#15803D','Jawa':'#B91C1C','KTM':'#C2410C',
   'Triumph':'#6D28D9','Ampere':'#0369A1','BGauss':'#92400E','Bajaj Chetak':'#7E22CE','Ather':'#0F766E' };
@@ -355,7 +386,7 @@ const brandFg = b => BRAND_FG[b] || '#374151';
 const brandBg = b => BRAND_BG[b] || '#F3F4F6';
 
 // ── Formatters ─────────────────────────────────────
-const fmtINR  = n => (n == null || isNaN(n)) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
+const fmtINR  = n => (n == null || isNaN(n) || n === 0) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
 const fmtNum  = (n, d=0) => (n == null || isNaN(n)) ? '—' : parseFloat(n.toFixed(d)).toLocaleString('en-IN');
 const fmtPct  = n => (n == null || isNaN(n)) ? '—' : n.toFixed(1) + '%';
 const fmtDate = s => { const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); };
@@ -365,11 +396,6 @@ function trigClass(p) {
   if (p >= 60) return 'trig-high';
   if (p >= 20) return 'trig-med';
   return 'trig-low';
-}
-
-function srcBadge(src) {
-  const cls = src === 'FB' ? 'src-fb' : src === 'GA' ? 'src-ga' : 'src-combined';
-  return `<span class="src-badge ${cls}">${src}</span>`;
 }
 
 // ── Init ───────────────────────────────────────────
@@ -394,8 +420,8 @@ async function init() {
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     }));
 
-    // Brand dropdown — populate from Combined rows only (no duplicates)
-    const brands = [...new Set(DATA.daywise.filter(r => r.source === 'Combined').map(r => r.brand))].sort();
+    // Brand dropdown
+    const brands = [...new Set(DATA.daywise.map(r => r.brand))].sort();
     const bSel = document.getElementById('brand-select');
     brands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; bSel.appendChild(o); });
 
@@ -413,7 +439,7 @@ async function init() {
       updateModelDropdown(); currentPage = 1; renderDaywise();
     });
 
-    // Column sort (only on daywise table headers)
+    // Column sort on both header rows
     document.querySelectorAll('#panel-daywise thead th[data-col]').forEach(th => {
       th.addEventListener('click', () => {
         const col = th.dataset.col;
@@ -438,7 +464,7 @@ function updateModelDropdown() {
   const sel = document.getElementById('model-select');
   sel.innerHTML = '<option value="">All Models</option>';
   const models = [...new Set(
-    DATA.daywise.filter(r => r.source === 'Combined' && (!selectedBrand || r.brand === selectedBrand)).map(r => r.model)
+    DATA.daywise.filter(r => !selectedBrand || r.brand === selectedBrand).map(r => r.model)
   )].sort();
   models.forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; sel.appendChild(o); });
 }
@@ -455,12 +481,11 @@ function getFiltered() {
 function renderDaywise() {
   const rows = getFiltered();
 
-  // KPIs: always compute from Combined rows to avoid double-counting
-  const combined = rows.filter(r => r.source === 'Combined');
-  const T = combined.reduce((a, r) => ({
-    spends: a.spends + (r.spends || 0),
-    leads:  a.leads  + (r.leads  || 0),
-    trig:   a.trig   + (r.triggered_leads || 0),
+  // KPIs from combined fields (avoids double-counting, WA triggers included)
+  const T = rows.reduce((a, r) => ({
+    spends: a.spends + (r.combined_spends    || 0),
+    leads:  a.leads  + (r.combined_leads     || 0),
+    trig:   a.trig   + (r.combined_triggered || 0),
   }), { spends: 0, leads: 0, trig: 0 });
   const cpl  = T.leads > 0 ? T.spends / T.leads  : null;
   const tcpl = T.trig  > 0 ? T.spends / T.trig   : null;
@@ -473,26 +498,21 @@ function renderDaywise() {
   document.getElementById('kpi-tcpl').textContent      = fmtINR(tcpl);
   document.getElementById('kpi-tpct').textContent      = fmtPct(tpct);
 
-  // Sort: primary = user-chosen column, secondary = source order (FB→GA→Combined)
+  // Sort
   const sorted = [...rows].sort((a, b) => {
-    // For date/brand/model, sort primary col first
-    if (sortCol === 'date' || sortCol === 'source') {
-      const dateC = a.date.localeCompare(b.date) * sortDir;
-      if (dateC !== 0) return dateC;
-      const brandC = (a.brand || '').localeCompare(b.brand || '');
-      if (brandC !== 0) return brandC;
-      const modelC = (a.model || '').localeCompare(b.model || '');
-      if (modelC !== 0) return modelC;
-      return (SRC_ORDER[a.source] || 9) - (SRC_ORDER[b.source] || 9);
+    if (sortCol === 'date') {
+      const dc = a.date.localeCompare(b.date) * sortDir;
+      if (dc !== 0) return dc;
+      const bc = (a.brand||'').localeCompare(b.brand||'');
+      if (bc !== 0) return bc;
+      return (a.model||'').localeCompare(b.model||'');
     }
-    // For other columns, sort by that value first
+    if (sortCol === 'brand') return (a.brand||'').localeCompare(b.brand||'') * sortDir;
+    if (sortCol === 'model') return (a.model||'').localeCompare(b.model||'') * sortDir;
     let av = a[sortCol], bv = b[sortCol];
-    if (av == null) av = sortDir > 0 ?  Infinity : -Infinity;
-    if (bv == null) bv = sortDir > 0 ?  Infinity : -Infinity;
-    const cmp = (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
-    if (cmp !== 0) return cmp;
-    // secondary: keep FB→GA→Combined within same value
-    return (SRC_ORDER[a.source] || 9) - (SRC_ORDER[b.source] || 9);
+    if (av == null) av = sortDir > 0 ? Infinity : -Infinity;
+    if (bv == null) bv = sortDir > 0 ? Infinity : -Infinity;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
   });
 
   // Pagination
@@ -502,24 +522,30 @@ function renderDaywise() {
   const start = (currentPage - 1) * PAGE_SIZE;
   const slice = sorted.slice(start, start + PAGE_SIZE);
 
-  document.getElementById('record-count').textContent = `${total} records (FB + GA + Combined)`;
+  document.getElementById('record-count').textContent = `${total} records`;
 
   const tbody = document.getElementById('daywise-tbody');
   if (!slice.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
   } else {
     tbody.innerHTML = slice.map(r => `
-      <tr class="${r.source === 'Combined' ? 'row-combined' : ''}">
+      <tr>
         <td style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
-        <td>${srcBadge(r.source)}</td>
         <td><span class="brand-pill" style="background:${brandBg(r.brand)};color:${brandFg(r.brand)}">${r.brand}</span></td>
-        <td>${r.model}</td>
-        <td class="num">${fmtINR(r.spends)}</td>
-        <td class="num">${fmtNum(r.leads, 0)}</td>
-        <td class="num">${fmtNum(r.triggered_leads, 0)}</td>
-        <td class="num">${r.cpl  != null ? fmtINR(r.cpl)  : '—'}</td>
-        <td class="num">${r.tcpl != null ? fmtINR(r.tcpl) : '—'}</td>
-        <td class="num ${trigClass(r.trigger_pct)}">${fmtPct(r.trigger_pct)}</td>
+        <td style="white-space:nowrap">${r.model}</td>
+        <td class="num sep-paid">${fmtINR(r.paid_spends)}</td>
+        <td class="num">${fmtNum(r.paid_leads, 0)}</td>
+        <td class="num">${fmtNum(r.paid_triggered, 0)}</td>
+        <td class="num">${r.paid_cpl  != null ? fmtINR(r.paid_cpl)  : '—'}</td>
+        <td class="num">${r.paid_tcpl != null ? fmtINR(r.paid_tcpl) : '—'}</td>
+        <td class="num ${trigClass(r.paid_trigger_pct)}">${fmtPct(r.paid_trigger_pct)}</td>
+        <td class="num sep-wa">${r.wa_triggered > 0 ? fmtNum(r.wa_triggered, 0) : '—'}</td>
+        <td class="num sep-comb">${fmtINR(r.combined_spends)}</td>
+        <td class="num">${fmtNum(r.combined_leads, 0)}</td>
+        <td class="num">${fmtNum(r.combined_triggered, 0)}</td>
+        <td class="num">${r.combined_cpl  != null ? fmtINR(r.combined_cpl)  : '—'}</td>
+        <td class="num">${r.combined_tcpl != null ? fmtINR(r.combined_tcpl) : '—'}</td>
+        <td class="num ${trigClass(r.combined_trigger_pct)}">${fmtPct(r.combined_trigger_pct)}</td>
       </tr>`).join('');
   }
 
@@ -545,46 +571,58 @@ function goPage(p) { currentPage = p; renderDaywise(); }
 // ── MTD Summary ────────────────────────────────────
 function computeTotals(rows) {
   const T = rows.reduce((a, r) => ({
-    spends: a.spends + (r.spends || 0),
-    leads:  a.leads  + (r.leads  || 0),
-    trig:   a.trig   + (r.triggered_leads || 0),
-  }), { spends: 0, leads: 0, trig: 0 });
-  return { ...T,
-    cpl:  T.leads > 0 ? T.spends / T.leads  : null,
-    tcpl: T.trig  > 0 ? T.spends / T.trig   : null,
-    tpct: T.leads > 0 ? T.trig   / T.leads * 100 : null,
+    paidS: a.paidS + (r.paid_spends       || 0),
+    paidL: a.paidL + (r.paid_leads        || 0),
+    paidT: a.paidT + (r.paid_triggered    || 0),
+    waT:   a.waT   + (r.wa_triggered      || 0),
+    combT: a.combT + (r.combined_triggered|| 0),
+  }), { paidS: 0, paidL: 0, paidT: 0, waT: 0, combT: 0 });
+
+  return {
+    paidS: T.paidS, paidL: T.paidL, paidT: T.paidT, waT: T.waT, combT: T.combT,
+    paid_cpl:            T.paidL > 0 ? T.paidS / T.paidL : null,
+    paid_tcpl:           T.paidT > 0 ? T.paidS / T.paidT : null,
+    paid_trigger_pct:    T.paidL > 0 ? T.paidT / T.paidL * 100 : null,
+    combined_tcpl:       T.combT > 0 ? T.paidS / T.combT : null,
+    combined_trigger_pct: T.paidL > 0 ? T.combT / T.paidL * 100 : null,
   };
 }
 
 function mtdCells(T) {
   return `
-    <td class="num">${fmtINR(T.spends)}</td>
-    <td class="num">${fmtNum(T.leads, 0)}</td>
-    <td class="num">${fmtNum(T.trig, 0)}</td>
-    <td class="num">${T.cpl  != null ? fmtINR(T.cpl)  : '—'}</td>
-    <td class="num">${T.tcpl != null ? fmtINR(T.tcpl) : '—'}</td>
-    <td class="num ${trigClass(T.tpct)}">${fmtPct(T.tpct)}</td>`;
+    <td class="num sep-paid">${fmtINR(T.paidS)}</td>
+    <td class="num">${fmtNum(T.paidL, 0)}</td>
+    <td class="num">${fmtNum(T.paidT, 0)}</td>
+    <td class="num">${T.paid_cpl  != null ? fmtINR(T.paid_cpl)  : '—'}</td>
+    <td class="num">${T.paid_tcpl != null ? fmtINR(T.paid_tcpl) : '—'}</td>
+    <td class="num ${trigClass(T.paid_trigger_pct)}">${fmtPct(T.paid_trigger_pct)}</td>
+    <td class="num sep-wa">${T.waT > 0 ? fmtNum(T.waT, 0) : '—'}</td>
+    <td class="num sep-comb">${fmtINR(T.paidS)}</td>
+    <td class="num">${fmtNum(T.paidL, 0)}</td>
+    <td class="num">${fmtNum(T.combT, 0)}</td>
+    <td class="num">${T.paid_cpl  != null ? fmtINR(T.paid_cpl)  : '—'}</td>
+    <td class="num">${T.combined_tcpl != null ? fmtINR(T.combined_tcpl) : '—'}</td>
+    <td class="num ${trigClass(T.combined_trigger_pct)}">${fmtPct(T.combined_trigger_pct)}</td>`;
 }
 
 function renderMTD() {
-  // Use Combined rows from mtd_summary for clean brand/model totals
-  const combined = DATA.mtd_summary.filter(r => r.source === 'Combined');
+  const allRows = DATA.mtd_summary;
 
   // Group by brand
   const brandMap = {};
-  combined.forEach(r => {
+  allRows.forEach(r => {
     if (!brandMap[r.brand]) brandMap[r.brand] = [];
     brandMap[r.brand].push(r);
   });
 
   const brands = Object.keys(brandMap).sort();
-  const grand  = computeTotals(combined);
+  const grand  = computeTotals(allRows);
 
   let html = `<tr class="grand-total-row">
     <td>Grand Total</td>${mtdCells(grand)}</tr>`;
 
   brands.forEach(brand => {
-    const models   = brandMap[brand].sort((a, b) => b.spends - a.spends);
+    const models   = brandMap[brand].sort((a, b) => b.paid_spends - a.paid_spends);
     const T        = computeTotals(models);
     const expanded = expandedBrands.has(brand);
     const sb       = brand.replace(/'/g, "\\'");
@@ -598,8 +636,12 @@ function renderMTD() {
 
     if (expanded) {
       models.forEach(m => {
-        const mT = { spends: m.spends, leads: m.leads, trig: m.triggered_leads,
-          cpl: m.cpl, tcpl: m.tcpl, tpct: m.trigger_pct };
+        const mT = {
+          paidS: m.paid_spends, paidL: m.paid_leads, paidT: m.paid_triggered,
+          waT: m.wa_triggered, combT: m.combined_triggered,
+          paid_cpl: m.paid_cpl, paid_tcpl: m.paid_tcpl, paid_trigger_pct: m.paid_trigger_pct,
+          combined_tcpl: m.combined_tcpl, combined_trigger_pct: m.combined_trigger_pct,
+        };
         html += `<tr class="model-row">
           <td class="model-indent">${m.model}</td>${mtdCells(mT)}</tr>`;
       });
