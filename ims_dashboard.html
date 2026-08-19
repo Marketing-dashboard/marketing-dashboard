@@ -446,7 +446,7 @@ tfoot .mp-date-col { background: var(--surface2); }
           <div class="radio-card" data-level="mixed">
             <div class="rc-icon">🔀</div>
             <div class="rc-label">Brand Budget +<br>Model Targets</div>
-            <div class="rc-hint">Total brand budget, impression target per model</div>
+            <div class="rc-hint">Brand budget (+ optional brand impr target) + per-model targets</div>
           </div>
         </div>
       </div>
@@ -463,6 +463,10 @@ tfoot .mp-date-col { background: var(--surface2); }
     <!-- Step 3: Per-Model table (level=model) -->
     <div class="modal-step" id="msMM">
       <div class="mf">
+        <label>Campaign End Date <small style="color:var(--muted)">(optional — DRR uses days until this date)</small></label>
+        <input type="date" id="inMMEndDate">
+      </div>
+      <div class="mf">
         <label id="mmTableLabel">Set target &amp; budget for each model (leave blank to skip)</label>
         <div class="mm-scroll">
           <table class="mm-table" id="mmTable">
@@ -473,11 +477,19 @@ tfoot .mp-date-col { background: var(--surface2); }
       </div>
     </div>
 
-    <!-- Step 4: Mixed — brand budget + per-model impression targets -->
+    <!-- Step 4: Mixed — brand budget + optional brand target + per-model impression targets -->
     <div class="modal-step" id="msMX">
+      <div class="mf">
+        <label>Brand Impression Target <small style="color:var(--muted)">(optional — adds a brand-total tracking row)</small></label>
+        <input type="number" id="inMxBrandTarget" placeholder="e.g. 50000000" min="0">
+      </div>
       <div class="mf">
         <label>Total Brand Budget (₹)</label>
         <input type="number" id="inBrandBudget" placeholder="e.g. 5000000" min="0">
+      </div>
+      <div class="mf">
+        <label>Campaign End Date <small style="color:var(--muted)">(optional — DRR uses days until this date)</small></label>
+        <input type="date" id="inMxEndDate">
       </div>
       <div class="mf">
         <label>Target Impressions per Model (leave blank to skip)</label>
@@ -532,6 +544,10 @@ tfoot .mp-date-col { background: var(--surface2); }
           <label>Budget for Leads (₹)</label>
           <input type="number" id="inBudgetLeads" placeholder="e.g. 80000" min="0">
         </div>
+      </div>
+      <div class="mf">
+        <label>Campaign End Date <small style="color:var(--muted)">(optional — DRR uses days until this date)</small></label>
+        <input type="date" id="inBrandEndDate">
       </div>
     </div>
 
@@ -1115,15 +1131,26 @@ async function renderTracker() {
   const today         = new Date();
 
   // Compute remaining days from the last data date, not today.
-  // "Yesterday" in the projection formula = last data date, so remaining = days after last data date.
   const latestDateStr = [...new Set(RAW.map(r => r.dateStr))].sort().pop() || '';
   const latestDate    = latestDateStr ? parseDate(latestDateStr) : null;
   const refDate       = latestDate || today;
   const daysInMonth   = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate();
-  const remaining     = daysInMonth - refDate.getDate();
+  const defaultRemaining = daysInMonth - refDate.getDate();
+
+  // Per-entity remaining days: use campaign end date if set, else month-end
+  function entityRemaining(e) {
+    const t = saved[e.key] || {};
+    const ed = t.endDate || (e.level === 'model' ? (saved[`brand::${e.brand}`] || {}).endDate : null);
+    if (ed) {
+      const end  = new Date(ed + 'T00:00:00');
+      const diff = Math.round((end - refDate) / 86400000);
+      return Math.max(0, diff);
+    }
+    return defaultRemaining;
+  }
 
   document.getElementById('trackerMeta').textContent =
-    `Last data: ${latestDate ? F.dateL(latestDate) : '—'} · Days remaining after last data: ${remaining} · Projection = last-day × ${remaining} + delivered`;
+    `Last data: ${latestDate ? F.dateL(latestDate) : '—'} · Default days remaining: ${defaultRemaining} · Projection = last-day × remaining + delivered`;
 
   const entities = buildEntities(saved);
   const hasLeads = RAW.some(r => r.leads > 0);
@@ -1164,6 +1191,7 @@ async function renderTracker() {
 
     const t     = saved[e.key] || {};
     const isBudgetOnly = t.targetType === 'budget-only';
+    const remaining = entityRemaining(e);
 
     const tImpr  = isBudgetOnly ? null : (t.targetImpr  || null);
     const tLeads = isBudgetOnly ? null : (t.targetLeads || null);
@@ -1195,14 +1223,22 @@ async function renderTracker() {
       return lines.length ? lines.join('<br>') : '<span class="exp-na">—</span>';
     }
 
+    // Resolve end date for display (entity's own or brand's)
+    const dispEndDate = t.endDate || (e.level === 'model' ? (saved[`brand::${e.brand}`] || {}).endDate : null);
+    const endTag = dispEndDate
+      ? `<br><small style="color:var(--muted);font-weight:400;">Ends ${new Date(dispEndDate + 'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · ${remaining}d left</small>`
+      : '';
+
     // Label: model sub-label, or "(Total Budget)" hint for mixed brand rows
     let lbl;
     if (e.level === 'model' && e.model) {
-      lbl = `${e.brand}<br><small style="color:var(--muted);font-weight:400;">${e.model}</small>`;
+      lbl = `${e.brand}<br><small style="color:var(--muted);font-weight:400;">${e.model}</small>${endTag}`;
     } else if (isBudgetOnly) {
-      lbl = `${e.brand}<br><small style="color:var(--warn);font-weight:400;">Total Budget</small>`;
+      lbl = `${e.brand}<br><small style="color:var(--warn);font-weight:400;">Total Budget</small>${endTag}`;
+    } else if (t.groupMode === 'mixed' && t.targetImpr) {
+      lbl = `${e.brand}<br><small style="color:var(--accent);font-weight:400;">Brand Total</small>${endTag}`;
     } else {
-      lbl = e.brand;
+      lbl = e.brand + endTag;
     }
 
     const na = '<span class="exp-na">—</span>';
@@ -1286,9 +1322,9 @@ function buildEntities(saved) {
   const brandMode = {};   // brand → 'mixed' | 'per-model' | 'brand'
   for (const t of Object.values(saved)) {
     const b = t.brand;
-    if (t.level === 'brand' && t.targetType === 'budget-only') {
+    if (t.level === 'brand' && t.groupMode === 'mixed') {
       brandMode[b] = 'mixed';
-    } else if (t.level === 'model' && (t.groupMode === 'model') && brandMode[b] !== 'mixed') {
+    } else if (t.level === 'model' && t.groupMode === 'model' && brandMode[b] !== 'mixed') {
       brandMode[b] = 'per-model';
     } else if (t.level === 'brand' && !brandMode[b]) {
       brandMode[b] = 'brand';
@@ -1384,8 +1420,9 @@ async function openModal(existingKey) {
   modal.level = null; modal.brand = null; modal.model = null; modal.ttype = null;
   modal._editKey = null; modal._editBrand = null;
   document.querySelectorAll('[data-level],[data-ttype]').forEach(el => el.classList.remove('sel'));
-  ['inTargetImpr','inBudgetImpr','inTargetLeads','inBudgetLeads','inBrandBudget'].forEach(id => {
-    document.getElementById(id).value = '';
+  ['inTargetImpr','inBudgetImpr','inTargetLeads','inBudgetLeads','inBrandBudget',
+   'inMxBrandTarget','inMxEndDate','inBrandEndDate','inMMEndDate'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
   });
 
   // Pre-fill brand dropdown
@@ -1401,7 +1438,7 @@ async function openModal(existingKey) {
       const brand = parts[1];
       const brandEntry = saved[`brand::${brand}`];
       const hasPerModel = Object.values(saved).some(e => e.brand === brand && e.level === 'model' && e.groupMode === 'model');
-      if (brandEntry && brandEntry.targetType === 'budget-only') {
+      if (brandEntry && brandEntry.groupMode === 'mixed') {
         modal.level = 'mixed'; modal.brand = brand; modal._editBrand = brand;
       } else if (hasPerModel) {
         modal.level = 'model'; modal.brand = brand; modal._editBrand = brand;
@@ -1418,7 +1455,7 @@ async function openModal(existingKey) {
       if (t) {
         const gm = t.groupMode || t.level;
 
-        if (gm === 'mixed' || t.targetType === 'budget-only') {
+        if (gm === 'mixed') {
           modal.level = 'mixed';
           modal.brand = t.brand;
           modal._editBrand = t.brand;
@@ -1440,6 +1477,7 @@ async function openModal(existingKey) {
           if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
           if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
           if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
+          if (t.endDate)     document.getElementById('inBrandEndDate').value = t.endDate;
         }
 
         document.querySelector(`[data-level="${modal.level}"]`)?.classList.add('sel');
@@ -1492,6 +1530,7 @@ async function modalNext() {
     const tl = sl ? parseFloat(document.getElementById('inTargetLeads').value) || null : null;
     const bl = sl ? parseFloat(document.getElementById('inBudgetLeads').value) || null : null;
 
+    const endDate = document.getElementById('inBrandEndDate').value || null;
     const key = `brand::${modal.brand}`;
     const all = await loadTargets();
     if (modal._editKey && modal._editKey !== key) delete all[modal._editKey];
@@ -1499,6 +1538,7 @@ async function modalNext() {
       level: 'brand', brand: modal.brand, model: null, groupMode: 'brand',
       targetType: modal.ttype,
       targetImpr: ti, budgetImpr: bi, targetLeads: tl, budgetLeads: bl,
+      endDate,
     };
     await saveTargets(all);
     closeModal();
@@ -1550,32 +1590,43 @@ async function modalNext() {
     });
 
     if (!saved) { alert('Please fill in at least one model row.'); return; }
+    const mmEndDate = document.getElementById('inMMEndDate').value || null;
+    if (mmEndDate) {
+      Object.keys(all).forEach(k => {
+        if (k.startsWith(`model::${modal.brand}::`) && all[k].groupMode === 'model') {
+          all[k].endDate = mmEndDate;
+        }
+      });
+    }
     await saveTargets(all);
     closeModal();
     renderTracker();
     return;
 
   } else if (modal.step === 'msMX') {
-    // ── Save mixed: brand budget + per-model impression targets ──
+    // ── Save mixed: optional brand impr target + brand budget + per-model impression targets ──
     if (!modal.brand) { alert('Brand is required.'); return; }
     const brandBudget = parseFloat(document.getElementById('inBrandBudget').value) || null;
+    const brandTarget = parseFloat(document.getElementById('inMxBrandTarget').value) || null;
+    const endDate     = document.getElementById('inMxEndDate').value || null;
     const all = await loadTargets();
 
     // Remove old mixed entries for this brand
     if (modal._editBrand) {
       const bk = `brand::${modal._editBrand}`;
-      if (all[bk] && all[bk].targetType === 'budget-only') delete all[bk];
+      if (all[bk] && all[bk].groupMode === 'mixed') delete all[bk];
       Object.keys(all).forEach(k => {
         if (k.startsWith(`model::${modal._editBrand}::`) && all[k].groupMode === 'mixed') delete all[k];
       });
     }
 
-    // Save brand-level budget entry
-    if (brandBudget) {
+    // Save brand-level entry (always saved when budget or brand target is set)
+    if (brandBudget || brandTarget) {
       all[`brand::${modal.brand}`] = {
         level: 'brand', brand: modal.brand, model: null, groupMode: 'mixed',
-        targetType: 'budget-only',
-        targetImpr: null, budgetImpr: brandBudget, targetLeads: null, budgetLeads: null,
+        targetType: brandTarget ? 'impressions' : 'budget-only',
+        targetImpr: brandTarget, budgetImpr: brandBudget, targetLeads: null, budgetLeads: null,
+        endDate,
       };
     }
 
@@ -1593,11 +1644,12 @@ async function modalNext() {
         level: 'model', brand: modal.brand, model: m, groupMode: 'mixed',
         targetType: 'impressions',
         targetImpr: ti, budgetImpr: null, targetLeads: null, budgetLeads: null,
+        endDate,
       };
       saved++;
     });
 
-    if (!brandBudget && !saved) { alert('Please enter a budget and/or at least one model target.'); return; }
+    if (!brandBudget && !brandTarget && !saved) { alert('Please enter a budget, brand target, and/or at least one model target.'); return; }
     await saveTargets(all);
     closeModal();
     renderTracker();
@@ -1638,14 +1690,20 @@ function populateMultiModel(brand, ttype, saved) {
   document.getElementById('mmTbody').innerHTML = tbody;
   document.getElementById('mmTableLabel').textContent =
     `${brand} — set targets for each model (leave blank to skip)`;
+
+  // Pre-fill shared end date from any existing model entry for this brand
+  const anyEntry = Object.values(saved).find(t => t.brand === brand && t.level === 'model' && t.groupMode === 'model' && t.endDate);
+  if (anyEntry) document.getElementById('inMMEndDate').value = anyEntry.endDate;
 }
 
 function populateMixed(brand, saved) {
   const models = MODELS[brand] || [];
   saved = saved || {};
   const brandEntry = saved[`brand::${brand}`];
-  if (brandEntry && brandEntry.targetType === 'budget-only') {
-    document.getElementById('inBrandBudget').value = brandEntry.budgetImpr || '';
+  if (brandEntry) {
+    if (brandEntry.budgetImpr)  document.getElementById('inBrandBudget').value    = brandEntry.budgetImpr;
+    if (brandEntry.targetImpr)  document.getElementById('inMxBrandTarget').value  = brandEntry.targetImpr;
+    if (brandEntry.endDate)     document.getElementById('inMxEndDate').value      = brandEntry.endDate;
   }
   const tbody = models.map(m => {
     const existing = saved[`model::${brand}::${m}`] || {};
