@@ -586,7 +586,7 @@ function renderDaywise() {
     if (r.trigger_leads > 0) {
       tcpl = r.spends > 0 ? fmt(r.spends/r.trigger_leads) : '<span class="na">No spend</span>';
     }
-    var trigPct = (r.leads > 0 && r.trigger_leads > 0) ? pctPill(r.trigger_leads/r.leads*100) : '<span class="na">—</span>';
+    var trigPct = r.leads > 0 ? pctPill(r.trigger_leads/r.leads*100) : '<span class="na">—</span>';
     rows += '<tr>' +
       '<td>' + fmtDate(r.date) + '</td>' +
       '<td><span class="bdot" style="background:' + color + '"></span>' + r.brand + '</td>' +
@@ -599,7 +599,7 @@ function renderDaywise() {
       '</tr>';
   });
 
-  var totTrigPct = (totL > 0 && mktT > 0) ? pctPill(mktT/totL*100) : '—';
+  var totTrigPct = totL > 0 ? pctPill(mktT/totL*100) : '—';
   rows += '<tr class="total-row">' +
     '<td colspan="2">TOTAL</td>' +
     '<td class="num">' + fmt(totS) + '</td>' +
@@ -647,7 +647,7 @@ function renderSummary() {
     var color = BRAND_COLORS[brand] || '#888';
     var cpl = (v.spends>0 && v.leads>0) ? fmt(v.spends/v.leads) : '—';
     var tcpl = (v.spends>0 && v.mkt>0) ? fmt(v.spends/v.mkt) : '—';
-    var trigPct = (v.leads>0 && v.mkt>0) ? pctPill(v.mkt/v.leads*100) : '<span class="na">—</span>';
+    var trigPct = v.leads>0 ? pctPill(v.mkt/v.leads*100) : '<span class="na">—</span>';
     rows += '<tr>' +
       '<td><span class="bdot" style="background:' + color + '"></span><strong>' + brand + '</strong></td>' +
       '<td class="num">' + (v.spends>0 ? fmt(v.spends) : '<span class="na">—</span>') + '</td>' +
@@ -661,7 +661,7 @@ function renderSummary() {
       '</tr>';
   });
 
-  var totTrigPct = (totL>0 && totM>0) ? pctPill(totM/totL*100) : '—';
+  var totTrigPct = totL>0 ? pctPill(totM/totL*100) : '—';
   rows += '<tr class="total-row">' +
     '<td>TOTAL</td>' +
     '<td class="num">' + fmt(totS) + '</td>' +
