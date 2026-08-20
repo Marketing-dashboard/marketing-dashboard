@@ -13,6 +13,16 @@ var REPO_OWNER = 'Marketing-dashboard';
 var REPO_NAME  = 'marketing-dashboard';
 var FILE_PATH  = 'dashboard_data.json';
 
+// ── BRAND ALIASES: map variant names → canonical name ─────────
+// Add entries here whenever two brand names should be treated as one.
+var BRAND_ALIAS = {
+  'hero xtreme': 'Hero'
+};
+function normBrand(brand) {
+  if (!brand) return brand;
+  return BRAND_ALIAS[brand.toLowerCase().trim()] || brand;
+}
+
 // ── ONE-TIME TOKEN SETUP ──────────────────────────────────────
 function setGitHubToken(token) {
   PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
@@ -168,7 +178,7 @@ function processTriggers(rawData) {
 
     var model   = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
     var medium  = iMedium  >= 0 ? String(row[iMedium]  || '').trim().toLowerCase() : '';
-    var brand   = iProcess >= 0 ? String(row[iProcess] || '').trim() : '';
+    var brand   = normBrand(iProcess >= 0 ? String(row[iProcess] || '').trim() : '');
     var count   = iTotal   >= 0 ? (parseInt(row[iTotal]) || 0) : 0;
     var dateStr = iDate    >= 0 ? fmtDate(row[iDate]) : '';
 
@@ -229,11 +239,11 @@ function processGASpends(gaData, tvsData) {
     Logger.log('GA_Raw idx — date:'+gDate+' cost:'+gCost+' conv:'+gConv+' brand:'+gBrand+' model:'+gModel);
     for (var i = 1; i < gaData.length; i++) {
       var r = gaData[i];
-      var d = gDate  >= 0 ? fmtDate(r[gDate])               : '';
-      var b = gBrand >= 0 ? String(r[gBrand]||'').trim()    : '';
-      var m = gModel >= 0 ? String(r[gModel]||'').trim()    : '';
-      var s = gCost  >= 0 ? (parseFloat(r[gCost])  || 0)   : 0;
-      var l = gConv  >= 0 ? (parseFloat(r[gConv])  || 0)   : 0;
+      var d = gDate  >= 0 ? fmtDate(r[gDate])                        : '';
+      var b = normBrand(gBrand >= 0 ? String(r[gBrand]||'').trim() : '');
+      var m = gModel >= 0 ? String(r[gModel]||'').trim()            : '';
+      var s = gCost  >= 0 ? (parseFloat(r[gCost])  || 0)           : 0;
+      var l = gConv  >= 0 ? (parseFloat(r[gConv])  || 0)           : 0;
       add(d, b, m, s, l);
     }
   }
@@ -250,11 +260,11 @@ function processGASpends(gaData, tvsData) {
     Logger.log('TVS_Jawa idx — date:'+tDate+' cost:'+tCost+' conv:'+tConv+' brand:'+tBrand+' model:'+tModel);
     for (var j = 1; j < tvsData.length; j++) {
       var r = tvsData[j];
-      var d = tDate  >= 0 ? fmtDate(r[tDate])               : '';
-      var b = tBrand >= 0 ? String(r[tBrand]||'').trim()    : '';
-      var m = tModel >= 0 ? String(r[tModel]||'').trim()    : '';
-      var s = tCost  >= 0 ? (parseFloat(r[tCost])  || 0)   : 0;
-      var l = tConv  >= 0 ? (parseFloat(r[tConv])  || 0)   : 0;
+      var d = tDate  >= 0 ? fmtDate(r[tDate])                        : '';
+      var b = normBrand(tBrand >= 0 ? String(r[tBrand]||'').trim() : '');
+      var m = tModel >= 0 ? String(r[tModel]||'').trim()            : '';
+      var s = tCost  >= 0 ? (parseFloat(r[tCost])  || 0)           : 0;
+      var l = tConv  >= 0 ? (parseFloat(r[tConv])  || 0)           : 0;
       add(d, b, m, s, l);
     }
   }
@@ -280,9 +290,9 @@ function processFBandWASpends(fbData) {
 
   for (var i = 1; i < fbData.length; i++) {
     var r      = fbData[i];
-    var d      = fDate   >= 0 ? fmtDate(r[fDate])              : '';
-    var brand  = fBrand  >= 0 ? String(r[fBrand]||'').trim()   : '';
-    var model  = fModel  >= 0 ? String(r[fModel]||'').trim()   : '';
+    var d      = fDate   >= 0 ? fmtDate(r[fDate])                          : '';
+    var brand  = normBrand(fBrand >= 0 ? String(r[fBrand]||'').trim()    : '');
+    var model  = fModel  >= 0 ? String(r[fModel]||'').trim()              : '';
     var spends = fSpend  >= 0 ? (parseFloat(r[fSpend]) || 0)   : 0;
     var leads  = fLead   >= 0 ? (parseFloat(r[fLead])  || 0)   : 0;
     var source = fSource >= 0 ? String(r[fSource]||'').trim().toLowerCase() : '';
