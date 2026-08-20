@@ -23,6 +23,12 @@ function normBrand(brand) {
   return BRAND_ALIAS[brand.toLowerCase().trim()] || brand;
 }
 
+// ── EXCLUDED BRANDS: drop these from all output ───────────────
+var EXCLUDED_BRANDS = ['others', '#n/a', ''];
+function isExcluded(brand) {
+  return !brand || EXCLUDED_BRANDS.indexOf(brand.toLowerCase().trim()) !== -1;
+}
+
 // ── ONE-TIME TOKEN SETUP ──────────────────────────────────────
 function setGitHubToken(token) {
   PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
@@ -309,30 +315,21 @@ function processFBandWASpends(fbData) {
 }
 
 // ── BUILD DAYWISE RECORDS ─────────────────────────────────────
-// One row per date+brand+model with FB, GA, WA, and combined fields.
+// One row per date+brand+model. Triggers are only attached to models
+// that have spend/lead data — trigger-only models are excluded.
 function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
+  // Keys come from spend maps only — no trigger-only rows
   var allKeys = {};
   Object.keys(fbSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(gaSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(waSpends).forEach(function(k) { allKeys[k] = true; });
-
-  function addTrigKeys(tMap) {
-    Object.keys(tMap).forEach(function(dk) {
-      var parts   = dk.split('||');
-      var dateStr = parts[0], model = parts[1];
-      var brand   = triggers.modelToBrand[model];
-      if (brand) allKeys[dateStr + '||' + brand + '||' + model] = true;
-    });
-  }
-  addTrigKeys(triggers.fbByDateModel);
-  addTrigKeys(triggers.waByDateModel);
-  addTrigKeys(triggers.gaByDateModel);
 
   var rows = [];
 
   Object.keys(allKeys).forEach(function(key) {
     var parts   = key.split('||');
     var dateStr = parts[0], brand = parts[1], model = parts[2];
+    if (isExcluded(brand)) return;
     var fb = fbSpends[key] || {spends: 0, leads: 0};
     var ga = gaSpends[key] || {spends: 0, leads: 0};
     var wa = waSpends[key] || {spends: 0, leads: 0};
@@ -340,9 +337,6 @@ function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
     var fbTrig = triggers.fbByDateModel[dk] || 0;
     var waTrig = triggers.waByDateModel[dk] || 0;
     var gaTrig = triggers.gaByDateModel[dk] || 0;
-    if (!fb.spends && !fb.leads && !fbTrig &&
-        !ga.spends && !ga.leads && !gaTrig &&
-        !wa.spends && !wa.leads && !waTrig) return;
     rows.push(makeRow(dateStr, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,
@@ -373,31 +367,24 @@ function buildMTD(fbSpends, gaSpends, waSpends, triggers) {
     var r = waSpends[k]; addBM(waBM, r.brand, r.model, r.spends, r.leads);
   });
 
+  // Keys come from spend maps only — no trigger-only rows
   var allBMKeys = {};
   Object.keys(fbBM).forEach(function(k) { allBMKeys[k] = true; });
   Object.keys(gaBM).forEach(function(k) { allBMKeys[k] = true; });
   Object.keys(waBM).forEach(function(k) { allBMKeys[k] = true; });
-  ['fbByModel','waByModel','gaByModel'].forEach(function(bucket) {
-    Object.keys(triggers[bucket]).forEach(function(model) {
-      var brand = triggers.modelToBrand[model];
-      if (brand) allBMKeys[brand + '||' + model] = true;
-    });
-  });
 
   var rows = [];
 
   Object.keys(allBMKeys).forEach(function(bmKey) {
     var parts = bmKey.split('||');
     var brand = parts[0], model = parts[1];
+    if (isExcluded(brand)) return;
     var fb = fbBM[bmKey] || {spends: 0, leads: 0};
     var ga = gaBM[bmKey] || {spends: 0, leads: 0};
     var wa = waBM[bmKey] || {spends: 0, leads: 0};
     var fbTrig = triggers.fbByModel[model] || 0;
     var waTrig = triggers.waByModel[model] || 0;
     var gaTrig = triggers.gaByModel[model] || 0;
-    if (!fb.spends && !fb.leads && !fbTrig &&
-        !ga.spends && !ga.leads && !gaTrig &&
-        !wa.spends && !wa.leads && !waTrig) return;
     rows.push(makeRow(null, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,
