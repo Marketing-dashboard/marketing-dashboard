@@ -171,9 +171,10 @@ function processTriggers(rawData) {
 
     if (!model || count <= 0 || !dateStr) continue;
 
-    var isFB = (medium === 'Facebook');
-    var isWA = (medium === 'Whatsapp');
-    var isGA = (medium === 'Google' || medium === 'Adwords');
+    var medLower = medium.toLowerCase();
+    var isFB = (medLower === 'facebook');
+    var isWA = (medLower === 'whatsapp');
+    var isGA = (medLower === 'google' || medLower === 'adwords');
     // Skip Non-MS, Organic, and any unrecognised medium
     if (!isFB && !isWA && !isGA) continue;
 
