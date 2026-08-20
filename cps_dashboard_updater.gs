@@ -31,18 +31,20 @@ function updateCPSDashboard() {
   var tvsData = ss.getSheetByName('Raw_TVS_Jawa').getDataRange().getValues();
   var gaData  = ss.getSheetByName('GA_Raw').getDataRange().getValues();
   var fbData  = ss.getSheetByName('FB_Raw').getDataRange().getValues();
-  Logger.log('Rows — Raw:' + (rawData.length-1) + ' TVS_Jawa:' + (tvsData.length-1) + ' GA:' + (gaData.length-1) + ' FB:' + (fbData.length-1));
+  Logger.log('Rows — Raw:' + (rawData.length-1) + ' TVS_Jawa:' + (tvsData.length-1) + ' GA:' + (gaData.length-1) + ' FB_Raw:' + (fbData.length-1));
 
   var triggers = processTriggers(rawData);
   var gaSpends = processGASpends(gaData, tvsData);
-  var fbSpends = processFBSpends(fbData);
+  var fbwa     = processFBandWASpends(fbData);
+  var fbSpends = fbwa.fbMap;
+  var waSpends = fbwa.waMap;
 
-  var daywise    = buildDaywise(fbSpends, gaSpends, triggers);
-  var mtdSummary = buildMTD(fbSpends, gaSpends, triggers);
+  var daywise    = buildDaywise(fbSpends, gaSpends, waSpends, triggers);
+  var mtdSummary = buildMTD(fbSpends, gaSpends, waSpends, triggers);
 
   // Sort daywise: date → brand → model
   daywise.sort(function(a, b) {
-    var d = a.date.localeCompare(b.date);          if (d) return d;
+    var d = (a.date||'').localeCompare(b.date||''); if (d) return d;
     var br = (a.brand||'').localeCompare(b.brand||''); if (br) return br;
     return (a.model||'').localeCompare(b.model||'');
   });
@@ -84,31 +86,33 @@ function testRun() {
 
   var triggers = processTriggers(rawData);
   var gaSpends = processGASpends(gaData, tvsData);
-  var fbSpends = processFBSpends(fbData);
-  var daywise    = buildDaywise(fbSpends, gaSpends, triggers);
-  var mtdSummary = buildMTD(fbSpends, gaSpends, triggers);
+  var fbwa     = processFBandWASpends(fbData);
+  var fbSpends = fbwa.fbMap;
+  var waSpends = fbwa.waMap;
+  var daywise    = buildDaywise(fbSpends, gaSpends, waSpends, triggers);
+  var mtdSummary = buildMTD(fbSpends, gaSpends, waSpends, triggers);
 
   var allDates = daywise.map(function(r){return r.date;}).sort();
   Logger.log('=== TEST RUN ===');
-  Logger.log('Raw rows: ' + (rawData.length-1) + ', GA rows: ' + (gaData.length-1) + ', TVS rows: ' + (tvsData.length-1) + ', FB rows: ' + (fbData.length-1));
+  Logger.log('Raw rows: ' + (rawData.length-1) + ', GA rows: ' + (gaData.length-1) + ', TVS rows: ' + (tvsData.length-1) + ', FB_Raw rows: ' + (fbData.length-1));
   Logger.log('Date range: ' + allDates[0] + ' → ' + allDates[allDates.length-1]);
   Logger.log('Daywise records: ' + daywise.length + ', MTD records: ' + mtdSummary.length);
 
-  // Log brand-level MTD totals
   var brandTotals = {};
   mtdSummary.forEach(function(r) {
-    if (!brandTotals[r.brand]) brandTotals[r.brand] = {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wT:0,cT:0};
+    if (!brandTotals[r.brand]) brandTotals[r.brand] = {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wS:0,wL:0,wT:0,cT:0};
     var b = brandTotals[r.brand];
     b.fS += r.fb_spends; b.fL += r.fb_leads; b.fT += r.fb_triggered;
     b.gS += r.ga_spends; b.gL += r.ga_leads; b.gT += r.ga_triggered;
-    b.wT += r.wa_triggered; b.cT += r.combined_triggered;
+    b.wS += r.wa_spends; b.wL += r.wa_leads; b.wT += r.wa_triggered;
+    b.cT += r.combined_triggered;
   });
   Logger.log('=== MTD Brand Totals ===');
   Object.keys(brandTotals).sort().forEach(function(b) {
     var t = brandTotals[b];
     Logger.log(b + ': fb_s='+Math.round(t.fS)+' fb_l='+Math.round(t.fL)+' fb_t='+t.fT+
       ' ga_s='+Math.round(t.gS)+' ga_l='+Math.round(t.gL)+' ga_t='+t.gT+
-      ' wa_t='+t.wT+' comb_t='+t.cT);
+      ' wa_s='+Math.round(t.wS)+' wa_l='+Math.round(t.wL)+' wa_t='+t.wT+' comb_t='+t.cT);
   });
 }
 
@@ -122,7 +126,7 @@ function findCol(headers, candidates) {
   return -1;
 }
 
-// ── DIAGNOSE: log column headers of all sheets (run once to verify) ──
+// ── DIAGNOSE: log column headers of all sheets ────────────────
 function diagnoseSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ['Raw','Raw_TVS_Jawa','GA_Raw','FB_Raw'].forEach(function(name) {
@@ -136,8 +140,7 @@ function diagnoseSheets() {
 }
 
 // ── PROCESS RAW TAB (triggered leads only) ────────────────────
-// Only maps Facebook, Adwords/Google, and Whatsapp mediums.
-// Non-MS, Organic, and all other mediums are excluded.
+// Maps Facebook, Google/Adwords, Whatsapp triggers. Excludes Non-MS, Organic, etc.
 function processTriggers(rawData) {
   var fbByModel = {}, waByModel = {}, gaByModel = {};
   var fbByDateModel = {}, waByDateModel = {}, gaByDateModel = {};
@@ -164,17 +167,16 @@ function processTriggers(rawData) {
     if (iTrigCol >= 0 && String(row[iTrigCol] || '').trim() !== 'Trigger') continue;
 
     var model   = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
-    var medium  = iMedium  >= 0 ? String(row[iMedium]  || '').trim() : '';
+    var medium  = iMedium  >= 0 ? String(row[iMedium]  || '').trim().toLowerCase() : '';
     var brand   = iProcess >= 0 ? String(row[iProcess] || '').trim() : '';
     var count   = iTotal   >= 0 ? (parseInt(row[iTotal]) || 0) : 0;
     var dateStr = iDate    >= 0 ? fmtDate(row[iDate]) : '';
 
     if (!model || count <= 0 || !dateStr) continue;
 
-    var medLower = medium.toLowerCase();
-    var isFB = (medLower === 'facebook');
-    var isWA = (medLower === 'whatsapp');
-    var isGA = (medLower === 'google' || medLower === 'adwords');
+    var isFB = (medium === 'facebook');
+    var isWA = (medium === 'whatsapp');
+    var isGA = (medium === 'google' || medium === 'adwords');
     // Skip Non-MS, Organic, and any unrecognised medium
     if (!isFB && !isWA && !isGA) continue;
 
@@ -260,43 +262,49 @@ function processGASpends(gaData, tvsData) {
   return map;
 }
 
-// ── PROCESS FB SPENDS (FB_Raw) ────────────────────────────────
-function processFBSpends(fbData) {
-  var map = {};
-  if (fbData.length === 0) return map;
+// ── PROCESS FB_Raw (splits FB vs WhatsApp by source column) ───
+// Rows where source/medium = "whatsapp" → waMap; everything else → fbMap.
+function processFBandWASpends(fbData) {
+  var fbMap = {}, waMap = {};
+  if (fbData.length === 0) return { fbMap: fbMap, waMap: waMap };
 
   var fh = fbData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
-  var fDate  = findCol(fh, ['date','day']);
-  var fSpend = findCol(fh, ['spend','spends','cost','amount spent','amount_spent']);
-  var fLead  = findCol(fh, ['lead','leads','result','results','conv','conversions']);
-  var fBrand = findCol(fh, ['brand']);
-  var fModel = findCol(fh, ['model']);
+  var fDate   = findCol(fh, ['date','day']);
+  var fSpend  = findCol(fh, ['spend','spends','cost','amount spent','amount_spent']);
+  var fLead   = findCol(fh, ['lead','leads','result','results','conv','conversions']);
+  var fBrand  = findCol(fh, ['brand']);
+  var fModel  = findCol(fh, ['model']);
+  var fSource = findCol(fh, ['source','platform','channel','medium']);
   Logger.log('FB_Raw headers: ' + fh.join(' | '));
-  Logger.log('FB_Raw idx — date:'+fDate+' spend:'+fSpend+' lead:'+fLead+' brand:'+fBrand+' model:'+fModel);
+  Logger.log('FB_Raw idx — date:'+fDate+' spend:'+fSpend+' lead:'+fLead+' brand:'+fBrand+' model:'+fModel+' source:'+fSource);
 
   for (var i = 1; i < fbData.length; i++) {
     var r      = fbData[i];
-    var d      = fDate  >= 0 ? fmtDate(r[fDate])              : '';
-    var brand  = fBrand >= 0 ? String(r[fBrand]||'').trim()   : '';
-    var model  = fModel >= 0 ? String(r[fModel]||'').trim()   : '';
-    var spends = fSpend >= 0 ? (parseFloat(r[fSpend]) || 0)   : 0;
-    var leads  = fLead  >= 0 ? (parseFloat(r[fLead])  || 0)   : 0;
+    var d      = fDate   >= 0 ? fmtDate(r[fDate])              : '';
+    var brand  = fBrand  >= 0 ? String(r[fBrand]||'').trim()   : '';
+    var model  = fModel  >= 0 ? String(r[fModel]||'').trim()   : '';
+    var spends = fSpend  >= 0 ? (parseFloat(r[fSpend]) || 0)   : 0;
+    var leads  = fLead   >= 0 ? (parseFloat(r[fLead])  || 0)   : 0;
+    var source = fSource >= 0 ? String(r[fSource]||'').trim().toLowerCase() : '';
     if (!d || !brand || !model || (!spends && !leads)) continue;
     var k = d + '||' + brand + '||' + model;
+    var isWA = (source === 'whatsapp');
+    var map = isWA ? waMap : fbMap;
     if (!map[k]) map[k] = {date: d, brand: brand, model: model, spends: 0, leads: 0};
     map[k].spends += spends;
     map[k].leads  += leads;
   }
 
-  return map;
+  return { fbMap: fbMap, waMap: waMap };
 }
 
 // ── BUILD DAYWISE RECORDS ─────────────────────────────────────
 // One row per date+brand+model with FB, GA, WA, and combined fields.
-function buildDaywise(fbSpends, gaSpends, triggers) {
+function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
   var allKeys = {};
   Object.keys(fbSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(gaSpends).forEach(function(k) { allKeys[k] = true; });
+  Object.keys(waSpends).forEach(function(k) { allKeys[k] = true; });
 
   function addTrigKeys(tMap) {
     Object.keys(tMap).forEach(function(dk) {
@@ -317,20 +325,26 @@ function buildDaywise(fbSpends, gaSpends, triggers) {
     var dateStr = parts[0], brand = parts[1], model = parts[2];
     var fb = fbSpends[key] || {spends: 0, leads: 0};
     var ga = gaSpends[key] || {spends: 0, leads: 0};
+    var wa = waSpends[key] || {spends: 0, leads: 0};
     var dk = dateStr + '||' + model;
     var fbTrig = triggers.fbByDateModel[dk] || 0;
     var waTrig = triggers.waByDateModel[dk] || 0;
     var gaTrig = triggers.gaByDateModel[dk] || 0;
-    if (!fb.spends && !fb.leads && !fbTrig && !ga.spends && !ga.leads && !gaTrig && !waTrig) return;
-    rows.push(makeRow(dateStr, brand, model, fb.spends, fb.leads, fbTrig, ga.spends, ga.leads, gaTrig, waTrig));
+    if (!fb.spends && !fb.leads && !fbTrig &&
+        !ga.spends && !ga.leads && !gaTrig &&
+        !wa.spends && !wa.leads && !waTrig) return;
+    rows.push(makeRow(dateStr, brand, model,
+      fb.spends, fb.leads, fbTrig,
+      ga.spends, ga.leads, gaTrig,
+      wa.spends, wa.leads, waTrig));
   });
 
   return rows;
 }
 
 // ── BUILD MTD SUMMARY ─────────────────────────────────────────
-function buildMTD(fbSpends, gaSpends, triggers) {
-  var fbBM = {}, gaBM = {};
+function buildMTD(fbSpends, gaSpends, waSpends, triggers) {
+  var fbBM = {}, gaBM = {}, waBM = {};
 
   function addBM(map, brand, model, spends, leads) {
     var k = brand + '||' + model;
@@ -345,10 +359,14 @@ function buildMTD(fbSpends, gaSpends, triggers) {
   Object.keys(gaSpends).forEach(function(k) {
     var r = gaSpends[k]; addBM(gaBM, r.brand, r.model, r.spends, r.leads);
   });
+  Object.keys(waSpends).forEach(function(k) {
+    var r = waSpends[k]; addBM(waBM, r.brand, r.model, r.spends, r.leads);
+  });
 
   var allBMKeys = {};
   Object.keys(fbBM).forEach(function(k) { allBMKeys[k] = true; });
   Object.keys(gaBM).forEach(function(k) { allBMKeys[k] = true; });
+  Object.keys(waBM).forEach(function(k) { allBMKeys[k] = true; });
   ['fbByModel','waByModel','gaByModel'].forEach(function(bucket) {
     Object.keys(triggers[bucket]).forEach(function(model) {
       var brand = triggers.modelToBrand[model];
@@ -363,28 +381,40 @@ function buildMTD(fbSpends, gaSpends, triggers) {
     var brand = parts[0], model = parts[1];
     var fb = fbBM[bmKey] || {spends: 0, leads: 0};
     var ga = gaBM[bmKey] || {spends: 0, leads: 0};
+    var wa = waBM[bmKey] || {spends: 0, leads: 0};
     var fbTrig = triggers.fbByModel[model] || 0;
     var waTrig = triggers.waByModel[model] || 0;
     var gaTrig = triggers.gaByModel[model] || 0;
-    if (!fb.spends && !fb.leads && !fbTrig && !ga.spends && !ga.leads && !gaTrig && !waTrig) return;
-    rows.push(makeRow(null, brand, model, fb.spends, fb.leads, fbTrig, ga.spends, ga.leads, gaTrig, waTrig));
+    if (!fb.spends && !fb.leads && !fbTrig &&
+        !ga.spends && !ga.leads && !gaTrig &&
+        !wa.spends && !wa.leads && !waTrig) return;
+    rows.push(makeRow(null, brand, model,
+      fb.spends, fb.leads, fbTrig,
+      ga.spends, ga.leads, gaTrig,
+      wa.spends, wa.leads, waTrig));
   });
 
   return rows;
 }
 
 // ── ROW BUILDER ───────────────────────────────────────────────
-function makeRow(date, brand, model, fbSpends, fbLeads, fbTriggered, gaSpends, gaLeads, gaTriggered, waTriggered) {
+function makeRow(date, brand, model,
+    fbSpends, fbLeads, fbTriggered,
+    gaSpends, gaLeads, gaTriggered,
+    waSpends, waLeads, waTriggered) {
   var fS = Math.round(fbSpends    * 100) / 100;
   var fL = Math.round(fbLeads     * 100) / 100;
   var fT = Math.round(fbTriggered) || 0;
   var gS = Math.round(gaSpends    * 100) / 100;
   var gL = Math.round(gaLeads     * 100) / 100;
   var gT = Math.round(gaTriggered) || 0;
+  var wS = Math.round(waSpends    * 100) / 100;
+  var wL = Math.round(waLeads     * 100) / 100;
   var wT = Math.round(waTriggered) || 0;
 
-  var cS = fS + gS;
-  var cL = fL + gL;
+  // Combined includes FB + GA + WA spends and leads
+  var cS = fS + gS + wS;
+  var cL = fL + gL + wL;
   var cT = fT + gT + wT;
 
   function kpi(spends, leads, trig) {
@@ -394,7 +424,7 @@ function makeRow(date, brand, model, fbSpends, fbLeads, fbTriggered, gaSpends, g
       tpct: leads > 0 ? Math.round(trig / leads * 10000) / 100 : null
     };
   }
-  var fk = kpi(fS, fL, fT), gk = kpi(gS, gL, gT), ck = kpi(cS, cL, cT);
+  var fk = kpi(fS, fL, fT), gk = kpi(gS, gL, gT), wk = kpi(wS, wL, wT), ck = kpi(cS, cL, cT);
 
   var row = {};
   if (date) row.date = date;
@@ -404,7 +434,8 @@ function makeRow(date, brand, model, fbSpends, fbLeads, fbTriggered, gaSpends, g
   row.fb_cpl          = fk.cpl;  row.fb_tcpl    = fk.tcpl;  row.fb_trigger_pct = fk.tpct;
   row.ga_spends       = gS;  row.ga_leads       = gL;  row.ga_triggered       = gT;
   row.ga_cpl          = gk.cpl;  row.ga_tcpl    = gk.tcpl;  row.ga_trigger_pct = gk.tpct;
-  row.wa_triggered    = wT;
+  row.wa_spends       = wS;  row.wa_leads       = wL;  row.wa_triggered       = wT;
+  row.wa_cpl          = wk.cpl;  row.wa_tcpl    = wk.tcpl;  row.wa_trigger_pct = wk.tpct;
   row.combined_spends = cS;  row.combined_leads = cL;  row.combined_triggered = cT;
   row.combined_cpl    = ck.cpl;  row.combined_tcpl = ck.tcpl; row.combined_trigger_pct = ck.tpct;
   return row;
@@ -414,7 +445,6 @@ function makeRow(date, brand, model, fbSpends, fbLeads, fbTriggered, gaSpends, g
 function pushJsonToGitHub(token, jsonStr, dateMin, dateMax) {
   var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + FILE_PATH;
 
-  // GET current SHA (needed for update)
   var getResp = UrlFetchApp.fetch(apiUrl, {
     headers: {'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json'},
     muteHttpExceptions: true

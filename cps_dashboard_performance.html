@@ -224,8 +224,8 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
     </div>
 
     <div class="kpi-grid">
-      <div class="kpi-card primary"><div class="kpi-label">Total Spends</div><div class="kpi-value" id="kpi-spends">—</div><div class="kpi-sub">FB + Google combined</div></div>
-      <div class="kpi-card green"><div class="kpi-label">Total Leads</div><div class="kpi-value" id="kpi-leads">—</div><div class="kpi-sub">FB + Google combined</div></div>
+      <div class="kpi-card primary"><div class="kpi-label">Total Spends</div><div class="kpi-value" id="kpi-spends">—</div><div class="kpi-sub">FB + Google + WhatsApp</div></div>
+      <div class="kpi-card green"><div class="kpi-label">Total Leads</div><div class="kpi-value" id="kpi-leads">—</div><div class="kpi-sub">FB + Google + WhatsApp</div></div>
       <div class="kpi-card teal"><div class="kpi-label">Triggered Leads</div><div class="kpi-value" id="kpi-triggered">—</div><div class="kpi-sub">FB + Google + WhatsApp</div></div>
       <div class="kpi-card amber"><div class="kpi-label">CPL</div><div class="kpi-value" id="kpi-cpl">—</div><div class="kpi-sub">Spends / Leads</div></div>
       <div class="kpi-card purple"><div class="kpi-label">TCPL</div><div class="kpi-value" id="kpi-tcpl">—</div><div class="kpi-sub">Spends / All Triggered</div></div>
@@ -246,7 +246,7 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
               <th class="grp-dim" rowspan="2" style="text-align:left">Model</th>
               <th class="grp-fb"   colspan="6">Facebook</th>
               <th class="grp-ga"   colspan="6">Google / Adwords</th>
-              <th class="grp-wa"   colspan="1">WhatsApp</th>
+              <th class="grp-wa"   colspan="6">WhatsApp</th>
               <th class="grp-comb" colspan="6">Combined</th>
             </tr>
             <tr class="sub-row">
@@ -262,7 +262,12 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
               <th class="sub-ga"   data-col="ga_cpl">CPL (₹)</th>
               <th class="sub-ga"   data-col="ga_tcpl">TCPL (₹)</th>
               <th class="sub-ga"   data-col="ga_trigger_pct">Trigger %</th>
+              <th class="sub-wa"   data-col="wa_spends">Spends (₹)</th>
+              <th class="sub-wa"   data-col="wa_leads">Leads</th>
               <th class="sub-wa"   data-col="wa_triggered">Triggered</th>
+              <th class="sub-wa"   data-col="wa_cpl">CPL (₹)</th>
+              <th class="sub-wa"   data-col="wa_tcpl">TCPL (₹)</th>
+              <th class="sub-wa"   data-col="wa_trigger_pct">Trigger %</th>
               <th class="sub-comb" data-col="combined_spends">Spends (₹)</th>
               <th class="sub-comb" data-col="combined_leads">Leads</th>
               <th class="sub-comb" data-col="combined_triggered">Triggered</th>
@@ -295,13 +300,13 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
               <th class="grp-dim" rowspan="2" style="text-align:left">Brand / Model</th>
               <th class="grp-fb"   colspan="6">Facebook</th>
               <th class="grp-ga"   colspan="6">Google / Adwords</th>
-              <th class="grp-wa"   colspan="1">WhatsApp</th>
+              <th class="grp-wa"   colspan="6">WhatsApp</th>
               <th class="grp-comb" colspan="6">Combined</th>
             </tr>
             <tr class="sub-row">
               <th class="sub-fb">Spends (₹)</th><th class="sub-fb">Leads</th><th class="sub-fb">Triggered</th><th class="sub-fb">CPL (₹)</th><th class="sub-fb">TCPL (₹)</th><th class="sub-fb">Trigger %</th>
               <th class="sub-ga">Spends (₹)</th><th class="sub-ga">Leads</th><th class="sub-ga">Triggered</th><th class="sub-ga">CPL (₹)</th><th class="sub-ga">TCPL (₹)</th><th class="sub-ga">Trigger %</th>
-              <th class="sub-wa">Triggered</th>
+              <th class="sub-wa">Spends (₹)</th><th class="sub-wa">Leads</th><th class="sub-wa">Triggered</th><th class="sub-wa">CPL (₹)</th><th class="sub-wa">TCPL (₹)</th><th class="sub-wa">Trigger %</th>
               <th class="sub-comb">Spends (₹)</th><th class="sub-comb">Leads</th><th class="sub-comb">Triggered</th><th class="sub-comb">CPL (₹)</th><th class="sub-comb">TCPL (₹)</th><th class="sub-comb">Trigger %</th>
             </tr>
           </thead>
@@ -410,7 +415,7 @@ function getFiltered() {
 function renderDaywise() {
   const rows = getFiltered();
 
-  // KPIs from combined fields
+  // KPIs from combined fields (FB + GA + WA)
   const T = rows.reduce((a, r) => ({
     spends: a.spends + (r.combined_spends    || 0),
     leads:  a.leads  + (r.combined_leads     || 0),
@@ -450,7 +455,7 @@ function renderDaywise() {
 
   const tbody = document.getElementById('daywise-tbody');
   if (!slice.length) {
-    tbody.innerHTML = '<tr><td colspan="22" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="27" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
   } else {
     tbody.innerHTML = slice.map(r => `
       <tr>
@@ -469,7 +474,12 @@ function renderDaywise() {
         <td class="num">${fmtINR(r.ga_cpl)}</td>
         <td class="num">${fmtINR(r.ga_tcpl)}</td>
         <td class="num ${trigClass(r.ga_trigger_pct)}">${fmtPct(r.ga_trigger_pct)}</td>
-        <td class="num sep-wa">${r.wa_triggered > 0 ? fmtNum(r.wa_triggered, 0) : '—'}</td>
+        <td class="num sep-wa">${fmtINR(r.wa_spends)}</td>
+        <td class="num">${fmtNum(r.wa_leads, 0)}</td>
+        <td class="num">${fmtNum(r.wa_triggered, 0)}</td>
+        <td class="num">${fmtINR(r.wa_cpl)}</td>
+        <td class="num">${fmtINR(r.wa_tcpl)}</td>
+        <td class="num ${trigClass(r.wa_trigger_pct)}">${fmtPct(r.wa_trigger_pct)}</td>
         <td class="num sep-comb">${fmtINR(r.combined_spends)}</td>
         <td class="num">${fmtNum(r.combined_leads, 0)}</td>
         <td class="num">${fmtNum(r.combined_triggered, 0)}</td>
@@ -497,10 +507,12 @@ function computeTotals(rows) {
   const T = rows.reduce((a, r) => ({
     fS: a.fS+(r.fb_spends||0), fL: a.fL+(r.fb_leads||0), fT: a.fT+(r.fb_triggered||0),
     gS: a.gS+(r.ga_spends||0), gL: a.gL+(r.ga_leads||0), gT: a.gT+(r.ga_triggered||0),
-    wT: a.wT+(r.wa_triggered||0), cT: a.cT+(r.combined_triggered||0),
-  }), {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wT:0,cT:0});
+    wS: a.wS+(r.wa_spends||0), wL: a.wL+(r.wa_leads||0), wT: a.wT+(r.wa_triggered||0),
+    cT: a.cT+(r.combined_triggered||0),
+  }), {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wS:0,wL:0,wT:0,cT:0});
 
-  const cS = T.fS + T.gS, cL = T.fL + T.gL;
+  const cS = T.fS + T.gS + T.wS;
+  const cL = T.fL + T.gL + T.wL;
   return { ...T, cS, cL,
     fb_cpl:   T.fL>0 ? T.fS/T.fL : null,
     fb_tcpl:  T.fT>0&&T.fS>0 ? T.fS/T.fT : null,
@@ -508,6 +520,9 @@ function computeTotals(rows) {
     ga_cpl:   T.gL>0 ? T.gS/T.gL : null,
     ga_tcpl:  T.gT>0&&T.gS>0 ? T.gS/T.gT : null,
     ga_tpct:  T.gL>0 ? T.gT/T.gL*100 : null,
+    wa_cpl:   T.wL>0 ? T.wS/T.wL : null,
+    wa_tcpl:  T.wT>0&&T.wS>0 ? T.wS/T.wT : null,
+    wa_tpct:  T.wL>0 ? T.wT/T.wL*100 : null,
     c_cpl:    cL>0 ? cS/cL : null,
     c_tcpl:   T.cT>0&&cS>0 ? cS/T.cT : null,
     c_tpct:   cL>0 ? T.cT/cL*100 : null,
@@ -522,7 +537,9 @@ function mtdCells(T) {
     <td class="num sep-ga">${fmtINR(T.gS)}</td><td class="num">${fmtNum(T.gL,0)}</td>
     <td class="num">${fmtNum(T.gT,0)}</td><td class="num">${fmtINR(T.ga_cpl)}</td>
     <td class="num">${fmtINR(T.ga_tcpl)}</td><td class="num ${trigClass(T.ga_tpct)}">${fmtPct(T.ga_tpct)}</td>
-    <td class="num sep-wa">${T.wT>0?fmtNum(T.wT,0):'—'}</td>
+    <td class="num sep-wa">${fmtINR(T.wS)}</td><td class="num">${fmtNum(T.wL,0)}</td>
+    <td class="num">${fmtNum(T.wT,0)}</td><td class="num">${fmtINR(T.wa_cpl)}</td>
+    <td class="num">${fmtINR(T.wa_tcpl)}</td><td class="num ${trigClass(T.wa_tpct)}">${fmtPct(T.wa_tpct)}</td>
     <td class="num sep-comb">${fmtINR(T.cS)}</td><td class="num">${fmtNum(T.cL,0)}</td>
     <td class="num">${fmtNum(T.cT,0)}</td><td class="num">${fmtINR(T.c_cpl)}</td>
     <td class="num">${fmtINR(T.c_tcpl)}</td><td class="num ${trigClass(T.c_tpct)}">${fmtPct(T.c_tpct)}</td>`;
@@ -552,12 +569,14 @@ function renderMTD() {
     if (expanded) {
       models.forEach(m => {
         const mT = {
-          fS: m.fb_spends, fL: m.fb_leads, fT: m.fb_triggered,
-          gS: m.ga_spends, gL: m.ga_leads, gT: m.ga_triggered,
-          wT: m.wa_triggered, cT: m.combined_triggered,
-          cS: m.combined_spends, cL: m.combined_leads,
+          fS: m.fb_spends||0, fL: m.fb_leads||0, fT: m.fb_triggered||0,
+          gS: m.ga_spends||0, gL: m.ga_leads||0, gT: m.ga_triggered||0,
+          wS: m.wa_spends||0, wL: m.wa_leads||0, wT: m.wa_triggered||0,
+          cT: m.combined_triggered||0,
+          cS: m.combined_spends||0, cL: m.combined_leads||0,
           fb_cpl: m.fb_cpl, fb_tcpl: m.fb_tcpl, fb_tpct: m.fb_trigger_pct,
           ga_cpl: m.ga_cpl, ga_tcpl: m.ga_tcpl, ga_tpct: m.ga_trigger_pct,
+          wa_cpl: m.wa_cpl, wa_tcpl: m.wa_tcpl, wa_tpct: m.wa_trigger_pct,
           c_cpl: m.combined_cpl, c_tcpl: m.combined_tcpl, c_tpct: m.combined_trigger_pct,
         };
         html += `<tr class="model-row"><td class="model-indent">${m.model}</td>${mtdCells(mT)}</tr>`;
