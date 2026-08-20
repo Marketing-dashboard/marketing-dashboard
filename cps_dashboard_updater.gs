@@ -154,13 +154,13 @@ function processTriggers(rawData) {
 
   var h = rawData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
   var iDate    = findCol(h, ['date','day']);
-  var iModel   = findCol(h, ['model']);
+  var iModel   = findCol(h, ['model_map', 'modelmap']);
+  if (iModel < 0) iModel = findCol(h, ['model']);
   var iMedium  = findCol(h, ['medium']);
   var iTrigCol = findCol(h, ['trigger']);
   var iTotal   = findCol(h, ['total','count','leads']);
-  var iProcess = findCol(h, ['process','brand name','brandname']);
-  if (iProcess < 0) iProcess = findCol(h, ['brand']);
-  Logger.log('Raw idx — date:'+iDate+' model:'+iModel+' medium:'+iMedium+' trigcol:'+iTrigCol+' total:'+iTotal+' process:'+iProcess);
+  var iProcess = findCol(h, ['brand']);
+  Logger.log('Raw idx — date:'+iDate+' model_map:'+iModel+' medium:'+iMedium+' trigcol:'+iTrigCol+' total:'+iTotal+' brand:'+iProcess);
 
   for (var i = 1; i < rawData.length; i++) {
     var row = rawData[i];
