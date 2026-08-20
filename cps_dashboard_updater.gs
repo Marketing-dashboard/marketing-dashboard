@@ -116,7 +116,7 @@ function testRun() {
 
   var brandTotals = {};
   mtdSummary.forEach(function(r) {
-    if (!brandTotals[r.brand]) brandTotals[r.brand] = {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wS:0,wL:0,wT:0,cT:0};
+    if (!brandTotals[r.brand]) brandTotals[r.brand] = {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wS:0,wL:0,wT:0,cT:0,oT:0};
     var b = brandTotals[r.brand];
     b.fS += r.fb_spends; b.fL += r.fb_leads; b.fT += r.fb_triggered;
     b.gS += r.ga_spends; b.gL += r.ga_leads; b.gT += r.ga_triggered;
@@ -155,73 +155,102 @@ function diagnoseSheets() {
   });
 }
 
-// ── PROCESS RAW TAB (triggered leads only) ────────────────────
-// Maps Facebook, Google/Adwords, Whatsapp triggers. Excludes Non-MS, Organic, etc.
+// ── PROCESS RAW TAB (triggered leads) ────────────────────────
+// Supports two tab schemas:
+//
+// Schema A — OEM Tracker (has a "Medium" column):
+//   Date | Model | brand | Medium | Lead Type | Model Type | Trigger | Total | Process | Model_Map
+//   Trigger col = "Trigger" row-type marker; Medium col = "Facebook"/"Google"/"Whatsapp"/...
+//
+// Schema B — CPS_Spends Raw (no "Medium" column):
+//   Day | brand | model | utm_campaign | Trigger | Source | Last Updated at | Month
+//   Trigger col = the medium itself ("FB"/"GA"/"WhatsApp"/"Others")
+//   Source col  = count
+//
+// "Others" triggers go into a separate bucket that feeds combined_triggered only.
 function processTriggers(rawData) {
-  var fbByModel = {}, waByModel = {}, gaByModel = {};
-  var fbByDateModel = {}, waByDateModel = {}, gaByDateModel = {};
+  var fbByModel = {}, waByModel = {}, gaByModel = {}, otByModel = {};
+  var fbByDateModel = {}, waByDateModel = {}, gaByDateModel = {}, otByDateModel = {};
   var modelToBrand = {};
 
-  if (rawData.length === 0) return {
-    fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel,
-    fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel,
+  var empty = {
+    fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel, otByModel: otByModel,
+    fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel, otByDateModel: otByDateModel,
     modelToBrand: modelToBrand
   };
+  if (rawData.length === 0) return empty;
 
   var h = rawData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
   var iDate    = findCol(h, ['date','day']);
-  var iModel   = findCol(h, ['model_map', 'modelmap']);
+  var iModel   = findCol(h, ['model_map','modelmap']);
   if (iModel < 0) iModel = findCol(h, ['model']);
   var iMedium  = findCol(h, ['medium']);
   var iTrigCol = findCol(h, ['trigger']);
-  var iTotal   = findCol(h, ['total','count','leads']);
-  var iProcess = findCol(h, ['process', 'brand name', 'brandname', 'segment', 'category']);
+  // "source" is the count column in Schema B
+  var iTotal   = findCol(h, ['total','count','leads','source']);
+  var iProcess = findCol(h, ['process','brand name','brandname','segment','category']);
   var iBrand   = findCol(h, ['brand']);
-  Logger.log('Raw idx — date:'+iDate+' model_map:'+iModel+' medium:'+iMedium+' trigcol:'+iTrigCol+' total:'+iTotal+' process:'+iProcess+' brand:'+iBrand);
+
+  // Schema B: no dedicated medium col → Trigger col IS the medium; no row-type filter needed
+  var schemaB = (iMedium < 0 && iTrigCol >= 0);
+  Logger.log('Raw schema:'+(schemaB?'B(CPS_Raw)':'A(OEMTracker)')+
+    ' date:'+iDate+' model:'+iModel+' medium:'+iMedium+' trigger:'+iTrigCol+
+    ' total:'+iTotal+' process:'+iProcess+' brand:'+iBrand);
 
   for (var i = 1; i < rawData.length; i++) {
     var row = rawData[i];
-    if (iTrigCol >= 0 && String(row[iTrigCol] || '').trim() !== 'Trigger') continue;
 
-    var model   = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
-    var medium  = iMedium  >= 0 ? String(row[iMedium]  || '').trim().toLowerCase() : '';
+    var medium;
+    if (schemaB) {
+      // Trigger col value IS the medium code ("FB", "GA", "WhatsApp", "Others")
+      medium = iTrigCol >= 0 ? String(row[iTrigCol] || '').trim().toLowerCase() : '';
+    } else {
+      // Schema A: skip rows where Trigger col != "Trigger"
+      if (iTrigCol >= 0 && String(row[iTrigCol] || '').trim() !== 'Trigger') continue;
+      medium = iMedium >= 0 ? String(row[iMedium] || '').trim().toLowerCase() : '';
+    }
+
+    var model      = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
     var processVal = iProcess >= 0 ? String(row[iProcess] || '').trim() : '';
     var brandVal   = iBrand   >= 0 ? String(row[iBrand]   || '').trim() : '';
-    // When Process column says "Others", use the Brand column for the real brand name
+    // When Process = "Others", use the Brand column for the real brand
     var brand = normBrand(processVal.toLowerCase() === 'others' ? brandVal : (processVal || brandVal));
-    var count   = iTotal   >= 0 ? (parseInt(row[iTotal]) || 0) : 0;
-    var dateStr = iDate    >= 0 ? fmtDate(row[iDate]) : '';
+    // Strip commas from counts (e.g., "1,234" → 1234)
+    var count   = iTotal >= 0 ? (parseInt(String(row[iTotal] || '0').replace(/,/g,'')) || 0) : 0;
+    var dateStr = iDate  >= 0 ? fmtDate(row[iDate]) : '';
 
     if (!model || count <= 0 || !dateStr) continue;
 
-    var isFB = (medium === 'facebook');
+    // Map medium codes from both schemas
+    var isFB = (medium === 'facebook' || medium === 'fb');
     var isWA = (medium === 'whatsapp');
-    var isGA = (medium === 'google' || medium === 'adwords');
-    // Skip Non-MS, Organic, and any unrecognised medium
-    if (!isFB && !isWA && !isGA) continue;
+    var isGA = (medium === 'google' || medium === 'google ads' || medium === 'adwords' || medium === 'ga');
+    var isOT = (medium === 'others' || medium === 'other');
+    // Skip Non-MS, Organic, and any other unrecognised mediums
+    if (!isFB && !isWA && !isGA && !isOT) continue;
 
-    // Normalise model key to lowercase so case differences don't break matching
     var mk = model.toLowerCase();
     if (brand && !modelToBrand[mk]) modelToBrand[mk] = brand;
 
     var dk = dateStr + '||' + mk;
     if (isFB) {
-      fbByModel[mk]       = (fbByModel[mk]       || 0) + count;
-      fbByDateModel[dk]   = (fbByDateModel[dk]   || 0) + count;
-    }
-    if (isWA) {
-      waByModel[mk]       = (waByModel[mk]       || 0) + count;
-      waByDateModel[dk]   = (waByDateModel[dk]   || 0) + count;
-    }
-    if (isGA) {
-      gaByModel[mk]       = (gaByModel[mk]       || 0) + count;
-      gaByDateModel[dk]   = (gaByDateModel[dk]   || 0) + count;
+      fbByModel[mk]     = (fbByModel[mk]     || 0) + count;
+      fbByDateModel[dk] = (fbByDateModel[dk] || 0) + count;
+    } else if (isWA) {
+      waByModel[mk]     = (waByModel[mk]     || 0) + count;
+      waByDateModel[dk] = (waByDateModel[dk] || 0) + count;
+    } else if (isGA) {
+      gaByModel[mk]     = (gaByModel[mk]     || 0) + count;
+      gaByDateModel[dk] = (gaByDateModel[dk] || 0) + count;
+    } else if (isOT) {
+      otByModel[mk]     = (otByModel[mk]     || 0) + count;
+      otByDateModel[dk] = (otByDateModel[dk] || 0) + count;
     }
   }
 
   return {
-    fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel,
-    fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel,
+    fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel, otByModel: otByModel,
+    fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel, otByDateModel: otByDateModel,
     modelToBrand: modelToBrand
   };
 }
@@ -343,10 +372,11 @@ function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
     var fbTrig = triggers.fbByDateModel[dk] || 0;
     var waTrig = triggers.waByDateModel[dk] || 0;
     var gaTrig = triggers.gaByDateModel[dk] || 0;
+    var otTrig = triggers.otByDateModel[dk] || 0;
     rows.push(makeRow(dateStr, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,
-      wa.spends, wa.leads, waTrig));
+      wa.spends, wa.leads, waTrig, otTrig));
   });
 
   return rows;
@@ -392,20 +422,23 @@ function buildMTD(fbSpends, gaSpends, waSpends, triggers) {
     var fbTrig = triggers.fbByModel[mk] || 0;
     var waTrig = triggers.waByModel[mk] || 0;
     var gaTrig = triggers.gaByModel[mk] || 0;
+    var otTrig = triggers.otByModel[mk] || 0;
     rows.push(makeRow(null, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,
-      wa.spends, wa.leads, waTrig));
+      wa.spends, wa.leads, waTrig, otTrig));
   });
 
   return rows;
 }
 
 // ── ROW BUILDER ───────────────────────────────────────────────
+// othersTriggered: triggers from "Others" source — added to combined only, not to FB/GA/WA cols
 function makeRow(date, brand, model,
     fbSpends, fbLeads, fbTriggered,
     gaSpends, gaLeads, gaTriggered,
-    waSpends, waLeads, waTriggered) {
+    waSpends, waLeads, waTriggered,
+    othersTriggered) {
   var fS = Math.round(fbSpends    * 100) / 100;
   var fL = Math.round(fbLeads     * 100) / 100;
   var fT = Math.round(fbTriggered) || 0;
@@ -415,11 +448,12 @@ function makeRow(date, brand, model,
   var wS = Math.round(waSpends    * 100) / 100;
   var wL = Math.round(waLeads     * 100) / 100;
   var wT = Math.round(waTriggered) || 0;
+  var oT = Math.round(othersTriggered) || 0;
 
-  // Combined includes FB + GA + WA spends and leads
+  // Combined includes FB + GA + WA spends/leads; Others triggers add to combined triggered
   var cS = fS + gS + wS;
   var cL = fL + gL + wL;
-  var cT = fT + gT + wT;
+  var cT = fT + gT + wT + oT;
 
   function kpi(spends, leads, trig) {
     return {
