@@ -175,8 +175,9 @@ function processTriggers(rawData) {
   var iMedium  = findCol(h, ['medium']);
   var iTrigCol = findCol(h, ['trigger']);
   var iTotal   = findCol(h, ['total','count','leads']);
-  var iProcess = findCol(h, ['brand']);
-  Logger.log('Raw idx — date:'+iDate+' model_map:'+iModel+' medium:'+iMedium+' trigcol:'+iTrigCol+' total:'+iTotal+' brand:'+iProcess);
+  var iProcess = findCol(h, ['process', 'brand name', 'brandname', 'segment', 'category']);
+  var iBrand   = findCol(h, ['brand']);
+  Logger.log('Raw idx — date:'+iDate+' model_map:'+iModel+' medium:'+iMedium+' trigcol:'+iTrigCol+' total:'+iTotal+' process:'+iProcess+' brand:'+iBrand);
 
   for (var i = 1; i < rawData.length; i++) {
     var row = rawData[i];
@@ -184,7 +185,10 @@ function processTriggers(rawData) {
 
     var model   = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
     var medium  = iMedium  >= 0 ? String(row[iMedium]  || '').trim().toLowerCase() : '';
-    var brand   = normBrand(iProcess >= 0 ? String(row[iProcess] || '').trim() : '');
+    var processVal = iProcess >= 0 ? String(row[iProcess] || '').trim() : '';
+    var brandVal   = iBrand   >= 0 ? String(row[iBrand]   || '').trim() : '';
+    // When Process column says "Others", use the Brand column for the real brand name
+    var brand = normBrand(processVal.toLowerCase() === 'others' ? brandVal : (processVal || brandVal));
     var count   = iTotal   >= 0 ? (parseInt(row[iTotal]) || 0) : 0;
     var dateStr = iDate    >= 0 ? fmtDate(row[iDate]) : '';
 
