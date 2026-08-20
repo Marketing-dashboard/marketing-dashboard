@@ -196,19 +196,21 @@ function processTriggers(rawData) {
     // Skip Non-MS, Organic, and any unrecognised medium
     if (!isFB && !isWA && !isGA) continue;
 
-    if (brand && !modelToBrand[model]) modelToBrand[model] = brand;
+    // Normalise model key to lowercase so case differences don't break matching
+    var mk = model.toLowerCase();
+    if (brand && !modelToBrand[mk]) modelToBrand[mk] = brand;
 
-    var dk = dateStr + '||' + model;
+    var dk = dateStr + '||' + mk;
     if (isFB) {
-      fbByModel[model]    = (fbByModel[model]    || 0) + count;
+      fbByModel[mk]       = (fbByModel[mk]       || 0) + count;
       fbByDateModel[dk]   = (fbByDateModel[dk]   || 0) + count;
     }
     if (isWA) {
-      waByModel[model]    = (waByModel[model]    || 0) + count;
+      waByModel[mk]       = (waByModel[mk]       || 0) + count;
       waByDateModel[dk]   = (waByDateModel[dk]   || 0) + count;
     }
     if (isGA) {
-      gaByModel[model]    = (gaByModel[model]    || 0) + count;
+      gaByModel[mk]       = (gaByModel[mk]       || 0) + count;
       gaByDateModel[dk]   = (gaByDateModel[dk]   || 0) + count;
     }
   }
@@ -333,7 +335,7 @@ function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
     var fb = fbSpends[key] || {spends: 0, leads: 0};
     var ga = gaSpends[key] || {spends: 0, leads: 0};
     var wa = waSpends[key] || {spends: 0, leads: 0};
-    var dk = dateStr + '||' + model;
+    var dk = dateStr + '||' + model.toLowerCase();
     var fbTrig = triggers.fbByDateModel[dk] || 0;
     var waTrig = triggers.waByDateModel[dk] || 0;
     var gaTrig = triggers.gaByDateModel[dk] || 0;
@@ -382,9 +384,10 @@ function buildMTD(fbSpends, gaSpends, waSpends, triggers) {
     var fb = fbBM[bmKey] || {spends: 0, leads: 0};
     var ga = gaBM[bmKey] || {spends: 0, leads: 0};
     var wa = waBM[bmKey] || {spends: 0, leads: 0};
-    var fbTrig = triggers.fbByModel[model] || 0;
-    var waTrig = triggers.waByModel[model] || 0;
-    var gaTrig = triggers.gaByModel[model] || 0;
+    var mk = model.toLowerCase();
+    var fbTrig = triggers.fbByModel[mk] || 0;
+    var waTrig = triggers.waByModel[mk] || 0;
+    var gaTrig = triggers.gaByModel[mk] || 0;
     rows.push(makeRow(null, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,
