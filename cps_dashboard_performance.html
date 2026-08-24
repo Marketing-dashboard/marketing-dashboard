@@ -188,6 +188,31 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
   border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tracker tab ── */
+.tracker-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.tracker-active { font-weight: 600; color: var(--text); }
+table.tracker-tbl { font-size: 12px; }
+table.tracker-tbl thead th {
+  padding: 9px 10px; background: var(--tbl-head); border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text-muted); white-space: nowrap;
+}
+table.tracker-tbl thead th:not(:first-child) { text-align: right; }
+table.tracker-tbl tbody td { padding: 9px 10px; vertical-align: middle; border-bottom: 1px solid var(--border-light); }
+table.tracker-tbl tbody td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.tracker-tbl tbody tr:last-child td { border-bottom: none; }
+table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
+.drr-ok   { color: #16A34A; font-weight: 600; }
+.drr-warn { color: #D97706; font-weight: 600; }
+.drr-bad  { color: #DC2626; font-weight: 600; }
+.days-input {
+  width: 64px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); font-size: 12px; text-align: center; color: var(--text);
+  font-family: inherit; outline: none; transition: border-color .15s;
+}
+.days-input:focus { border-color: var(--primary); }
+.remaining-neg { color: #DC2626; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -203,6 +228,7 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
   <div class="tabs">
     <button class="tab-btn active" data-tab="daywise">Daywise Analysis</button>
     <button class="tab-btn" data-tab="mtd">MTD Summary</button>
+    <button class="tab-btn" data-tab="tracker">Tracker</button>
   </div>
 </div>
 
@@ -286,6 +312,43 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
     </div>
   </div>
 
+  <!-- TRACKER TAB -->
+  <div id="panel-tracker" class="tab-panel">
+    <div class="filters">
+      <div class="filter-group">
+        <label>Brand</label>
+        <select id="tracker-brand-select"><option value="">All Brands</option></select>
+      </div>
+      <button class="filter-reset" id="tracker-reset-btn">Reset</button>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Demand Tracker · MTD</div>
+        <div class="record-count tracker-meta">
+          Active days: <span id="tracker-active-days" class="tracker-active">—</span>
+          &nbsp;·&nbsp; Days remaining: enter manually per model
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="tracker-tbl">
+          <thead>
+            <tr>
+              <th style="text-align:left">Model</th>
+              <th>Brand</th>
+              <th>Triggered Till Date</th>
+              <th>Demand</th>
+              <th>Remaining</th>
+              <th>Days Remaining</th>
+              <th>Current DRR</th>
+              <th>Required DRR</th>
+            </tr>
+          </thead>
+          <tbody id="tracker-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- MTD TAB -->
   <div id="panel-mtd" class="tab-panel">
     <div class="table-card">
@@ -358,11 +421,21 @@ async function init() {
       btn.classList.add('active');
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'tracker') renderTracker();
     }));
 
     const brands = [...new Set(DATA.daywise.map(r => r.brand))].sort();
     const bSel = document.getElementById('brand-select');
     brands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; bSel.appendChild(o); });
+
+    // Tracker brand dropdown
+    const tBrands = [...new Set(DATA.mtd_summary.map(r => r.brand))].sort();
+    const tBSel = document.getElementById('tracker-brand-select');
+    tBrands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; tBSel.appendChild(o); });
+    tBSel.addEventListener('change', () => { trackerBrand = tBSel.value; renderTracker(); });
+    document.getElementById('tracker-reset-btn').addEventListener('click', () => {
+      trackerBrand = ''; tBSel.value = ''; renderTracker();
+    });
 
     bSel.addEventListener('change', () => {
       selectedBrand = bSel.value; selectedModel = '';
@@ -590,6 +663,119 @@ function renderMTD() {
 function toggleBrand(brand) {
   expandedBrands.has(brand) ? expandedBrands.delete(brand) : expandedBrands.add(brand);
   renderMTD();
+}
+
+// ── TRACKER ────────────────────────────────────────────────────
+let trackerBrand = '';
+
+function getActiveDays() {
+  const dates = new Set(DATA.daywise.map(r => r.date));
+  return dates.size;
+}
+
+function lsKey(model) { return 'cps_tracker_days_' + model.toLowerCase().replace(/\s+/g, '_'); }
+
+function getDaysRemaining(model) {
+  const v = localStorage.getItem(lsKey(model));
+  return v !== null ? parseInt(v) || 0 : '';
+}
+
+function setDaysRemaining(model, val) {
+  if (val === '' || val == null) localStorage.removeItem(lsKey(model));
+  else localStorage.setItem(lsKey(model), String(parseInt(val) || 0));
+}
+
+function drrClass(current, required) {
+  if (!required || isNaN(required)) return '';
+  const ratio = current / required;
+  if (ratio >= 1) return 'drr-ok';
+  if (ratio >= 0.75) return 'drr-warn';
+  return 'drr-bad';
+}
+
+function renderTracker() {
+  const activeDays = getActiveDays();
+  document.getElementById('tracker-active-days').textContent = activeDays;
+
+  // Build model-level map from MTD summary
+  const modelMap = {};
+  DATA.mtd_summary.forEach(r => {
+    const mk = r.model.toLowerCase();
+    if (!modelMap[mk]) modelMap[mk] = { model: r.model, brand: r.brand, triggered: 0 };
+    modelMap[mk].triggered += (r.combined_triggered || 0);
+  });
+
+  // Merge demand data
+  const demand = DATA.demand || {};
+
+  // Build rows
+  let rows = Object.values(modelMap);
+
+  // Add models that have demand but no MTD data
+  Object.keys(demand).forEach(mk => {
+    if (!modelMap[mk]) {
+      const d = demand[mk];
+      rows.push({ model: d.model || mk, brand: d.brand || '—', triggered: 0 });
+    }
+  });
+
+  // Apply brand filter
+  if (trackerBrand) rows = rows.filter(r => r.brand === trackerBrand);
+
+  // Sort by brand then model
+  rows.sort((a, b) => (a.brand||'').localeCompare(b.brand||'') || (a.model||'').localeCompare(b.model||''));
+
+  const tbody = document.getElementById('tracker-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--text-muted)">No records</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const mk       = r.model.toLowerCase();
+    const dem      = demand[mk] ? demand[mk].demand : 0;
+    const trig     = Math.round(r.triggered);
+    const rem      = dem > 0 ? dem - trig : null;
+    const daysRem  = getDaysRemaining(r.model);
+    const currDRR  = activeDays > 0 ? Math.round(trig / activeDays) : 0;
+    const reqDRR   = (daysRem > 0 && rem !== null && rem > 0) ? Math.round(rem / daysRem) : null;
+    const remClass = (rem !== null && rem < 0) ? 'remaining-neg' : '';
+    const drrCls   = drrClass(currDRR, reqDRR);
+
+    return `<tr>
+      <td style="white-space:nowrap;font-weight:500">${r.model}</td>
+      <td style="text-align:right"><span class="brand-pill" style="background:${brandBg(r.brand)};color:${brandFg(r.brand)}">${r.brand}</span></td>
+      <td>${fmtNum(trig, 0)}</td>
+      <td>${dem > 0 ? fmtNum(dem, 0) : '—'}</td>
+      <td class="${remClass}">${rem !== null ? fmtNum(rem, 0) : '—'}</td>
+      <td><input class="days-input" type="number" min="0" placeholder="—"
+          value="${daysRem !== '' ? daysRem : ''}"
+          data-model="${r.model.replace(/"/g, '&quot;')}"
+          onchange="onDaysInput(this)" oninput="onDaysInput(this)"></td>
+      <td>${currDRR > 0 ? fmtNum(currDRR, 0) : '—'}</td>
+      <td class="${drrCls}">${reqDRR !== null ? fmtNum(reqDRR, 0) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function onDaysInput(el) {
+  const model = el.getAttribute('data-model');
+  const val   = el.value.trim();
+  setDaysRemaining(model, val === '' ? null : val);
+  // Recompute just this row's DRR cells without full re-render
+  const row = el.closest('tr');
+  const cells = row.querySelectorAll('td');
+  const mk       = model.toLowerCase();
+  const dem      = (DATA.demand && DATA.demand[mk]) ? DATA.demand[mk].demand : 0;
+  const trig     = parseInt(cells[2].textContent.replace(/,/g,'')) || 0;
+  const rem      = dem > 0 ? dem - trig : null;
+  const daysRem  = parseInt(val) || 0;
+  const activeDays = getActiveDays();
+  const currDRR  = activeDays > 0 ? Math.round(trig / activeDays) : 0;
+  const reqDRR   = (daysRem > 0 && rem !== null && rem > 0) ? Math.round(rem / daysRem) : null;
+  cells[6].textContent = currDRR > 0 ? fmtNum(currDRR, 0) : '—';
+  cells[7].textContent = reqDRR !== null ? fmtNum(reqDRR, 0) : '—';
+  cells[7].className   = reqDRR !== null ? drrClass(currDRR, reqDRR) : '';
 }
 
 init();

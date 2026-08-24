@@ -43,12 +43,15 @@ function updateCPSDashboard() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   Logger.log('Reading sheet tabs...');
-  var rawData = ss.getSheetByName('Raw').getDataRange().getValues();
-  var tvsData = ss.getSheetByName('Raw_TVS_Jawa').getDataRange().getValues();
-  var gaData  = ss.getSheetByName('GA_Raw').getDataRange().getValues();
-  var fbData  = ss.getSheetByName('FB_Raw').getDataRange().getValues();
-  Logger.log('Rows — Raw:' + (rawData.length-1) + ' TVS_Jawa:' + (tvsData.length-1) + ' GA:' + (gaData.length-1) + ' FB_Raw:' + (fbData.length-1));
+  var rawData    = ss.getSheetByName('Raw').getDataRange().getValues();
+  var tvsData    = ss.getSheetByName('Raw_TVS_Jawa').getDataRange().getValues();
+  var gaData     = ss.getSheetByName('GA_Raw').getDataRange().getValues();
+  var fbData     = ss.getSheetByName('FB_Raw').getDataRange().getValues();
+  var demandSheet = ss.getSheetByName('Demand');
+  var demandData  = demandSheet ? demandSheet.getDataRange().getValues() : [];
+  Logger.log('Rows — Raw:' + (rawData.length-1) + ' TVS_Jawa:' + (tvsData.length-1) + ' GA:' + (gaData.length-1) + ' FB_Raw:' + (fbData.length-1) + ' Demand:' + (demandData.length > 0 ? demandData.length-1 : 0));
 
+  var demand   = processDemand(demandData);
   var triggers = processTriggers(rawData);
   var gaSpends = processGASpends(gaData, tvsData);
   var fbwa     = processFBandWASpends(fbData);
@@ -77,6 +80,7 @@ function updateCPSDashboard() {
       ga_raw:   gaData.length  - 1,
       fb_raw:   fbData.length  - 1
     },
+    demand: demand,
     summary: {
       date_min:      dateMin,
       date_max:      dateMax,
@@ -153,6 +157,38 @@ function diagnoseSheets() {
     Logger.log(first2[0].join(' | '));
     Logger.log('Row 2: ' + first2[1].join(' | '));
   });
+}
+
+// ── PROCESS DEMAND TAB ────────────────────────────────────────
+// Expected columns (flexible): Model | Brand | Demand  (or any order)
+// Returns { 'model name lowercase': demand_count, ... }
+function processDemand(demandData) {
+  var result = {};
+  if (!demandData || demandData.length < 2) return result;
+
+  var h = demandData[0].map(function(v) { return String(v||'').toLowerCase().trim(); });
+  var iModel  = findCol(h, ['model','model name','modelname','model_name']);
+  var iDemand = findCol(h, ['demand','target','requirement','required','leads target','target leads','mkt triggers','mkt trigger']);
+  var iBrand  = findCol(h, ['brand','oem','brand name']);
+
+  if (iModel < 0 || iDemand < 0) {
+    Logger.log('Demand sheet: model col=' + iModel + ' demand col=' + iDemand + ' headers: ' + h.join(' | '));
+    return result;
+  }
+
+  for (var i = 1; i < demandData.length; i++) {
+    var row    = demandData[i];
+    var model  = String(row[iModel]  || '').trim();
+    var dval   = parseInt(String(row[iDemand] || '0').replace(/,/g,'')) || 0;
+    var brand  = iBrand >= 0 ? String(row[iBrand] || '').trim() : '';
+    if (!model || dval <= 0) continue;
+    var mk = model.toLowerCase();
+    result[mk] = { demand: (result[mk] ? result[mk].demand : 0) + dval, brand: brand, model: model };
+  }
+
+  // Flatten: convert objects to { model: {...}, ... }
+  Logger.log('Demand: ' + Object.keys(result).length + ' models loaded.');
+  return result;
 }
 
 // ── PROCESS RAW TAB (triggered leads) ────────────────────────
