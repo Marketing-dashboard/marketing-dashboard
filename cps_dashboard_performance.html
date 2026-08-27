@@ -227,6 +227,7 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
   </div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="daywise">Daywise Analysis</button>
+    <button class="tab-btn" data-tab="brand-daywise">Brand Daywise</button>
     <button class="tab-btn" data-tab="mtd">MTD Summary</button>
     <button class="tab-btn" data-tab="tracker">Tracker</button>
   </div>
@@ -345,6 +346,44 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
     </div>
   </div>
 
+  <!-- BRAND DAYWISE TAB -->
+  <div id="panel-brand-daywise" class="tab-panel">
+    <div class="filters">
+      <div class="filter-group">
+        <label>Brand</label>
+        <select id="bd-brand-select"><option value="">All Brands</option></select>
+      </div>
+      <button class="filter-reset" id="bd-reset-btn">Reset</button>
+    </div>
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Brand-Level Daywise Spends</div>
+        <div class="record-count" id="bd-record-count">—</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr class="grp-row">
+              <th class="grp-dim" rowspan="2" style="text-align:left">Date</th>
+              <th class="grp-dim" rowspan="2" style="text-align:left">Brand</th>
+              <th class="grp-fb"   colspan="6">Facebook</th>
+              <th class="grp-ga"   colspan="6">Google / Adwords</th>
+              <th class="grp-wa"   colspan="6">WhatsApp</th>
+              <th class="grp-comb" colspan="6">Combined</th>
+            </tr>
+            <tr class="sub-row">
+              <th class="sub-fb">Spends (₹)</th><th class="sub-fb">Leads</th><th class="sub-fb">Triggered</th><th class="sub-fb">CPL (₹)</th><th class="sub-fb">TCPL (₹)</th><th class="sub-fb">Trigger %</th>
+              <th class="sub-ga">Spends (₹)</th><th class="sub-ga">Leads</th><th class="sub-ga">Triggered</th><th class="sub-ga">CPL (₹)</th><th class="sub-ga">TCPL (₹)</th><th class="sub-ga">Trigger %</th>
+              <th class="sub-wa">Spends (₹)</th><th class="sub-wa">Leads</th><th class="sub-wa">Triggered</th><th class="sub-wa">CPL (₹)</th><th class="sub-wa">TCPL (₹)</th><th class="sub-wa">Trigger %</th>
+              <th class="sub-comb">Spends (₹)</th><th class="sub-comb">Leads</th><th class="sub-comb">Triggered</th><th class="sub-comb">CPL (₹)</th><th class="sub-comb">TCPL (₹)</th><th class="sub-comb">Trigger %</th>
+            </tr>
+          </thead>
+          <tbody id="bd-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- MTD TAB -->
   <div id="panel-mtd" class="tab-panel">
     <div class="table-card">
@@ -377,7 +416,7 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
 </div>
 
 <script>
-let DATA = null, selectedBrand = '';
+let DATA = null, selectedBrand = '', bdSelectedBrand = '';
 let expandedBrands = new Set(), expandedModels = new Set();
 
 const BRAND_FG = { 'Bajaj':'#1D4ED8','TVS':'#15803D','Jawa':'#B91C1C','KTM':'#C2410C',
@@ -417,11 +456,19 @@ async function init() {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'tracker') renderTracker();
+      if (btn.dataset.tab === 'brand-daywise') renderBrandDaywise();
     }));
 
     const brands = [...new Set(DATA.daywise.map(r => r.brand))].sort();
     const bSel = document.getElementById('brand-select');
     brands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; bSel.appendChild(o); });
+
+    // Brand Daywise dropdown
+    const bdBrands = [...new Set(DATA.daywise.map(r => r.brand))].sort();
+    const bdSel = document.getElementById('bd-brand-select');
+    bdBrands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; bdSel.appendChild(o); });
+    bdSel.addEventListener('change', () => { bdSelectedBrand = bdSel.value; renderBrandDaywise(); });
+    document.getElementById('bd-reset-btn').addEventListener('click', () => { bdSelectedBrand = ''; bdSel.value = ''; renderBrandDaywise(); });
 
     // Tracker brand dropdown
     const tBrands = [...new Set(DATA.mtd_summary.map(r => r.brand))].sort();
@@ -642,6 +689,60 @@ function renderMTD() {
 function toggleBrand(brand) {
   expandedBrands.has(brand) ? expandedBrands.delete(brand) : expandedBrands.add(brand);
   renderMTD();
+}
+
+// ── BRAND DAYWISE ──────────────────────────────────────────────
+function renderBrandDaywise() {
+  // Aggregate daywise rows by date + brand
+  const agg = {};
+  const src = bdSelectedBrand
+    ? DATA.daywise.filter(r => r.brand === bdSelectedBrand)
+    : DATA.daywise;
+
+  src.forEach(r => {
+    const k = r.date + '||' + r.brand;
+    if (!agg[k]) agg[k] = {
+      date: r.date, brand: r.brand,
+      fS:0, fL:0, fT:0, gS:0, gL:0, gT:0, wS:0, wL:0, wT:0, cS:0, cL:0, cT:0
+    };
+    const a = agg[k];
+    a.fS += r.fb_spends||0;    a.fL += r.fb_leads||0;    a.fT += r.fb_triggered||0;
+    a.gS += r.ga_spends||0;    a.gL += r.ga_leads||0;    a.gT += r.ga_triggered||0;
+    a.wS += r.wa_spends||0;    a.wL += r.wa_leads||0;    a.wT += r.wa_triggered||0;
+    a.cS += r.combined_spends||0; a.cL += r.combined_leads||0; a.cT += r.combined_triggered||0;
+  });
+
+  // Sort: date descending, then brand ascending
+  const rows = Object.values(agg).sort((a, b) =>
+    b.date.localeCompare(a.date) || a.brand.localeCompare(b.brand)
+  );
+
+  document.getElementById('bd-record-count').textContent = `${rows.length} records`;
+
+  const tbody = document.getElementById('bd-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="26" style="text-align:center;padding:36px;color:var(--text-muted)">No records</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(a => {
+    const fCPL=a.fL>0?a.fS/a.fL:null, fTCPL=a.fT>0&&a.fS>0?a.fS/a.fT:null, fTP=a.fL>0?a.fT/a.fL*100:null;
+    const gCPL=a.gL>0?a.gS/a.gL:null, gTCPL=a.gT>0&&a.gS>0?a.gS/a.gT:null, gTP=a.gL>0?a.gT/a.gL*100:null;
+    const wCPL=a.wL>0?a.wS/a.wL:null, wTCPL=a.wT>0&&a.wS>0?a.wS/a.wT:null, wTP=a.wL>0?a.wT/a.wL*100:null;
+    const cCPL=a.cL>0?a.cS/a.cL:null, cTCPL=a.cT>0&&a.cS>0?a.cS/a.cT:null, cTP=a.cL>0?a.cT/a.cL*100:null;
+    return `<tr>
+      <td style="white-space:nowrap;font-weight:500">${fmtDate(a.date)}</td>
+      <td><span class="brand-pill" style="background:${brandBg(a.brand)};color:${brandFg(a.brand)}">${a.brand}</span></td>
+      <td class="num sep-fb">${fmtINR(a.fS)}</td><td class="num">${fmtNum(a.fL,0)}</td><td class="num">${fmtNum(a.fT,0)}</td>
+      <td class="num">${fmtINR(fCPL)}</td><td class="num">${fmtINR(fTCPL)}</td><td class="num ${trigClass(fTP)}">${fmtPct(fTP)}</td>
+      <td class="num sep-ga">${fmtINR(a.gS)}</td><td class="num">${fmtNum(a.gL,0)}</td><td class="num">${fmtNum(a.gT,0)}</td>
+      <td class="num">${fmtINR(gCPL)}</td><td class="num">${fmtINR(gTCPL)}</td><td class="num ${trigClass(gTP)}">${fmtPct(gTP)}</td>
+      <td class="num sep-wa">${fmtINR(a.wS)}</td><td class="num">${fmtNum(a.wL,0)}</td><td class="num">${fmtNum(a.wT,0)}</td>
+      <td class="num">${fmtINR(wCPL)}</td><td class="num">${fmtINR(wTCPL)}</td><td class="num ${trigClass(wTP)}">${fmtPct(wTP)}</td>
+      <td class="num sep-comb">${fmtINR(a.cS)}</td><td class="num">${fmtNum(a.cL,0)}</td><td class="num">${fmtNum(a.cT,0)}</td>
+      <td class="num">${fmtINR(cCPL)}</td><td class="num">${fmtINR(cTCPL)}</td><td class="num ${trigClass(cTP)}">${fmtPct(cTP)}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── TRACKER ────────────────────────────────────────────────────
