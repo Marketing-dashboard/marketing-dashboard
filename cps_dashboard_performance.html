@@ -242,10 +242,6 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
         <label>Brand</label>
         <select id="brand-select"><option value="">All Brands</option></select>
       </div>
-      <div class="filter-group">
-        <label>Model</label>
-        <select id="model-select"><option value="">All Models</option></select>
-      </div>
       <button class="filter-reset" id="reset-btn">Reset</button>
     </div>
 
@@ -381,9 +377,8 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
 </div>
 
 <script>
-let DATA = null, selectedBrand = '', selectedModel = '';
-let expandedBrands = new Set(), sortCol = 'date', sortDir = 1, currentPage = 1;
-const PAGE_SIZE = 30;
+let DATA = null, selectedBrand = '';
+let expandedBrands = new Set(), expandedModels = new Set();
 
 const BRAND_FG = { 'Bajaj':'#1D4ED8','TVS':'#15803D','Jawa':'#B91C1C','KTM':'#C2410C',
   'Triumph':'#6D28D9','Ampere':'#0369A1','BGauss':'#92400E','Bajaj Chetak':'#7E22CE','Ather':'#0F766E' };
@@ -438,28 +433,13 @@ async function init() {
     });
 
     bSel.addEventListener('change', () => {
-      selectedBrand = bSel.value; selectedModel = '';
-      document.getElementById('model-select').value = '';
-      updateModelDropdown(); currentPage = 1; renderDaywise();
-    });
-    document.getElementById('model-select').addEventListener('change', e => {
-      selectedModel = e.target.value; currentPage = 1; renderDaywise();
+      selectedBrand = bSel.value;
+      expandedModels.clear();
+      renderDaywise();
     });
     document.getElementById('reset-btn').addEventListener('click', () => {
-      selectedBrand = ''; selectedModel = '';
-      bSel.value = ''; document.getElementById('model-select').value = '';
-      updateModelDropdown(); currentPage = 1; renderDaywise();
-    });
-
-    document.querySelectorAll('#panel-daywise thead th[data-col]').forEach(th => {
-      th.addEventListener('click', () => {
-        const col = th.dataset.col;
-        sortDir = sortCol === col ? -sortDir : 1;
-        sortCol = col;
-        document.querySelectorAll('#panel-daywise thead th').forEach(h => h.classList.remove('sorted-asc','sorted-desc'));
-        th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
-        currentPage = 1; renderDaywise();
-      });
+      selectedBrand = ''; bSel.value = '';
+      expandedModels.clear(); renderDaywise();
     });
 
     renderDaywise();
@@ -470,110 +450,109 @@ async function init() {
   }
 }
 
-function updateModelDropdown() {
-  const sel = document.getElementById('model-select');
-  sel.innerHTML = '<option value="">All Models</option>';
-  [...new Set(DATA.daywise.filter(r => !selectedBrand || r.brand === selectedBrand).map(r => r.model))].sort()
-    .forEach(m => { const o = document.createElement('option'); o.value = o.textContent = m; sel.appendChild(o); });
-}
-
-function getFiltered() {
-  return DATA.daywise.filter(r => {
-    if (selectedBrand && r.brand !== selectedBrand) return false;
-    if (selectedModel && r.model !== selectedModel) return false;
-    return true;
-  });
-}
-
 function renderDaywise() {
-  const rows = getFiltered();
+  const brandRows = selectedBrand
+    ? DATA.daywise.filter(r => r.brand === selectedBrand)
+    : DATA.daywise;
 
-  // KPIs from combined fields (FB + GA + WA)
-  const T = rows.reduce((a, r) => ({
+  // KPI cards reflect current brand selection
+  const T = brandRows.reduce((a, r) => ({
     spends: a.spends + (r.combined_spends    || 0),
     leads:  a.leads  + (r.combined_leads     || 0),
     trig:   a.trig   + (r.combined_triggered || 0),
   }), { spends: 0, leads: 0, trig: 0 });
-  const cpl  = T.leads > 0 ? T.spends / T.leads  : null;
-  const tcpl = T.trig  > 0 ? T.spends / T.trig   : null;
-  const tpct = T.leads > 0 ? T.trig   / T.leads * 100 : null;
-
   document.getElementById('kpi-spends').textContent    = fmtINR(T.spends);
   document.getElementById('kpi-leads').textContent     = fmtNum(T.leads, 0);
   document.getElementById('kpi-triggered').textContent = fmtNum(T.trig, 0);
-  document.getElementById('kpi-cpl').textContent       = fmtINR(cpl);
-  document.getElementById('kpi-tcpl').textContent      = fmtINR(tcpl);
-  document.getElementById('kpi-tpct').textContent      = fmtPct(tpct);
-
-  const sorted = [...rows].sort((a, b) => {
-    if (sortCol === 'date') {
-      const dc = (a.date||'').localeCompare(b.date||'') * sortDir; if (dc) return dc;
-      const bc = (a.brand||'').localeCompare(b.brand||''); if (bc) return bc;
-      return (a.model||'').localeCompare(b.model||'');
-    }
-    if (sortCol === 'brand') return (a.brand||'').localeCompare(b.brand||'') * sortDir;
-    if (sortCol === 'model') return (a.model||'').localeCompare(b.model||'') * sortDir;
-    let av = a[sortCol], bv = b[sortCol];
-    if (av == null) av = sortDir > 0 ? Infinity : -Infinity;
-    if (bv == null) bv = sortDir > 0 ? Infinity : -Infinity;
-    return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir;
-  });
-
-  const total = sorted.length, pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  currentPage = Math.min(currentPage, pages);
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const slice = sorted.slice(start, start + PAGE_SIZE);
-
-  document.getElementById('record-count').textContent = `${total} records`;
+  document.getElementById('kpi-cpl').textContent       = fmtINR(T.leads > 0 ? T.spends / T.leads : null);
+  document.getElementById('kpi-tcpl').textContent      = fmtINR(T.trig  > 0 ? T.spends / T.trig  : null);
+  document.getElementById('kpi-tpct').textContent      = fmtPct(T.leads > 0 ? T.trig / T.leads * 100 : null);
 
   const tbody = document.getElementById('daywise-tbody');
-  if (!slice.length) {
-    tbody.innerHTML = '<tr><td colspan="27" style="text-align:center;padding:36px;color:var(--text-muted)">No records match</td></tr>';
-  } else {
-    tbody.innerHTML = slice.map(r => `
-      <tr>
-        <td style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
-        <td><span class="brand-pill" style="background:${brandBg(r.brand)};color:${brandFg(r.brand)}">${r.brand}</span></td>
-        <td style="white-space:nowrap">${r.model}</td>
-        <td class="num sep-fb">${fmtINR(r.fb_spends)}</td>
-        <td class="num">${fmtNum(r.fb_leads, 0)}</td>
-        <td class="num">${fmtNum(r.fb_triggered, 0)}</td>
-        <td class="num">${fmtINR(r.fb_cpl)}</td>
-        <td class="num">${fmtINR(r.fb_tcpl)}</td>
-        <td class="num ${trigClass(r.fb_trigger_pct)}">${fmtPct(r.fb_trigger_pct)}</td>
-        <td class="num sep-ga">${fmtINR(r.ga_spends)}</td>
-        <td class="num">${fmtNum(r.ga_leads, 0)}</td>
-        <td class="num">${fmtNum(r.ga_triggered, 0)}</td>
-        <td class="num">${fmtINR(r.ga_cpl)}</td>
-        <td class="num">${fmtINR(r.ga_tcpl)}</td>
-        <td class="num ${trigClass(r.ga_trigger_pct)}">${fmtPct(r.ga_trigger_pct)}</td>
-        <td class="num sep-wa">${fmtINR(r.wa_spends)}</td>
-        <td class="num">${fmtNum(r.wa_leads, 0)}</td>
-        <td class="num">${fmtNum(r.wa_triggered, 0)}</td>
-        <td class="num">${fmtINR(r.wa_cpl)}</td>
-        <td class="num">${fmtINR(r.wa_tcpl)}</td>
-        <td class="num ${trigClass(r.wa_trigger_pct)}">${fmtPct(r.wa_trigger_pct)}</td>
-        <td class="num sep-comb">${fmtINR(r.combined_spends)}</td>
-        <td class="num">${fmtNum(r.combined_leads, 0)}</td>
-        <td class="num">${fmtNum(r.combined_triggered, 0)}</td>
-        <td class="num">${fmtINR(r.combined_cpl)}</td>
-        <td class="num">${fmtINR(r.combined_tcpl)}</td>
-        <td class="num ${trigClass(r.combined_trigger_pct)}">${fmtPct(r.combined_trigger_pct)}</td>
-      </tr>`).join('');
+
+  if (!selectedBrand) {
+    document.getElementById('record-count').textContent = `${DATA.daywise.length} records — select a brand to drill down`;
+    document.getElementById('pag-info').textContent = '';
+    document.getElementById('pag-btns').innerHTML = '';
+    tbody.innerHTML = `<tr><td colspan="27" style="text-align:center;padding:48px;color:var(--text-muted);font-size:13px">
+      Select a brand above to view model breakdown</td></tr>`;
+    return;
   }
 
-  document.getElementById('pag-info').textContent =
-    `Page ${currentPage} of ${pages} · ${start+1}–${Math.min(start+PAGE_SIZE,total)} of ${total}`;
+  // Group by model
+  const modelMap = {};
+  brandRows.forEach(r => {
+    if (!modelMap[r.model]) modelMap[r.model] = [];
+    modelMap[r.model].push(r);
+  });
+  const models = Object.keys(modelMap).sort();
 
-  let pnums = pages <= 7 ? Array.from({length:pages},(_,i)=>i+1)
-    : Array.from({length:Math.min(7,pages)},(_,i)=>Math.max(1,Math.min(currentPage-2,pages-6))+i);
-  document.getElementById('pag-btns').innerHTML =
-    `<button class="pag-btn" ${currentPage<=1?'disabled':''} onclick="goPage(${currentPage-1})">‹</button>` +
-    pnums.map(p=>`<button class="pag-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`).join('') +
-    `<button class="pag-btn" ${currentPage>=pages?'disabled':''} onclick="goPage(${currentPage+1})">›</button>`;
+  document.getElementById('record-count').textContent =
+    `${models.length} model${models.length !== 1 ? 's' : ''} · click to expand dates`;
+  document.getElementById('pag-info').textContent = '';
+  document.getElementById('pag-btns').innerHTML = '';
+
+  let html = '';
+  models.forEach(model => {
+    const mRows = modelMap[model];
+    // Aggregate MTD totals for this model
+    const M = mRows.reduce((a, r) => ({
+      fS: a.fS+(r.fb_spends||0),        fL: a.fL+(r.fb_leads||0),        fT: a.fT+(r.fb_triggered||0),
+      gS: a.gS+(r.ga_spends||0),        gL: a.gL+(r.ga_leads||0),        gT: a.gT+(r.ga_triggered||0),
+      wS: a.wS+(r.wa_spends||0),        wL: a.wL+(r.wa_leads||0),        wT: a.wT+(r.wa_triggered||0),
+      cS: a.cS+(r.combined_spends||0),  cL: a.cL+(r.combined_leads||0),  cT: a.cT+(r.combined_triggered||0),
+    }), {fS:0,fL:0,fT:0,gS:0,gL:0,gT:0,wS:0,wL:0,wT:0,cS:0,cL:0,cT:0});
+
+    const fCPL=M.fL>0?M.fS/M.fL:null, fTCPL=M.fT>0&&M.fS>0?M.fS/M.fT:null, fTP=M.fL>0?M.fT/M.fL*100:null;
+    const gCPL=M.gL>0?M.gS/M.gL:null, gTCPL=M.gT>0&&M.gS>0?M.gS/M.gT:null, gTP=M.gL>0?M.gT/M.gL*100:null;
+    const wCPL=M.wL>0?M.wS/M.wL:null, wTCPL=M.wT>0&&M.wS>0?M.wS/M.wT:null, wTP=M.wL>0?M.wT/M.wL*100:null;
+    const cCPL=M.cL>0?M.cS/M.cL:null, cTCPL=M.cT>0&&M.cS>0?M.cS/M.cT:null, cTP=M.cL>0?M.cT/M.cL*100:null;
+
+    const isExp = expandedModels.has(model);
+    const sm = model.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    html += `<tr class="brand-row" onclick="toggleDaywiseModel('${sm}')">
+      <td colspan="3"><div class="brand-row-inner">
+        <span class="expand-icon">${isExp ? '▼' : '▶'}</span>
+        <span>${model}</span>
+        <span class="model-count">${mRows.length} day${mRows.length!==1?'s':''}</span>
+      </div></td>
+      <td class="num sep-fb">${fmtINR(M.fS)}</td><td class="num">${fmtNum(M.fL,0)}</td><td class="num">${fmtNum(M.fT,0)}</td>
+      <td class="num">${fmtINR(fCPL)}</td><td class="num">${fmtINR(fTCPL)}</td><td class="num ${trigClass(fTP)}">${fmtPct(fTP)}</td>
+      <td class="num sep-ga">${fmtINR(M.gS)}</td><td class="num">${fmtNum(M.gL,0)}</td><td class="num">${fmtNum(M.gT,0)}</td>
+      <td class="num">${fmtINR(gCPL)}</td><td class="num">${fmtINR(gTCPL)}</td><td class="num ${trigClass(gTP)}">${fmtPct(gTP)}</td>
+      <td class="num sep-wa">${fmtINR(M.wS)}</td><td class="num">${fmtNum(M.wL,0)}</td><td class="num">${fmtNum(M.wT,0)}</td>
+      <td class="num">${fmtINR(wCPL)}</td><td class="num">${fmtINR(wTCPL)}</td><td class="num ${trigClass(wTP)}">${fmtPct(wTP)}</td>
+      <td class="num sep-comb">${fmtINR(M.cS)}</td><td class="num">${fmtNum(M.cL,0)}</td><td class="num">${fmtNum(M.cT,0)}</td>
+      <td class="num">${fmtINR(cCPL)}</td><td class="num">${fmtINR(cTCPL)}</td><td class="num ${trigClass(cTP)}">${fmtPct(cTP)}</td>
+    </tr>`;
+
+    if (isExp) {
+      // Date rows sorted newest → oldest
+      [...mRows].sort((a, b) => b.date.localeCompare(a.date)).forEach(r => {
+        html += `<tr class="model-row">
+          <td class="model-indent" style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
+          <td></td><td></td>
+          <td class="num sep-fb">${fmtINR(r.fb_spends)}</td><td class="num">${fmtNum(r.fb_leads,0)}</td><td class="num">${fmtNum(r.fb_triggered,0)}</td>
+          <td class="num">${fmtINR(r.fb_cpl)}</td><td class="num">${fmtINR(r.fb_tcpl)}</td><td class="num ${trigClass(r.fb_trigger_pct)}">${fmtPct(r.fb_trigger_pct)}</td>
+          <td class="num sep-ga">${fmtINR(r.ga_spends)}</td><td class="num">${fmtNum(r.ga_leads,0)}</td><td class="num">${fmtNum(r.ga_triggered,0)}</td>
+          <td class="num">${fmtINR(r.ga_cpl)}</td><td class="num">${fmtINR(r.ga_tcpl)}</td><td class="num ${trigClass(r.ga_trigger_pct)}">${fmtPct(r.ga_trigger_pct)}</td>
+          <td class="num sep-wa">${fmtINR(r.wa_spends)}</td><td class="num">${fmtNum(r.wa_leads,0)}</td><td class="num">${fmtNum(r.wa_triggered,0)}</td>
+          <td class="num">${fmtINR(r.wa_cpl)}</td><td class="num">${fmtINR(r.wa_tcpl)}</td><td class="num ${trigClass(r.wa_trigger_pct)}">${fmtPct(r.wa_trigger_pct)}</td>
+          <td class="num sep-comb">${fmtINR(r.combined_spends)}</td><td class="num">${fmtNum(r.combined_leads,0)}</td><td class="num">${fmtNum(r.combined_triggered,0)}</td>
+          <td class="num">${fmtINR(r.combined_cpl)}</td><td class="num">${fmtINR(r.combined_tcpl)}</td><td class="num ${trigClass(r.combined_trigger_pct)}">${fmtPct(r.combined_trigger_pct)}</td>
+        </tr>`;
+      });
+    }
+  });
+
+  tbody.innerHTML = html || `<tr><td colspan="27" style="text-align:center;padding:36px;color:var(--text-muted)">No records</td></tr>`;
 }
 
-function goPage(p) { currentPage = p; renderDaywise(); }
+function toggleDaywiseModel(model) {
+  expandedModels.has(model) ? expandedModels.delete(model) : expandedModels.add(model);
+  renderDaywise();
+}
 
 // ── MTD ────────────────────────────────────────────
 function computeTotals(rows) {
