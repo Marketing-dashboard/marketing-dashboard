@@ -319,6 +319,10 @@ thead .trk-entity { background: var(--surface2); z-index: 3; }
 
     <div class="filters-bar">
       <div class="fg">
+        <label>Month</label>
+        <select id="monthFilter"><option value="all">All Months</option></select>
+      </div>
+      <div class="fg">
         <label>Brand</label>
         <select id="brandFilter"><option value="all">All Brands</option></select>
       </div>
@@ -485,9 +489,15 @@ thead .trk-entity { background: var(--surface2); z-index: 3; }
 
     <!-- Step 3: Per-Model table (level=model) -->
     <div class="modal-step" id="msMM">
-      <div class="mf">
-        <label>Campaign End Date <small style="color:var(--muted)">(optional — DRR uses days until this date)</small></label>
-        <input type="date" id="inMMEndDate">
+      <div style="display:flex;gap:12px;">
+        <div class="mf" style="flex:1">
+          <label>Campaign Start Date <small style="color:var(--muted)">(default: 1st of current month)</small></label>
+          <input type="date" id="inMMStartDate">
+        </div>
+        <div class="mf" style="flex:1">
+          <label>Campaign End Date <small style="color:var(--muted)">(optional — for DRR)</small></label>
+          <input type="date" id="inMMEndDate">
+        </div>
       </div>
       <div class="mf">
         <label id="mmTableLabel">Set target &amp; budget for each model (leave blank to skip)</label>
@@ -510,9 +520,15 @@ thead .trk-entity { background: var(--surface2); z-index: 3; }
         <label>Total Brand Budget (₹)</label>
         <input type="number" id="inBrandBudget" placeholder="e.g. 5000000" min="0">
       </div>
-      <div class="mf">
-        <label>Campaign End Date <small style="color:var(--muted)">(optional — DRR uses days until this date)</small></label>
-        <input type="date" id="inMxEndDate">
+      <div style="display:flex;gap:12px;">
+        <div class="mf" style="flex:1">
+          <label>Campaign Start Date <small style="color:var(--muted)">(default: 1st of current month)</small></label>
+          <input type="date" id="inMxStartDate">
+        </div>
+        <div class="mf" style="flex:1">
+          <label>Campaign End Date <small style="color:var(--muted)">(optional — for DRR)</small></label>
+          <input type="date" id="inMxEndDate">
+        </div>
       </div>
       <div class="mf">
         <label>Target Impressions per Model (leave blank to skip)</label>
@@ -568,9 +584,15 @@ thead .trk-entity { background: var(--surface2); z-index: 3; }
           <input type="number" id="inBudgetLeads" placeholder="e.g. 80000" min="0">
         </div>
       </div>
-      <div class="mf">
-        <label>Campaign End Date <small style="color:var(--muted)">(optional — DRR uses days until this date)</small></label>
-        <input type="date" id="inBrandEndDate">
+      <div style="display:flex;gap:12px;">
+        <div class="mf" style="flex:1">
+          <label>Campaign Start Date <small style="color:var(--muted)">(default: 1st of current month)</small></label>
+          <input type="date" id="inBrandStartDate">
+        </div>
+        <div class="mf" style="flex:1">
+          <label>Campaign End Date <small style="color:var(--muted)">(optional — for DRR)</small></label>
+          <input type="date" id="inBrandEndDate">
+        </div>
       </div>
     </div>
 
@@ -690,8 +712,9 @@ let SEGMENTS  = [];       // sorted unique segments
 let activeBrand    = 'all';
 let activeModel    = 'all';
 let activePlatform = 'all';
-let activeSegment       = 'all';
-let activeSummaryBrand  = 'all';
+let activeSegment      = 'all';
+let activeMonth        = 'all';
+let activeSummaryBrand = 'all';
 
 const modal = {
   step: 1,
@@ -835,12 +858,13 @@ function processRows(rows) {
 /* ═══════════════════════════════════════════════
    FILTER
 ══════════════════════════════════════════════ */
-function filterRows(brand = 'all', model = 'all', platform = 'all', segment = 'all') {
+function filterRows(brand = 'all', model = 'all', platform = 'all', segment = 'all', month = 'all') {
   return RAW.filter(r => {
-    if (brand    !== 'all' && r.brand    !== brand)    return false;
-    if (model    !== 'all' && r.model    !== model)    return false;
-    if (platform !== 'all' && r.platform !== platform) return false;
-    if (segment  !== 'all' && r.segment  !== segment)  return false;
+    if (brand    !== 'all' && r.brand    !== brand)               return false;
+    if (model    !== 'all' && r.model    !== model)               return false;
+    if (platform !== 'all' && r.platform !== platform)            return false;
+    if (segment  !== 'all' && r.segment  !== segment)             return false;
+    if (month    !== 'all' && !r.dateStr.startsWith(month))       return false;
     return true;
   });
 }
@@ -908,6 +932,16 @@ const F = {
    RENDER FILTERS
 ══════════════════════════════════════════════ */
 function renderFilters() {
+  // Month filter — populate from unique YYYY-MM values in data
+  const mSel = document.getElementById('monthFilter');
+  const months = [...new Set(RAW.map(r => r.dateStr.substring(0, 7)))].sort().reverse();
+  const monthLabels = { '01':'January','02':'February','03':'March','04':'April','05':'May','06':'June','07':'July','08':'August','09':'September','10':'October','11':'November','12':'December' };
+  mSel.innerHTML = '<option value="all">All Months</option>' +
+    months.map(m => { const [y, mo] = m.split('-'); return `<option value="${m}">${monthLabels[mo]} ${y}</option>`; }).join('');
+  // Default to the latest month
+  if (months.length) { activeMonth = months[0]; mSel.value = months[0]; }
+  mSel.addEventListener('change', () => { activeMonth = mSel.value; renderDashboard(); });
+
   const bSel = document.getElementById('brandFilter');
   bSel.innerHTML = '<option value="all">All Brands</option>' +
     BRANDS.map(b => `<option value="${b}">${b}</option>`).join('');
@@ -951,7 +985,7 @@ function renderModelFilter() {
    RENDER DASHBOARD
 ══════════════════════════════════════════════ */
 function renderDashboard() {
-  const rows     = filterRows(activeBrand, activeModel, 'all', activeSegment);
+  const rows     = filterRows(activeBrand, activeModel, 'all', activeSegment, activeMonth);
   const totals   = sumRows(rows);
   const hasLeads = rows.some(r => r.leads > 0);
   const hasViews = rows.some(r => r.views > 0);
@@ -1158,7 +1192,9 @@ async function renderTracker() {
   const latestDate    = latestDateStr ? parseDate(latestDateStr) : null;
   const refDate       = latestDate || today;
   const daysInMonth   = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0).getDate();
-  const defaultRemaining = daysInMonth - refDate.getDate();
+  const defaultRemaining  = daysInMonth - refDate.getDate();
+  // Default tracker start = 1st of the month containing the latest data
+  const defaultStartDate  = latestDateStr ? latestDateStr.substring(0, 7) + '-01' : null;
 
   // Per-entity remaining days: use campaign end date if set, else month-end
   function entityRemaining(e) {
@@ -1190,6 +1226,7 @@ async function renderTracker() {
     const eRows = RAW.filter(r => {
       if (r.brand !== e.brand) return false;
       if (e.level === 'model' && e.model && r.model !== e.model) return false;
+      if (entityStartDate && r.dateStr < entityStartDate) return false;
       return true;
     });
     const yRows = eRows.filter(r => r.dateStr === latestDateStr);
@@ -1207,6 +1244,10 @@ async function renderTracker() {
     const t            = saved[e.key] || {};
     const isBudgetOnly = t.targetType === 'budget-only';
     const remaining    = entityRemaining(e);
+    // start date: entity's own → parent brand's → default (1st of latest month)
+    const entityStartDate = t.startDate
+      || (e.level === 'model' ? (saved[`brand::${e.brand}`] || {}).startDate : null)
+      || defaultStartDate;
 
     const tImpr  = isBudgetOnly ? null : (t.targetImpr  || null);
     const tLeads = isBudgetOnly ? null : (t.targetLeads || null);
@@ -1229,9 +1270,12 @@ async function renderTracker() {
     const drrSpend = budget > 0 && remaining > 0 ? Math.max(0, (budget - total.spend)   / remaining) : null;
 
     const dispEndDate = t.endDate || (e.level === 'model' ? (saved[`brand::${e.brand}`] || {}).endDate : null);
+    const fmt = d => new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+    const startLabel = entityStartDate && entityStartDate !== defaultStartDate
+      ? `${fmt(entityStartDate)} → ` : '';
     const endTag = dispEndDate
-      ? `<br><small style="color:var(--muted);font-weight:400;">${new Date(dispEndDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'})} · ${remaining}d</small>`
-      : (remaining !== defaultRemaining ? `<br><small style="color:var(--muted);font-weight:400;">${remaining}d left</small>` : '');
+      ? `<br><small style="color:var(--muted);font-weight:400;">${startLabel}${fmt(dispEndDate)} · ${remaining}d</small>`
+      : (startLabel ? `<br><small style="color:var(--muted);font-weight:400;">${startLabel}${remaining}d left</small>` : '');
 
     let lbl;
     if (e.level === 'model' && e.model)       lbl = `${e.model}${endTag}`;
@@ -1416,7 +1460,7 @@ async function openModal(existingKey) {
   modal._editKey = null; modal._editBrand = null;
   document.querySelectorAll('[data-level],[data-ttype]').forEach(el => el.classList.remove('sel'));
   ['inTargetImpr','inBudgetImpr','inTargetLeads','inBudgetLeads','inBrandBudget',
-   'inMxBrandTarget','inMxEndDate','inBrandEndDate','inMMEndDate'].forEach(id => {
+   'inMxBrandTarget','inMxStartDate','inMxEndDate','inBrandStartDate','inBrandEndDate','inMMStartDate','inMMEndDate'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
 
@@ -1468,11 +1512,12 @@ async function openModal(existingKey) {
           modal._editKey = existingKey;
 
           document.querySelector(`[data-ttype="${modal.ttype}"]`)?.classList.add('sel');
-          if (t.targetImpr)  document.getElementById('inTargetImpr').value  = t.targetImpr;
-          if (t.budgetImpr)  document.getElementById('inBudgetImpr').value  = t.budgetImpr;
-          if (t.targetLeads) document.getElementById('inTargetLeads').value = t.targetLeads;
-          if (t.budgetLeads) document.getElementById('inBudgetLeads').value = t.budgetLeads;
-          if (t.endDate)     document.getElementById('inBrandEndDate').value = t.endDate;
+          if (t.targetImpr)  document.getElementById('inTargetImpr').value   = t.targetImpr;
+          if (t.budgetImpr)  document.getElementById('inBudgetImpr').value   = t.budgetImpr;
+          if (t.targetLeads) document.getElementById('inTargetLeads').value  = t.targetLeads;
+          if (t.budgetLeads) document.getElementById('inBudgetLeads').value  = t.budgetLeads;
+          if (t.startDate)   document.getElementById('inBrandStartDate').value = t.startDate;
+          if (t.endDate)     document.getElementById('inBrandEndDate').value  = t.endDate;
         }
 
         document.querySelector(`[data-level="${modal.level}"]`)?.classList.add('sel');
@@ -1525,7 +1570,8 @@ async function modalNext() {
     const tl = sl ? parseFloat(document.getElementById('inTargetLeads').value) || null : null;
     const bl = sl ? parseFloat(document.getElementById('inBudgetLeads').value) || null : null;
 
-    const endDate = document.getElementById('inBrandEndDate').value || null;
+    const startDate = document.getElementById('inBrandStartDate').value || null;
+    const endDate   = document.getElementById('inBrandEndDate').value   || null;
     const key = `brand::${modal.brand}`;
     const all = await loadTargets();
     if (modal._editKey && modal._editKey !== key) delete all[modal._editKey];
@@ -1533,7 +1579,7 @@ async function modalNext() {
       level: 'brand', brand: modal.brand, model: null, groupMode: 'brand',
       targetType: modal.ttype,
       targetImpr: ti, budgetImpr: bi, targetLeads: tl, budgetLeads: bl,
-      endDate,
+      startDate, endDate,
     };
     await saveTargets(all);
     closeModal();
@@ -1585,14 +1631,14 @@ async function modalNext() {
     });
 
     if (!saved) { alert('Please fill in at least one model row.'); return; }
-    const mmEndDate = document.getElementById('inMMEndDate').value || null;
-    if (mmEndDate) {
-      Object.keys(all).forEach(k => {
-        if (k.startsWith(`model::${modal.brand}::`) && all[k].groupMode === 'model') {
-          all[k].endDate = mmEndDate;
-        }
-      });
-    }
+    const mmStartDate = document.getElementById('inMMStartDate').value || null;
+    const mmEndDate   = document.getElementById('inMMEndDate').value   || null;
+    Object.keys(all).forEach(k => {
+      if (k.startsWith(`model::${modal.brand}::`) && all[k].groupMode === 'model') {
+        if (mmStartDate) all[k].startDate = mmStartDate; else delete all[k].startDate;
+        if (mmEndDate)   all[k].endDate   = mmEndDate;   else delete all[k].endDate;
+      }
+    });
     await saveTargets(all);
     closeModal();
     renderTracker();
@@ -1603,7 +1649,8 @@ async function modalNext() {
     if (!modal.brand) { alert('Brand is required.'); return; }
     const brandBudget = parseFloat(document.getElementById('inBrandBudget').value) || null;
     const brandTarget = parseFloat(document.getElementById('inMxBrandTarget').value) || null;
-    const endDate     = document.getElementById('inMxEndDate').value || null;
+    const startDate   = document.getElementById('inMxStartDate').value || null;
+    const endDate     = document.getElementById('inMxEndDate').value   || null;
     const all = await loadTargets();
 
     // Remove old mixed entries for this brand
@@ -1621,7 +1668,7 @@ async function modalNext() {
         level: 'brand', brand: modal.brand, model: null, groupMode: 'mixed',
         targetType: brandTarget ? 'impressions' : 'budget-only',
         targetImpr: brandTarget, budgetImpr: brandBudget, targetLeads: null, budgetLeads: null,
-        endDate,
+        startDate, endDate,
       };
     }
 
@@ -1639,7 +1686,7 @@ async function modalNext() {
         level: 'model', brand: modal.brand, model: m, groupMode: 'mixed',
         targetType: 'impressions',
         targetImpr: ti, budgetImpr: null, targetLeads: null, budgetLeads: null,
-        endDate,
+        startDate, endDate,
       };
       saved++;
     });
@@ -1686,9 +1733,10 @@ function populateMultiModel(brand, ttype, saved) {
   document.getElementById('mmTableLabel').textContent =
     `${brand} — set targets for each model (leave blank to skip)`;
 
-  // Pre-fill shared end date from any existing model entry for this brand
-  const anyEntry = Object.values(saved).find(t => t.brand === brand && t.level === 'model' && t.groupMode === 'model' && t.endDate);
-  if (anyEntry) document.getElementById('inMMEndDate').value = anyEntry.endDate;
+  // Pre-fill shared start/end dates from any existing model entry for this brand
+  const anyEntry = Object.values(saved).find(t => t.brand === brand && t.level === 'model' && t.groupMode === 'model');
+  if (anyEntry && anyEntry.startDate) document.getElementById('inMMStartDate').value = anyEntry.startDate;
+  if (anyEntry && anyEntry.endDate)   document.getElementById('inMMEndDate').value   = anyEntry.endDate;
 }
 
 function populateMixed(brand, saved) {
@@ -1696,9 +1744,10 @@ function populateMixed(brand, saved) {
   saved = saved || {};
   const brandEntry = saved[`brand::${brand}`];
   if (brandEntry) {
-    if (brandEntry.budgetImpr)  document.getElementById('inBrandBudget').value    = brandEntry.budgetImpr;
-    if (brandEntry.targetImpr)  document.getElementById('inMxBrandTarget').value  = brandEntry.targetImpr;
-    if (brandEntry.endDate)     document.getElementById('inMxEndDate').value      = brandEntry.endDate;
+    if (brandEntry.budgetImpr)  document.getElementById('inBrandBudget').value   = brandEntry.budgetImpr;
+    if (brandEntry.targetImpr)  document.getElementById('inMxBrandTarget').value = brandEntry.targetImpr;
+    if (brandEntry.startDate)   document.getElementById('inMxStartDate').value   = brandEntry.startDate;
+    if (brandEntry.endDate)     document.getElementById('inMxEndDate').value     = brandEntry.endDate;
   }
   const tbody = models.map(m => {
     const existing = saved[`model::${brand}::${m}`] || {};
@@ -1791,7 +1840,7 @@ function downloadCsv(filename, rows) {
 }
 
 function exportDashboardCsv() {
-  const rows     = filterRows(activeBrand, activeModel, 'all', activeSegment);
+  const rows     = filterRows(activeBrand, activeModel, 'all', activeSegment, activeMonth);
   const hasLeads = rows.some(r => r.leads > 0);
   const hasViews = rows.some(r => r.views > 0);
   const plats    = [...new Set(rows.map(r => r.platform).filter(Boolean))].sort();
