@@ -389,6 +389,10 @@ thead .trk-entity { background: var(--surface2); z-index: 3; }
 
     <div class="filters-bar">
       <div class="fg">
+        <label>Month</label>
+        <select id="summaryMonthFilter"><option value="all">All Months</option></select>
+      </div>
+      <div class="fg">
         <label>Brand</label>
         <select id="summaryBrandFilter"><option value="all">All Brands</option></select>
       </div>
@@ -715,6 +719,7 @@ let activePlatform = 'all';
 let activeSegment      = 'all';
 let activeMonth        = 'all';
 let activeSummaryBrand = 'all';
+let activeSummaryMonth = 'all';
 
 const modal = {
   step: 1,
@@ -1112,6 +1117,21 @@ function renderSummary() {
     return;
   }
 
+  /* Populate month filter (once) */
+  const mSel2 = document.getElementById('summaryMonthFilter');
+  if (mSel2.children.length <= 1) {
+    const monthLabels2 = {'01':'January','02':'February','03':'March','04':'April','05':'May','06':'June','07':'July','08':'August','09':'September','10':'October','11':'November','12':'December'};
+    const months2 = [...new Set(RAW.map(r => r.dateStr.substring(0, 7)))].sort().reverse();
+    months2.forEach(m => {
+      const [y, mo] = m.split('-');
+      const opt = document.createElement('option');
+      opt.value = m; opt.textContent = `${monthLabels2[mo]} ${y}`;
+      mSel2.appendChild(opt);
+    });
+    // default to latest month
+    if (months2.length) { activeSummaryMonth = months2[0]; mSel2.value = months2[0]; }
+  }
+
   /* Populate brand filter (once) */
   const bSel = document.getElementById('summaryBrandFilter');
   if (bSel.children.length <= 1) {
@@ -1123,7 +1143,11 @@ function renderSummary() {
   }
   bSel.value = activeSummaryBrand;
 
-  const data     = activeSummaryBrand === 'all' ? RAW : RAW.filter(r => r.brand === activeSummaryBrand);
+  const data = RAW.filter(r => {
+    if (activeSummaryBrand !== 'all' && r.brand !== activeSummaryBrand) return false;
+    if (activeSummaryMonth !== 'all' && !r.dateStr.startsWith(activeSummaryMonth)) return false;
+    return true;
+  });
   const hasLeads = data.some(r => r.leads > 0);
   const hasViews = data.some(r => r.views > 0);
   const dates    = [...new Set(data.map(r => r.dateStr))].sort();
@@ -1223,6 +1247,14 @@ async function renderTracker() {
   const na = '<span class="exp-na">—</span>';
 
   function buildEntityRow(e) {
+    const t            = saved[e.key] || {};
+    const isBudgetOnly = t.targetType === 'budget-only';
+    const remaining    = entityRemaining(e);
+    // start date: entity's own → parent brand's → default (1st of latest month)
+    const entityStartDate = t.startDate
+      || (e.level === 'model' ? (saved[`brand::${e.brand}`] || {}).startDate : null)
+      || defaultStartDate;
+
     const eRows = RAW.filter(r => {
       if (r.brand !== e.brand) return false;
       if (e.level === 'model' && e.model && r.model !== e.model) return false;
@@ -1234,20 +1266,12 @@ async function renderTracker() {
     let yest  = sumRows(yRows);
 
     if (e.brand === 'Taigun-Imp' || e.brand === 'Taigun-Leads') {
-      const allTRows = RAW.filter(r => r.brand === 'Taigun-Imp' || r.brand === 'Taigun-Leads');
+      const allTRows = RAW.filter(r => (r.brand === 'Taigun-Imp' || r.brand === 'Taigun-Leads') && (!entityStartDate || r.dateStr >= entityStartDate));
       const yTRows   = allTRows.filter(r => r.dateStr === latestDateStr);
       const tAll = sumRows(allTRows), tYest = sumRows(yTRows);
       if (e.brand === 'Taigun-Imp')   { total = {...total, impressions: tAll.impressions};  yest = {...yest, impressions: tYest.impressions}; }
       else                             { total = {...total, leads: tAll.leads};               yest = {...yest, leads: tYest.leads}; }
     }
-
-    const t            = saved[e.key] || {};
-    const isBudgetOnly = t.targetType === 'budget-only';
-    const remaining    = entityRemaining(e);
-    // start date: entity's own → parent brand's → default (1st of latest month)
-    const entityStartDate = t.startDate
-      || (e.level === 'model' ? (saved[`brand::${e.brand}`] || {}).startDate : null)
-      || defaultStartDate;
 
     const tImpr  = isBudgetOnly ? null : (t.targetImpr  || null);
     const tLeads = isBudgetOnly ? null : (t.targetLeads || null);
@@ -1815,6 +1839,10 @@ document.querySelectorAll('[data-ttype]').forEach(el => {
   });
 });
 
+document.getElementById('summaryMonthFilter').addEventListener('change', () => {
+  activeSummaryMonth = document.getElementById('summaryMonthFilter').value;
+  if (RAW.length) renderSummary();
+});
 document.getElementById('summaryBrandFilter').addEventListener('change', () => {
   activeSummaryBrand = document.getElementById('summaryBrandFilter').value;
   if (RAW.length) renderSummary();
