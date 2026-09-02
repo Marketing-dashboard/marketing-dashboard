@@ -755,13 +755,11 @@ function downloadCSV(rows, filename) {
   var csv = rows.map(function(r) {
     return r.map(function(v) {
       var s = (v === null || v === undefined) ? '' : String(v);
-      return s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('
-') >= 0
+      return s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0
         ? '"' + s.replace(/"/g, '""') + '"' : s;
     }).join(',');
-  }).join('
-');
-  var blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
+  }).join('\r\n');
+  var blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8;'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url; a.download = filename; a.click();
