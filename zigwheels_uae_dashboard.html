@@ -70,6 +70,7 @@ tbody tr:hover td{background:#fef7f7;color:var(--txt);}
 tbody tr.total-row td{background:#fafafa;font-weight:700;border-top:2px solid var(--bdr2);border-bottom:none;}
 tbody tr.total-row:hover td{background:#f5f5f5;}
 .pct-pill{display:inline-block;padding:1px 6px;border-radius:100px;font-size:9px;font-weight:700;background:#f0fdf4;color:#16a34a;}
+.pct-pill-neg{display:inline-block;padding:1px 6px;border-radius:100px;font-size:9px;font-weight:700;background:#fef2f2;color:#dc2626;}
 .ct-chip{display:inline-block;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:600;}
 .ct-search{background:#eff6ff;color:#1d4ed8;}
 .ct-demandgen{background:#fdf4ff;color:#9333ea;}
@@ -536,7 +537,8 @@ function hexToRgba(hex, a) {
 
 function pctPill(val) {
   if (val === null || val === undefined || isNaN(val)) return '<span class="na">—</span>';
-  return '<span class="pct-pill">' + val.toFixed(1) + '%</span>';
+  var cls = val < 0 ? 'pct-pill-neg' : 'pct-pill';
+  return '<span class="' + cls + '">' + val.toFixed(1) + '%</span>';
 }
 
 var selectedBrands = new Set();
