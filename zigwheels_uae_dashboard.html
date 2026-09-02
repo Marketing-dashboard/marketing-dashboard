@@ -386,6 +386,8 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
           <th class="num">Trigger Leads</th>
           <th class="num">Trigger %</th>
           <th class="num">TCPL</th>
+          <th class="num">Revenue</th>
+          <th class="num">Margin %</th>
         </tr>
       </thead>
       <tbody id="daywise-body"></tbody>
@@ -449,6 +451,8 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
           <th class="num">Mkt Triggers</th>
           <th class="num">Trigger %</th>
           <th class="num">TCPL</th>
+          <th class="num">Revenue</th>
+          <th class="num">Margin %</th>
         </tr>
       </thead>
       <tbody id="summary-body"></tbody>
@@ -494,6 +498,11 @@ const BRAND_COLORS = {
   'Mitsubishi': '#dc2626',
   'Skoda': '#16a34a',
   'Volkswagen': '#1d4ed8'
+};
+
+const SOLD_CPL = {
+  'Hyundai': 2373,
+  'Skoda': 1708
 };
 
 const CT_CLASS = {
@@ -675,19 +684,21 @@ function renderDaywise() {
 
   var tbody = document.getElementById('daywise-body');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">No data for selected filters</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">No data for selected filters</td></tr>';
     return;
   }
 
   var rows = '';
+  var totRev = 0;
   filtered.forEach(function(r) {
     var color = BRAND_COLORS[r.brand] || '#888';
     var cpl = (r.spends > 0 && r.leads > 0) ? fmt(r.spends/r.leads) : '—';
-    var tcpl = '—';
-    if (r.trigger_leads > 0) {
-      tcpl = r.spends > 0 ? fmt(r.spends/r.trigger_leads) : '<span class="na">No spend</span>';
-    }
+    var tcpl = r.trigger_leads > 0 ? fmt(r.spends/r.trigger_leads) : '—';
     var trigPct = r.leads > 0 ? pctPill(r.trigger_leads/r.leads*100) : '<span class="na">—</span>';
+    var soldCpl = SOLD_CPL[r.brand];
+    var rev = (soldCpl && r.trigger_leads > 0) ? soldCpl * r.trigger_leads : null;
+    var margin = (rev && r.spends > 0) ? (1 - r.spends/rev)*100 : null;
+    if (rev) totRev += rev;
     rows += '<tr>' +
       '<td>' + fmtDate(r.date) + '</td>' +
       '<td><span class="bdot" style="background:' + color + '"></span>' + r.brand + '</td>' +
@@ -697,10 +708,14 @@ function renderDaywise() {
       '<td class="num">' + (r.trigger_leads > 0 ? fmt(r.trigger_leads) : '<span class="na">—</span>') + '</td>' +
       '<td class="num">' + trigPct + '</td>' +
       '<td class="num">' + tcpl + '</td>' +
+      '<td class="num">' + (rev ? fmt(rev) : '<span class="na">—</span>') + '</td>' +
+      '<td class="num">' + (margin !== null ? pctPill(margin) : '<span class="na">—</span>') + '</td>' +
       '</tr>';
   });
 
   var totTrigPct = totL > 0 ? pctPill(mktT/totL*100) : '—';
+  var totTcpl = mktT > 0 ? fmt(totS/mktT) : '—';
+  var totMargin = (totRev > 0 && totS > 0) ? pctPill((1-totS/totRev)*100) : '—';
   rows += '<tr class="total-row">' +
     '<td colspan="2">TOTAL</td>' +
     '<td class="num">' + fmt(totS) + '</td>' +
@@ -708,7 +723,9 @@ function renderDaywise() {
     '<td class="num">' + (totL>0 ? fmt(totS/totL) : '—') + '</td>' +
     '<td class="num">' + fmt(mktT) + '</td>' +
     '<td class="num">' + totTrigPct + '</td>' +
-    '<td class="num">' + (mktT>0 ? fmt(totS/mktT) : '—') + '</td>' +
+    '<td class="num">' + totTcpl + '</td>' +
+    '<td class="num">' + (totRev>0 ? fmt(totRev) : '—') + '</td>' +
+    '<td class="num">' + totMargin + '</td>' +
     '</tr>';
 
   tbody.innerHTML = rows;
@@ -742,6 +759,7 @@ function renderSummary() {
 
   var tbody = document.getElementById('summary-body');
   var rows = '';
+  var totRev = 0;
   DATA.brands.forEach(function(brand) {
     var v = byBrand[brand];
     if (!v || (v.spends===0 && v.leads===0 && v.total_trig===0)) return;
@@ -749,6 +767,10 @@ function renderSummary() {
     var cpl = (v.spends>0 && v.leads>0) ? fmt(v.spends/v.leads) : '—';
     var tcpl = (v.spends>0 && v.mkt>0) ? fmt(v.spends/v.mkt) : '—';
     var trigPct = v.leads>0 ? pctPill(v.mkt/v.leads*100) : '<span class="na">—</span>';
+    var soldCpl = SOLD_CPL[brand];
+    var rev = (soldCpl && v.mkt > 0) ? soldCpl * v.mkt : null;
+    var margin = (rev && v.spends > 0) ? (1 - v.spends/rev)*100 : null;
+    if (rev) totRev += rev;
     rows += '<tr>' +
       '<td><span class="bdot" style="background:' + color + '"></span><strong>' + brand + '</strong></td>' +
       '<td class="num">' + (v.spends>0 ? fmt(v.spends) : '<span class="na">—</span>') + '</td>' +
@@ -759,10 +781,13 @@ function renderSummary() {
       '<td class="num">' + (v.mkt>0 ? fmt(v.mkt) : '<span class="na">—</span>') + '</td>' +
       '<td class="num">' + trigPct + '</td>' +
       '<td class="num">' + tcpl + '</td>' +
+      '<td class="num">' + (rev ? fmt(rev) : '<span class="na">—</span>') + '</td>' +
+      '<td class="num">' + (margin !== null ? pctPill(margin) : '<span class="na">—</span>') + '</td>' +
       '</tr>';
   });
 
   var totTrigPct = totL>0 ? pctPill(totM/totL*100) : '—';
+  var totMargin = (totRev>0 && totS>0) ? pctPill((1-totS/totRev)*100) : '—';
   rows += '<tr class="total-row">' +
     '<td>TOTAL</td>' +
     '<td class="num">' + fmt(totS) + '</td>' +
@@ -773,9 +798,11 @@ function renderSummary() {
     '<td class="num">' + fmt(totM) + '</td>' +
     '<td class="num">' + totTrigPct + '</td>' +
     '<td class="num">' + (totM>0 ? fmt(totS/totM) : '—') + '</td>' +
+    '<td class="num">' + (totRev>0 ? fmt(totRev) : '—') + '</td>' +
+    '<td class="num">' + totMargin + '</td>' +
     '</tr>';
 
-  tbody.innerHTML = rows || '<tr><td colspan="9" class="empty">No data for selected filters</td></tr>';
+  tbody.innerHTML = rows || '<tr><td colspan="11" class="empty">No data for selected filters</td></tr>';
 
   // Campaign Type table
   var byCT = {};
