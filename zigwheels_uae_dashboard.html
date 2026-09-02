@@ -883,23 +883,28 @@ function downloadCSV(rows, filename) {
 }
 
 function exportDaywise() {
-  var header = ['Date','Brand','Spends','Leads','CPL','Trigger Leads','Trigger %','TCPL'];
+  var header = ['Date','Brand','Spends','Leads','CPL','Trigger Leads','Trigger %','TCPL','Revenue','Margin %'];
   var rows = [header];
   filtered.forEach(function(r) {
+    var soldCpl = SOLD_CPL[r.brand];
+    var rev = (soldCpl && r.trigger_leads > 0) ? soldCpl * r.trigger_leads : null;
+    var margin = (rev && r.spends > 0) ? ((1 - r.spends/rev)*100).toFixed(1)+'%' : '';
     rows.push([
       r.date, r.brand,
       r.spends, r.leads,
       r.leads > 0 ? (r.spends/r.leads).toFixed(2) : '',
       r.trigger_leads,
       r.leads > 0 ? (r.trigger_leads/r.leads*100).toFixed(1)+'%' : '',
-      r.trigger_leads > 0 ? (r.spends/r.trigger_leads).toFixed(2) : ''
+      r.trigger_leads > 0 ? (r.spends/r.trigger_leads).toFixed(2) : '',
+      rev !== null ? rev : '',
+      margin
     ]);
   });
   downloadCSV(rows, 'daywise_performance.csv');
 }
 
 function exportBrandSummary() {
-  var header = ['Brand','Spends','Leads','CPL','Total Triggers','Organic Triggers','Mkt Triggers','Trigger %','TCPL'];
+  var header = ['Brand','Spends','Leads','CPL','Total Triggers','Organic Triggers','Mkt Triggers','Trigger %','TCPL','Revenue','Margin %'];
   var rows = [header];
   var byBrand = {};
   DATA.brands.forEach(function(b) { byBrand[b] = {spends:0,leads:0,total_trig:0,org:0,mkt:0}; });
@@ -914,12 +919,17 @@ function exportBrandSummary() {
   DATA.brands.forEach(function(brand) {
     var v = byBrand[brand];
     if (!v || (v.spends===0 && v.leads===0 && v.total_trig===0)) return;
+    var soldCpl = SOLD_CPL[brand];
+    var rev = (soldCpl && v.mkt > 0) ? soldCpl * v.mkt : null;
+    var margin = (rev && v.spends > 0) ? ((1 - v.spends/rev)*100).toFixed(1)+'%' : '';
     rows.push([
       brand, v.spends, v.leads,
       v.leads > 0 ? (v.spends/v.leads).toFixed(2) : '',
       v.total_trig, v.org, v.mkt,
       v.leads > 0 ? (v.mkt/v.leads*100).toFixed(1)+'%' : '',
-      v.mkt > 0 ? (v.spends/v.mkt).toFixed(2) : ''
+      v.mkt > 0 ? (v.spends/v.mkt).toFixed(2) : '',
+      rev !== null ? rev : '',
+      margin
     ]);
   });
   downloadCSV(rows, 'brand_summary.csv');
