@@ -23,8 +23,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);min-he
 .fbar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;background:var(--surf);border-radius:12px;padding:14px 18px;margin-bottom:20px;box-shadow:var(--sh);}
 .fg{display:flex;flex-direction:column;gap:4px;}
 .fg label{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:1px;}
-select,input[type=date]{background:var(--surf2);border:1px solid var(--bdr2);color:var(--txt);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;padding:7px 12px;border-radius:8px;cursor:pointer;outline:none;min-width:120px;}
-select:focus,input[type=date]:focus{border-color:var(--acc);}
+input[type=date]{background:var(--surf2);border:1px solid var(--bdr2);color:var(--txt);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;padding:7px 12px;border-radius:8px;cursor:pointer;outline:none;min-width:120px;}
+input[type=date]:focus{border-color:var(--acc);}
+.ms-wrap{position:relative;}
+.ms-btn{background:var(--surf2);border:1px solid var(--bdr2);color:var(--txt);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;padding:7px 30px 7px 12px;border-radius:8px;cursor:pointer;outline:none;min-width:160px;text-align:left;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ms-btn:focus,.ms-btn.open{border-color:var(--acc);}
+.ms-btn::after{content:'';position:absolute;right:10px;top:50%;transform:translateY(-50%);border:4px solid transparent;border-top:5px solid var(--mut);margin-top:2px;}
+.ms-dropdown{position:absolute;top:calc(100% + 4px);left:0;background:var(--surf);border:1px solid var(--bdr2);border-radius:10px;box-shadow:var(--sh2);z-index:200;min-width:200px;display:none;padding:6px 0;}
+.ms-dropdown.open{display:block;}
+.ms-search{padding:6px 10px;border-bottom:1px solid var(--bdr);}
+.ms-search input{width:100%;background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;font-size:11px;font-family:'Inter',sans-serif;outline:none;color:var(--txt);}
+.ms-actions{display:flex;gap:0;border-bottom:1px solid var(--bdr);}
+.ms-act{flex:1;padding:5px 8px;font-size:10px;font-weight:700;color:var(--acc);background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;text-transform:uppercase;letter-spacing:.5px;}
+.ms-act:hover{background:var(--surf2);}
+.ms-list{max-height:220px;overflow-y:auto;padding:4px 0;}
+.ms-item{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;transition:background .1s;}
+.ms-item:hover{background:var(--surf2);}
+.ms-item input[type=checkbox]{accent-color:var(--acc);width:13px;height:13px;cursor:pointer;flex-shrink:0;}
+.ms-item-label{font-size:12px;font-weight:500;color:var(--txt2);display:flex;align-items:center;gap:6px;}
 .rbtn{padding:7px 15px;background:var(--surf2);border:1px solid var(--bdr2);border-radius:8px;font-size:12px;font-weight:500;color:var(--txt2);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;}
 .rbtn:hover{border-color:var(--acc);color:var(--acc);}
 .finfo{margin-left:auto;font-size:11px;color:var(--mut);align-self:center;background:var(--surf2);padding:6px 12px;border-radius:8px;border:1px solid var(--bdr);}
@@ -282,9 +298,16 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
 <div class="fbar">
   <div class="fg">
     <label>Brand</label>
-    <select id="f-brand" onchange="applyFilters()">
-      <option value="">All Brands</option>
-    </select>
+    <div class="ms-wrap" id="ms-wrap">
+      <button class="ms-btn" id="ms-btn" onclick="toggleMS(event)">All Brands</button>
+      <div class="ms-dropdown" id="ms-dropdown">
+        <div class="ms-actions">
+          <button class="ms-act" onclick="msSelectAll()">Select All</button>
+          <button class="ms-act" onclick="msClearAll()">Clear</button>
+        </div>
+        <div class="ms-list" id="ms-list"></div>
+      </div>
+    </div>
   </div>
   <div class="fg">
     <label>From</label>
@@ -507,13 +530,21 @@ function pctPill(val) {
   return '<span class="pct-pill">' + val.toFixed(1) + '%</span>';
 }
 
+var selectedBrands = new Set();
+
 function initFilters() {
-  var sel = document.getElementById('f-brand');
+  // Multi-select brand checkboxes
+  var list = document.getElementById('ms-list');
   DATA.brands.forEach(function(b) {
-    var o = document.createElement('option');
-    o.value = b; o.textContent = b;
-    sel.appendChild(o);
+    selectedBrands.add(b);
+    var c = BRAND_COLORS[b] || '#888';
+    var item = document.createElement('div');
+    item.className = 'ms-item';
+    item.innerHTML = '<input type="checkbox" id="cb-' + b + '" value="' + b + '" checked onchange="onBrandChange()">' +
+      '<label class="ms-item-label" for="cb-' + b + '"><span class="bdot" style="background:' + c + '"></span>' + b + '</label>';
+    list.appendChild(item);
   });
+
   document.getElementById('f-from').value = DATA.dates[0];
   document.getElementById('f-to').value = DATA.dates[DATA.dates.length-1];
 
@@ -527,22 +558,80 @@ function initFilters() {
   });
 
   document.getElementById('hdr-range').textContent = fmtDate(DATA.dates[0]) + ' – ' + fmtDate(DATA.dates[DATA.dates.length-1]);
+
+  // Close dropdown on outside click
+  document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('ms-wrap');
+    if (wrap && !wrap.contains(e.target)) closeMS();
+  });
+}
+
+function toggleMS(e) {
+  e.stopPropagation();
+  var dd = document.getElementById('ms-dropdown');
+  var btn = document.getElementById('ms-btn');
+  var open = dd.classList.contains('open');
+  if (open) { dd.classList.remove('open'); btn.classList.remove('open'); }
+  else { dd.classList.add('open'); btn.classList.add('open'); }
+}
+
+function closeMS() {
+  document.getElementById('ms-dropdown').classList.remove('open');
+  document.getElementById('ms-btn').classList.remove('open');
+}
+
+function updateMSLabel() {
+  var btn = document.getElementById('ms-btn');
+  if (selectedBrands.size === 0) btn.textContent = 'No Brand';
+  else if (selectedBrands.size === DATA.brands.length) btn.textContent = 'All Brands';
+  else if (selectedBrands.size === 1) btn.textContent = Array.from(selectedBrands)[0];
+  else btn.textContent = selectedBrands.size + ' Brands';
+}
+
+function onBrandChange() {
+  selectedBrands.clear();
+  DATA.brands.forEach(function(b) {
+    var cb = document.getElementById('cb-' + b);
+    if (cb && cb.checked) selectedBrands.add(b);
+  });
+  updateMSLabel();
+  applyFilters();
+}
+
+function msSelectAll() {
+  DATA.brands.forEach(function(b) {
+    var cb = document.getElementById('cb-' + b);
+    if (cb) cb.checked = true;
+    selectedBrands.add(b);
+  });
+  updateMSLabel();
+  applyFilters();
+}
+
+function msClearAll() {
+  DATA.brands.forEach(function(b) {
+    var cb = document.getElementById('cb-' + b);
+    if (cb) cb.checked = false;
+  });
+  selectedBrands.clear();
+  updateMSLabel();
+  applyFilters();
 }
 
 function applyFilters() {
-  var brand = document.getElementById('f-brand').value;
   var from = document.getElementById('f-from').value;
   var to = document.getElementById('f-to').value;
+  var allSelected = selectedBrands.size === DATA.brands.length;
 
   filtered = DATA.daily.filter(function(r) {
-    if (brand && r.brand !== brand) return false;
+    if (!allSelected && !selectedBrands.has(r.brand)) return false;
     if (from && r.date < from) return false;
     if (to && r.date > to) return false;
     return true;
   });
 
   filteredCT = DATA.camptype.filter(function(r) {
-    if (brand && r.brand !== brand) return false;
+    if (!allSelected && !selectedBrands.has(r.brand)) return false;
     if (from && r.date < from) return false;
     if (to && r.date > to) return false;
     return true;
@@ -554,7 +643,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  document.getElementById('f-brand').value = '';
+  msSelectAll();
   document.getElementById('f-from').value = DATA.dates[0];
   document.getElementById('f-to').value = DATA.dates[DATA.dates.length-1];
   applyFilters();
