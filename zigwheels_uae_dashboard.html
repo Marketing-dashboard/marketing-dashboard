@@ -60,6 +60,9 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
 .ct-pmax{background:#fff7ed;color:#c2410c;}
 .ct-ctwa{background:#ecfdf5;color:#065f46;}
 .ct-other{background:#f1f5f9;color:#64748b;}
+.csv-btn{padding:5px 12px;background:var(--surf2);border:1px solid var(--bdr2);border-radius:7px;font-size:11px;font-weight:600;color:var(--txt2);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;display:flex;align-items:center;gap:5px;}
+.csv-btn:hover{border-color:var(--acc);color:var(--acc);}
+.csv-btn svg{width:12px;height:12px;flex-shrink:0;}
 @media(max-width:1200px){.kg6{grid-template-columns:repeat(3,1fr);}.kg5{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:800px){body{padding:12px;}.kg3,.kg5,.kg6{grid-template-columns:repeat(2,1fr);}}
 </style>
@@ -347,6 +350,7 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
         <div class="tbox-title">Day-wise Performance</div>
         <div class="tbox-sub">Spends &amp; leads from raw campaigns &middot; trigger leads from marketing-tagged triggers only</div>
       </div>
+      <button class="csv-btn" onclick="exportDaywise()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
     </div>
     <table>
       <thead>
@@ -408,6 +412,7 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
         <div class="tbox-title">Brand Summary</div>
         <div class="tbox-sub">Aggregated performance across selected date range</div>
       </div>
+      <button class="csv-btn" onclick="exportBrandSummary()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
     </div>
     <table>
       <thead>
@@ -434,6 +439,7 @@ tbody tr.total-row:hover td{background:#f5f5f5;}
         <div class="tbox-title">Campaign Type Performance</div>
         <div class="tbox-sub">Search &middot; Demand Gen &middot; Performance Max — filtered by selected brand &amp; date range</div>
       </div>
+      <button class="csv-btn" onclick="exportCamptype()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
     </div>
     <table>
       <thead>
@@ -743,6 +749,94 @@ function renderSummary() {
   }
 
   document.getElementById('camptype-body').innerHTML = ctRows || '<tr><td colspan="11" class="empty">No data for selected filters</td></tr>';
+}
+
+function downloadCSV(rows, filename) {
+  var csv = rows.map(function(r) {
+    return r.map(function(v) {
+      var s = (v === null || v === undefined) ? '' : String(v);
+      return s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('
+') >= 0
+        ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(',');
+  }).join('
+');
+  var blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
+function exportDaywise() {
+  var header = ['Date','Brand','Spends','Leads','CPL','Trigger Leads','Trigger %','TCPL'];
+  var rows = [header];
+  filtered.forEach(function(r) {
+    rows.push([
+      r.date, r.brand,
+      r.spends, r.leads,
+      r.leads > 0 ? (r.spends/r.leads).toFixed(2) : '',
+      r.trigger_leads,
+      r.leads > 0 ? (r.trigger_leads/r.leads*100).toFixed(1)+'%' : '',
+      r.trigger_leads > 0 ? (r.spends/r.trigger_leads).toFixed(2) : ''
+    ]);
+  });
+  downloadCSV(rows, 'daywise_performance.csv');
+}
+
+function exportBrandSummary() {
+  var header = ['Brand','Spends','Leads','CPL','Total Triggers','Organic Triggers','Mkt Triggers','Trigger %','TCPL'];
+  var rows = [header];
+  var byBrand = {};
+  DATA.brands.forEach(function(b) { byBrand[b] = {spends:0,leads:0,total_trig:0,org:0,mkt:0}; });
+  filtered.forEach(function(r) {
+    if (!byBrand[r.brand]) byBrand[r.brand] = {spends:0,leads:0,total_trig:0,org:0,mkt:0};
+    byBrand[r.brand].spends += r.spends;
+    byBrand[r.brand].leads += r.leads;
+    byBrand[r.brand].total_trig += r.total_triggers;
+    byBrand[r.brand].org += r.organic_leads;
+    byBrand[r.brand].mkt += r.trigger_leads;
+  });
+  DATA.brands.forEach(function(brand) {
+    var v = byBrand[brand];
+    if (!v || (v.spends===0 && v.leads===0 && v.total_trig===0)) return;
+    rows.push([
+      brand, v.spends, v.leads,
+      v.leads > 0 ? (v.spends/v.leads).toFixed(2) : '',
+      v.total_trig, v.org, v.mkt,
+      v.leads > 0 ? (v.mkt/v.leads*100).toFixed(1)+'%' : '',
+      v.mkt > 0 ? (v.spends/v.mkt).toFixed(2) : ''
+    ]);
+  });
+  downloadCSV(rows, 'brand_summary.csv');
+}
+
+function exportCamptype() {
+  var header = ['Campaign Type','Spends','Leads','CPL','Mkt Triggers','TCPL','Impressions','Clicks','CTR %','CTL %','CPC'];
+  var rows = [header];
+  var byCT = {};
+  filteredCT.forEach(function(r) {
+    var ct = r.camp_type;
+    if (!byCT[ct]) byCT[ct] = {spends:0,leads:0,impr:0,clicks:0,trig:0};
+    byCT[ct].spends += r.spends; byCT[ct].leads += r.leads;
+    byCT[ct].impr += r.impr; byCT[ct].clicks += r.clicks;
+    byCT[ct].trig += (r.trigger_leads || 0);
+  });
+  ['Search','Demand Gen','Performance Max','CTWA'].forEach(function(ct) {
+    var v = byCT[ct];
+    if (!v || (v.spends===0 && v.leads===0)) return;
+    rows.push([
+      ct, v.spends, v.leads,
+      v.leads > 0 ? (v.spends/v.leads).toFixed(2) : '',
+      v.trig,
+      v.trig > 0 ? (v.spends/v.trig).toFixed(2) : '',
+      v.impr, v.clicks,
+      v.impr > 0 ? (v.clicks/v.impr*100).toFixed(2)+'%' : '',
+      v.clicks > 0 ? (v.leads/v.clicks*100).toFixed(2)+'%' : '',
+      v.clicks > 0 ? (v.spends/v.clicks).toFixed(2) : ''
+    ]);
+  });
+  downloadCSV(rows, 'camptype_performance.csv');
 }
 
 initFilters();
