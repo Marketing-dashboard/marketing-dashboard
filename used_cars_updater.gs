@@ -182,6 +182,7 @@ function updateDashboard() {
     if (nameLc.indexOf('ahm') !== -1 || nameLc.indexOf('ahmedabad') !== -1) city = 'Ahmedabad';
     else if (nameLc.indexOf('chd') !== -1 || nameLc.indexOf('chandigarh') !== -1) city = 'Chandigarh';
     else if (nameLc.indexOf('nashik') !== -1 || nameLc.indexOf('nasik') !== -1) city = 'Nashik';
+    else if (nameLc.indexOf('mohali') !== -1) city = 'Mohali';
 
     // Triggers — exact match, then prefix-based fuzzy match
     var trig = trigByC[campName];
@@ -355,6 +356,50 @@ function jstr(s) {
 // all data including DATA_ORGANIC to the UC_Dashboard repo.
 function _run() {
   _buildAndPush('UC_Dashboard');
+  _syncToLive();
+}
+
+// After pushing data to UC_Dashboard, copy it wholesale to the live URL repo
+function _syncToLive() {
+  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) throw new Error('GitHub token not set.');
+
+  // 1. Get the freshly-updated UC_Dashboard/index.html
+  var srcUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/UC_Dashboard/contents/index.html';
+  var srcResp = UrlFetchApp.fetch(srcUrl, {
+    headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'},
+    muteHttpExceptions: true
+  });
+  if (srcResp.getResponseCode() !== 200) throw new Error('Failed to read UC_Dashboard: ' + srcResp.getContentText());
+  var srcFile = JSON.parse(srcResp.getContentText());
+  var b64Content = srcFile.content.replace(/\n/g, '');
+
+  // 2. Get sha of marketing-dashboard/used_cars.html
+  var dstUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/marketing-dashboard/contents/used_cars.html';
+  var dstResp = UrlFetchApp.fetch(dstUrl, {
+    headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'},
+    muteHttpExceptions: true
+  });
+  if (dstResp.getResponseCode() !== 200) throw new Error('Failed to read marketing-dashboard/used_cars.html: ' + dstResp.getContentText());
+  var dstSha = JSON.parse(dstResp.getContentText()).sha;
+
+  // 3. Push UC_Dashboard content → marketing-dashboard/used_cars.html
+  var putResp = UrlFetchApp.fetch(dstUrl, {
+    method: 'PUT',
+    headers: {'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
+    payload: JSON.stringify({
+      message: 'Sync UC_Dashboard → used_cars.html [' + new Date().toISOString().split('T')[0] + ']',
+      content: b64Content,
+      sha: dstSha,
+      branch: 'main'
+    }),
+    muteHttpExceptions: true
+  });
+  if (putResp.getResponseCode() !== 200 && putResp.getResponseCode() !== 201) {
+    Logger.log('WARN: sync to marketing-dashboard failed (' + putResp.getResponseCode() + '): ' + putResp.getContentText());
+  } else {
+    Logger.log('Synced to marketing-dashboard/used_cars.html');
+  }
 }
 
 function _buildAndPush(repoName) {
@@ -370,7 +415,7 @@ function _buildAndPush(repoName) {
   var trigData = ss.getSheetByName('Triggers').getDataRange().getValues();
 
   // Read Organic sheet (columns: Date, City, Organic_Leads)
-  var orgSheet = ss.getSheetByName('Organic_triggers') || ss.getSheetByName('Organic');
+  var orgSheet = ss.getSheetByName('Triggers_organic') || ss.getSheetByName('Organic_triggers') || ss.getSheetByName('Organic');
   var orgData  = orgSheet ? orgSheet.getDataRange().getValues() : [];
 
   // Reuse the same build logic from updateDashboard by calling the shared helpers below
@@ -519,6 +564,7 @@ function _buildAllData(refData, googleData, fbData, trigData) {
     if(nameLc.indexOf('ahm')!==-1||nameLc.indexOf('ahmedabad')!==-1) city='Ahmedabad';
     else if(nameLc.indexOf('chd')!==-1||nameLc.indexOf('chandigarh')!==-1) city='Chandigarh';
     else if(nameLc.indexOf('nashik')!==-1||nameLc.indexOf('nasik')!==-1) city='Nashik';
+    else if(nameLc.indexOf('mohali')!==-1) city='Mohali';
     var trig=trigByC[campName];
     if(!trig){var prefix=campName.substring(0,Math.min(campName.length,12)),trigKeys=Object.keys(trigByC);
       for(var ti=0;ti<trigKeys.length;ti++){if(trigKeys[ti].indexOf(prefix)===0||campName.indexOf(trigKeys[ti].substring(0,12))===0){trig=trigByC[trigKeys[ti]];break;}}}
