@@ -444,7 +444,7 @@ tfoot td.sticky{background:var(--navy);box-shadow:2px 0 4px rgba(0,0,0,.15)}
 
     <h1>Used Cars — Performance Dashboard</h1>
 
-    <p>Ahmedabad &nbsp;·&nbsp; Chandigarh &nbsp;·&nbsp; Nashik &nbsp;·&nbsp; Mohali &nbsp;·&nbsp; Google + Meta</p>
+    <p>Ahmedabad &nbsp;·&nbsp; Chandigarh &nbsp;·&nbsp; Nashik &nbsp;·&nbsp; Mohali &nbsp;·&nbsp; Gurugram &nbsp;·&nbsp; Google + Meta</p>
 
   </div>
 
@@ -1282,7 +1282,7 @@ onAuthStateChanged(auth, async (user) => {
 
 <script>
 
-var BUILD_TS = '2026-09-10T02:59:14.082Z'; // replaced by Apps Script on each push
+var BUILD_TS = '2026-09-10T03:06:10.529Z'; // replaced by Apps Script on each push
 
 
 
@@ -14458,11 +14458,11 @@ var DATA = [];
 
 
 
-var CITY_COLOR  = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857', Mohali:'#B45309'};
+var CITY_COLOR  = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857', Mohali:'#B45309', Gurugram:'#0E7490'};
 
-var CITY_LIGHT  = {Ahmedabad:'#F5F3FF', Chandigarh:'#EFF6FF', Nashik:'#ECFDF5', Mohali:'#FEF3C7'};
+var CITY_LIGHT  = {Ahmedabad:'#F5F3FF', Chandigarh:'#EFF6FF', Nashik:'#ECFDF5', Mohali:'#FEF3C7', Gurugram:'#ECFEFF'};
 
-var CITY_BORDER = {Ahmedabad:'#C4B5FD', Chandigarh:'#BAE6FD', Nashik:'#6EE7B7', Mohali:'#FCD34D'};
+var CITY_BORDER = {Ahmedabad:'#C4B5FD', Chandigarh:'#BAE6FD', Nashik:'#6EE7B7', Mohali:'#FCD34D', Gurugram:'#67E8F9'};
 
 var PLAT_COLOR  = {Google:'#EA4335', Meta:'#1877F2'};
 
@@ -14870,9 +14870,9 @@ function renderComparison() {
 
 
 
-  var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik','Mohali'];
+  var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'];
 
-  var CC = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857', Mohali:'#B45309'};
+  var CC = {Ahmedabad:'#7C3AED', Chandigarh:'#0369A1', Nashik:'#047857', Mohali:'#B45309', Gurugram:'#0E7490'};
 
 
 
@@ -15666,7 +15666,7 @@ function toggleCompCity(city) {
 
   var raw = (document.getElementById('comp-cities')||{value:''}).value||'';
 
-  var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik','Mohali'];
+  var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'];
 
   var sel = raw ? raw.split(',').filter(function(c){return CITIES_ALL.indexOf(c)>=0;}) : CITIES_ALL.slice();
 
@@ -15834,12 +15834,13 @@ function cityFromCampaign(camp) {
   if (lc.indexOf('chd') !== -1 || lc.indexOf('chandigarh') !== -1) return 'Chandigarh';
   if (lc.indexOf('nashik') !== -1 || lc.indexOf('nasik') !== -1) return 'Nashik';
   if (lc.indexOf('mohali') !== -1) return 'Mohali';
+  if (lc.indexOf('gurugram') !== -1 || lc.indexOf('gurgaon') !== -1 || lc.indexOf('grg') !== -1) return 'Gurugram';
   return null;
 }
 
 // Top table: week × city, Organic+Mktg combined and Mktg (dealer) separately
 function buildWeeklyOrgTable(s, e) {
-  var CITIES = ['Ahmedabad','Nashik','Chandigarh','Mohali'];
+  var CITIES = ['Ahmedabad','Nashik','Chandigarh','Mohali','Gurugram'];
   var weeks = getDateRangeWeeks(s, e);
   if (!weeks.length) return '';
 
@@ -15930,7 +15931,7 @@ function buildWeeklyOrgTable(s, e) {
 
 // Second table: week × city campaign performance (spends, triggered leads, dealer triggers)
 function buildWeeklyCityPerfTable(s, e) {
-  var CITIES = ['Ahmedabad','Nashik','Chandigarh','Mohali'];
+  var CITIES = ['Ahmedabad','Nashik','Chandigarh','Mohali','Gurugram'];
   var weeks = getDateRangeWeeks(s, e);
   if (!weeks.length || !DATA_DAILY.length) return '';
 
@@ -16073,7 +16074,7 @@ function renderCity() {
 
   html+='</tr></thead><tbody>';
 
-  ['Ahmedabad','Chandigarh','Nashik','Mohali'].forEach(function(city) {
+  ['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'].forEach(function(city) {
 
     var rows=DATA.filter(function(r){return r.City===city;});
 
@@ -16124,7 +16125,7 @@ function renderCity() {
 
   html+='</tr></thead><tbody>';
 
-  ['Ahmedabad','Chandigarh','Nashik','Mohali'].forEach(function(city) {
+  ['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'].forEach(function(city) {
 
     ['Google','Meta'].forEach(function(plat) {
 
@@ -16186,7 +16187,7 @@ function renderCampaigns() {
 
   html+='<select id="f-city" class="fsel" onchange="renderCampaigns()"><option value="All">All Cities</option>';
 
-  ['Ahmedabad','Chandigarh','Nashik','Mohali'].forEach(function(c){html+='<option'+(c===cityF?' selected':'')+'>'+c+'</option>';});
+  ['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'].forEach(function(c){html+='<option'+(c===cityF?' selected':'')+'>'+c+'</option>';});
 
   html+='</select>';
 
@@ -16322,7 +16323,7 @@ function renderTypes() {
 
   var types=[...new Set(DATA.map(function(r){return r.Type;}))].sort();
 
-  var cities=['Ahmedabad','Chandigarh','Nashik','Mohali'];
+  var cities=['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'];
 
   var html='';
 
