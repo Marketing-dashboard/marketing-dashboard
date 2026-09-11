@@ -166,6 +166,7 @@ function buildRows() {
     var md = trim(r[RC.MODEL]);
     var ch = normCh(trim(r[RC.SRC]));
     if (!r[RC.DAY] || !br || !mo) continue;
+    if (br === '#N/A' || normStr(br) === 'n/a' || normStr(br) === '#n/a') continue;
     if (!sp && !ld) continue;
     var dt = fmtDate(r[RC.DAY]);
     if (!dt) continue;
