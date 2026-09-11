@@ -225,9 +225,10 @@ function buildTrigMap(data) {
     var triggered     = parseInt(r[TC.TRIG])      || 0;
     var triggeredList = parseInt(r[TC.TRIG_LIST]) || 0;
 
-    // Special brands sum both columns; standard brands use only Triggered_in_List_ID
+    // Special brands (JLR/Citroen/Lexus): Triggered + Triggered_in_List_ID
+    // Standard brands: Triggered only
     var isSpecial = SPECIAL_BRANDS.indexOf(br.toUpperCase()) !== -1;
-    var count = isSpecial ? (triggered + triggeredList) : triggeredList;
+    var count = isSpecial ? (triggered + triggeredList) : triggered;
 
     if (!br || !ch || count <= 0) continue;
 
