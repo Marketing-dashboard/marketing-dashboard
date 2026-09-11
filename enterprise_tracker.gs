@@ -137,7 +137,7 @@ function buildRows() {
   Logger.log('Raw:'+rawData.length+' CPL:'+cplData.length+' Sep:'+sepData.length+' Aug:'+augData.length);
 
   // Build Sold_CPL_Val lookup
-  // key: brand||model||channel_norm||month_label  →  {seg, vp, sc}
+  // key: normStr(brand)||normStr(model)||channel_norm||month_label  →  {seg, vp, sc}
   var cplMap = {};
   for (var i = 1; i < cplData.length; i++) {
     var c  = cplData[i];
@@ -146,7 +146,8 @@ function buildRows() {
     var vp = parseVP(c[CC.VP]), sc = parseSC(c[CC.SC]);
     var mo = normMo(trim(c[CC.MO]));
     if (!br || !md || !ch || !mo) continue;
-    cplMap[br+'||'+md+'||'+ch+'||'+mo] = {seg:sg, vp:vp, sc:sc};
+    var brKey = normStr(br), mdKey = normStr(md);
+    cplMap[brKey+'||'+mdKey+'||'+ch+'||'+mo] = {seg:sg, vp:vp, sc:sc};
   }
 
   // Build trigger maps
@@ -154,7 +155,7 @@ function buildRows() {
   var augTrigMap = buildTrigMap(augData);
   Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length);
 
-  // Aggregate Raw spends by date + brand + model + channel
+  // Aggregate Raw spends by date + normStr(brand) + normStr(model) + channel
   var rawMap = {};
   for (var j = 1; j < rawData.length; j++) {
     var r  = rawData[j];
@@ -168,20 +169,21 @@ function buildRows() {
     if (!sp && !ld) continue;
     var dt = fmtDate(r[RC.DAY]);
     if (!dt) continue;
-    var key = dt+'||'+br+'||'+md+'||'+ch;
+    var key = dt+'||'+normStr(br)+'||'+normStr(md)+'||'+ch;
     if (!rawMap[key]) rawMap[key] = {dt:dt, mo:mo, br:br, md:md, ch:ch, sp:0, ld:0};
     rawMap[key].sp += sp;
     rawMap[key].ld += ld;
   }
   Logger.log('Raw map:'+Object.keys(rawMap).length);
 
-  // Merge: join spends with triggers + CPL validation
+  // Merge: join spends with triggers + CPL validation (use normalized keys for lookup)
   var rows = [];
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
+    var brKey = normStr(r.br), mdKey = normStr(r.md);
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
-    var triggers = (trigMap[r.dt+'||'+r.br+'||'+r.md+'||'+r.ch] || {}).tr || 0;
-    var cplInfo  = cplMap[r.br+'||'+r.md+'||'+r.ch+'||'+r.mo] || {};
+    var triggers = (trigMap[r.dt+'||'+brKey+'||'+mdKey+'||'+r.ch] || {}).tr || 0;
+    var cplInfo  = cplMap[brKey+'||'+mdKey+'||'+r.ch+'||'+r.mo] || {};
     rows.push({
       dt:r.dt, mo:r.mo, br:r.br, md:r.md,
       sg:cplInfo.seg||'', ch:r.ch,
@@ -217,9 +219,11 @@ function buildTrigMap(data) {
     var dt = fmtDate(dateVal);
     if (!dt) continue;
 
-    // Use Brand_Mapped if present, fall back to brand column
-    var br = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
-    var md = trim(r[TC.MD_MAP]) || trim(r[TC.MD]);
+    // Use Brand_Mapped if present, fall back to brand column; normalize for join
+    var brRaw = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
+    var mdRaw = trim(r[TC.MD_MAP]) || trim(r[TC.MD]);
+    var brKey = normStr(brRaw);
+    var mdKey = normStr(mdRaw);
     var ch = normCh(trim(r[TC.SRC]));
 
     var triggered     = parseInt(r[TC.TRIG])      || 0;
@@ -227,12 +231,12 @@ function buildTrigMap(data) {
 
     // Special brands (JLR/Citroen/Lexus): Triggered + Triggered_in_List_ID
     // Standard brands: Triggered only
-    var isSpecial = SPECIAL_BRANDS.indexOf(br.toUpperCase()) !== -1;
+    var isSpecial = ['jlr','citroen','lexus'].indexOf(brKey) !== -1;
     var count = isSpecial ? (triggered + triggeredList) : triggered;
 
-    if (!br || !ch || count <= 0) continue;
+    if (!brKey || !ch || count <= 0) continue;
 
-    var key = dt+'||'+br+'||'+md+'||'+ch;
+    var key = dt+'||'+brKey+'||'+mdKey+'||'+ch;
     if (!map[key]) map[key] = {tr:0};
     map[key].tr += count;
   }
@@ -284,6 +288,7 @@ function parseSC(v) {
 
 // ── UTILITIES ──────────────────────────────────────────────────
 function trim(v) { return String(v||'').trim(); }
+function normStr(s) { return String(s||'').trim().toLowerCase(); }  // for join keys only
 function round2(n) { return Math.round(n * 100) / 100; }
 function jstr(s) { return JSON.stringify(String(s||'')); }
 
