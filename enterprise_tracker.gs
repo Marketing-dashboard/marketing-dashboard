@@ -156,6 +156,8 @@ function buildRows() {
   Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length);
 
   // Aggregate Raw spends by date + normStr(brand) + normStr(model) + channel
+  // brandCanon / modelCanon: pick the first-seen display name for each normalized key
+  var brandCanon = {}, modelCanon = {};
   var rawMap = {};
   for (var j = 1; j < rawData.length; j++) {
     var r  = rawData[j];
@@ -170,8 +172,11 @@ function buildRows() {
     if (!sp && !ld) continue;
     var dt = fmtDate(r[RC.DAY]);
     if (!dt) continue;
-    var key = dt+'||'+normStr(br)+'||'+normStr(md)+'||'+ch;
-    if (!rawMap[key]) rawMap[key] = {dt:dt, mo:mo, br:br, md:md, ch:ch, sp:0, ld:0};
+    var brk = normStr(br), mdk = normStr(md);
+    if (!brandCanon[brk]) brandCanon[brk] = br;  // lock display name on first occurrence
+    if (!modelCanon[mdk]) modelCanon[mdk] = md;
+    var key = dt+'||'+brk+'||'+mdk+'||'+ch;
+    if (!rawMap[key]) rawMap[key] = {dt:dt, mo:mo, brk:brk, mdk:mdk, ch:ch, sp:0, ld:0};
     rawMap[key].sp += sp;
     rawMap[key].ld += ld;
   }
@@ -181,12 +186,14 @@ function buildRows() {
   var rows = [];
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
-    var brKey = normStr(r.br), mdKey = normStr(r.md);
+    var brk = r.brk, mdk = r.mdk;
+    var br = brandCanon[brk] || brk;  // canonical display name
+    var md = modelCanon[mdk] || mdk;
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
-    var triggers = (trigMap[r.dt+'||'+brKey+'||'+mdKey+'||'+r.ch] || {}).tr || 0;
-    var cplInfo  = cplMap[brKey+'||'+mdKey+'||'+r.ch+'||'+r.mo] || {};
+    var triggers = (trigMap[r.dt+'||'+brk+'||'+mdk+'||'+r.ch] || {}).tr || 0;
+    var cplInfo  = cplMap[brk+'||'+mdk+'||'+r.ch+'||'+r.mo] || {};
     rows.push({
-      dt:r.dt, mo:r.mo, br:r.br, md:r.md,
+      dt:r.dt, mo:r.mo, br:br, md:md,
       sg:cplInfo.seg||'', ch:r.ch,
       sp:round2(r.sp), ld:round2(r.ld), tr:triggers,
       vp:cplInfo.vp!=null?cplInfo.vp:0, sc:cplInfo.sc||0
