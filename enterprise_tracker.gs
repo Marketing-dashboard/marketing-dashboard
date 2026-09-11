@@ -51,23 +51,52 @@ function setGitHubToken(token) {
   Logger.log('GitHub token saved.');
 }
 
-// ── WEB APP ENTRY POINT ───────────────────────────────────────
-// Serves the dashboard HTML with live data on every request.
-// Deploy this script as a Web App (Execute as: Me, Who has access: Anyone in org).
+// ── STEP 1: PROCESS & CACHE (run once from script editor) ────
+// Reads all 3 sheets, processes the data, saves to Drive.
+// Takes ~2 minutes. Run this whenever data needs refreshing.
+function processAndCacheData() {
+  var rows    = buildRows();
+  var dataRaw = serializeRows(rows);
+  var buildTs = new Date().toISOString();
+
+  var payload = JSON.stringify({dataRaw: dataRaw, buildTs: buildTs, rowCount: rows.length});
+  var fname   = 'enterprise_dashboard_cache.json';
+  var files   = DriveApp.getFilesByName(fname);
+  var fileId;
+
+  if (files.hasNext()) {
+    var f = files.next();
+    f.setContent(payload);
+    fileId = f.getId();
+  } else {
+    fileId = DriveApp.createFile(fname, payload, 'application/json').getId();
+  }
+  PropertiesService.getScriptProperties().setProperty('CACHE_FILE_ID', fileId);
+  Logger.log('Cache saved: ' + rows.length + ' rows | Build: ' + buildTs + ' | File: ' + fileId);
+}
+
+// ── STEP 2: WEB APP (doGet serves from cache in ~2 seconds) ──
+// After processAndCacheData() completes, every URL open is instant.
 function doGet(e) {
   try {
-    var rows    = buildRows();
-    var buildTs = new Date().toISOString();
-    var dataRaw = serializeRows(rows);
+    var fileId = PropertiesService.getScriptProperties().getProperty('CACHE_FILE_ID');
+    if (!fileId) {
+      return HtmlService.createHtmlOutput(
+        '<div style="font-family:Arial,sans-serif;padding:48px;text-align:center;color:#64748b">' +
+        '<h2 style="color:#0f3460">No cached data yet</h2>' +
+        '<p>Open the Apps Script editor and run <strong>processAndCacheData()</strong> first.<br>' +
+        'It takes ~2 minutes to process all sheets, then this URL will load instantly.</p></div>'
+      );
+    }
 
-    // Fetch the HTML template from GitHub raw
-    var resp = UrlFetchApp.fetch(TEMPLATE_URL, {muteHttpExceptions: true});
+    var cache   = JSON.parse(DriveApp.getFileById(fileId).getBlob().getDataAsString());
+    var resp    = UrlFetchApp.fetch(TEMPLATE_URL, {muteHttpExceptions: true});
     if (resp.getResponseCode() !== 200)
-      return HtmlService.createHtmlOutput('<pre>Error fetching template: ' + resp.getResponseCode() + '</pre>');
+      return HtmlService.createHtmlOutput('<pre>Template fetch failed: ' + resp.getResponseCode() + '</pre>');
 
     var html = resp.getContentText();
-    html = replaceBlock(html, 'var DATA_RAW = [', dataRaw);
-    html = html.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + buildTs + "';");
+    html = replaceBlock(html, 'var DATA_RAW = [', cache.dataRaw);
+    html = html.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + cache.buildTs + "';");
 
     return HtmlService.createHtmlOutput(html)
       .setTitle('Enterprise Dashboard')
