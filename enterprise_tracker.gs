@@ -12,8 +12,8 @@
 // ============================================================
 
 // ── CONFIGURATION ─────────────────────────────────────────────
-var REPO_OWNER = 'deepanshiahuja-dotcom';
-var REPO_NAME  = 'Marketing-Performance-dashboard';
+var REPO_OWNER = 'Marketing-dashboard';
+var REPO_NAME  = 'marketing-dashboard';
 var FILE_PATH  = 'enterprise_dashboard.html';
 
 // Raw URL of the HTML template on GitHub (used by doGet)
