@@ -1905,11 +1905,16 @@ function exportDashboardCsv() {
     return cells;
   })];
 
-  downloadCsv('dashboard_daywise.csv', csvRows);
+  const monthSuffix = activeMonth === 'all' ? 'all-months' : activeMonth;
+  downloadCsv(`dashboard_daywise_${monthSuffix}.csv`, csvRows);
 }
 
 function exportSummaryCsv(mode) {
-  const data     = activeSummaryBrand === 'all' ? RAW : RAW.filter(r => r.brand === activeSummaryBrand);
+  const data     = RAW.filter(r => {
+    if (activeSummaryBrand !== 'all' && r.brand !== activeSummaryBrand) return false;
+    if (activeSummaryMonth !== 'all' && !r.dateStr.startsWith(activeSummaryMonth)) return false;
+    return true;
+  });
   const hasLeads = data.some(r => r.leads > 0);
   const hasViews = data.some(r => r.views > 0);
   const zero     = () => ({ spend: 0, impressions: 0, clicks: 0, views: 0, leads: 0 });
@@ -1926,12 +1931,13 @@ function exportSummaryCsv(mode) {
   const metCols = ['Spend', 'Impressions', 'Clicks', 'CPM', 'CTR',
     ...(hasViews ? ['Views'] : []), ...(hasLeads ? ['Leads', 'CPL'] : [])];
 
+  const monthSuffix = activeSummaryMonth === 'all' ? 'all-months' : activeSummaryMonth;
   if (mode === 'brand') {
     const brandMap = {};
     data.forEach(r => { if (!brandMap[r.brand]) brandMap[r.brand] = zero(); acc(brandMap[r.brand], r); });
     const rows = [['Brand', ...metCols],
       ...Object.entries(brandMap).sort(([a], [b]) => a.localeCompare(b)).map(([b, d]) => [b, ...metVals(d)])];
-    downloadCsv('summary_brand.csv', rows);
+    downloadCsv(`summary_brand_${monthSuffix}.csv`, rows);
   } else {
     const modelMap = {};
     data.forEach(r => {
@@ -1943,7 +1949,7 @@ function exportSummaryCsv(mode) {
       ...Object.values(modelMap)
         .sort((a, b) => a.brand.localeCompare(b.brand) || (a.model || '').localeCompare(b.model || ''))
         .map(d => [d.brand, d.model || '', ...metVals(d)])];
-    downloadCsv('summary_model.csv', rows);
+    downloadCsv(`summary_model_${monthSuffix}.csv`, rows);
   }
 }
 
