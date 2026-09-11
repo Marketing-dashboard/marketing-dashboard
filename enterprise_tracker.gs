@@ -1,14 +1,23 @@
 // ============================================================
-// Enterprise Dashboard — Auto-Updater v2
-// Reads: Enterprise spends sheet (Raw + Sold_CPL_Val tabs)
-//        + September & August trigger sheets
-// Run updateEnterpriseDashboard() to push data to GitHub.
+// Enterprise Dashboard — Web App + Auto-Updater v2
+//
+// WEB APP MODE (primary):
+//   Deploy as a Web App → doGet() reads all sheets live and
+//   serves the dashboard HTML with fresh data on every request.
+//   No GitHub token required.
+//
+// GITHUB PUSH MODE (optional cache):
+//   Run updateEnterpriseDashboard() to push a static snapshot
+//   to GitHub Pages for offline / backup access.
 // ============================================================
 
 // ── CONFIGURATION ─────────────────────────────────────────────
 var REPO_OWNER = 'deepanshiahuja-dotcom';
 var REPO_NAME  = 'Marketing-Performance-dashboard';
 var FILE_PATH  = 'enterprise_dashboard.html';
+
+// Raw URL of the HTML template on GitHub (used by doGet)
+var TEMPLATE_URL = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/main/' + FILE_PATH;
 
 // Google Sheet IDs
 var ENTERPRISE_SS_ID  = '1c5mtbsRiA6axOKMA87KIPiCUvnjAXZGSELW2-jLt-Fk';
@@ -36,128 +45,137 @@ var TC = {DT:0, SRC:2, BR:3, MD:4, TRIG:5, TRIG_LIST:6, BR_MAP:9, MD_MAP:10};
 // Brands that use Triggered + Triggered_in_List_ID (others use only Triggered_in_List_ID)
 var SPECIAL_BRANDS = ['JLR','CITROEN','LEXUS'];
 
-// ── TOKEN SETUP (run once) ─────────────────────────────────────
+// ── TOKEN SETUP (run once, only needed for GitHub push mode) ───
 function setGitHubToken(token) {
   PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
   Logger.log('GitHub token saved.');
 }
 
-// ── ENTRY POINT ───────────────────────────────────────────────
+// ── WEB APP ENTRY POINT ───────────────────────────────────────
+// Serves the dashboard HTML with live data on every request.
+// Deploy this script as a Web App (Execute as: Me, Who has access: Anyone in org).
+function doGet(e) {
+  try {
+    var rows    = buildRows();
+    var buildTs = new Date().toISOString();
+    var dataRaw = serializeRows(rows);
+
+    // Fetch the HTML template from GitHub raw
+    var resp = UrlFetchApp.fetch(TEMPLATE_URL, {muteHttpExceptions: true});
+    if (resp.getResponseCode() !== 200)
+      return HtmlService.createHtmlOutput('<pre>Error fetching template: ' + resp.getResponseCode() + '</pre>');
+
+    var html = resp.getContentText();
+    html = replaceBlock(html, 'var DATA_RAW = [', dataRaw);
+    html = html.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + buildTs + "';");
+
+    return HtmlService.createHtmlOutput(html)
+      .setTitle('Enterprise Dashboard')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch(err) {
+    return HtmlService.createHtmlOutput('<pre style="color:red;padding:24px">Error: ' + err.message + '</pre>');
+  }
+}
+
+// ── GITHUB PUSH MODE (optional static snapshot) ───────────────
 function updateEnterpriseDashboard() {
   var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
   if (!token) throw new Error('GitHub token not set. Run setGitHubToken("ghp_...") first.');
 
+  var rows    = buildRows();
+  var buildTs = new Date().toISOString();
+  var dataRaw = serializeRows(rows);
+
+  pushToGitHub(token, dataRaw, buildTs);
+  Logger.log('Done. ' + rows.length + ' rows pushed. Build: ' + buildTs);
+}
+
+// ── CORE DATA BUILDER ─────────────────────────────────────────
+// Returns array of row objects with all fields merged from all sheets.
+function buildRows() {
   Logger.log('Reading spreadsheets…');
 
-  // 1. Enterprise sheet (Raw + Sold_CPL_Val)
-  var entSS  = SpreadsheetApp.openById(ENTERPRISE_SS_ID);
+  var entSS   = SpreadsheetApp.openById(ENTERPRISE_SS_ID);
   var rawData = entSS.getSheetByName(SHEET_RAW).getDataRange().getValues();
   var cplData = entSS.getSheetByName(SHEET_CPL_VAL).getDataRange().getValues();
 
-  // 2. Trigger sheets
-  var sepSS  = SpreadsheetApp.openById(SEP_TRIGGERS_ID);
+  var sepSS   = SpreadsheetApp.openById(SEP_TRIGGERS_ID);
   var sepData = sepSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
 
-  var augSS  = SpreadsheetApp.openById(AUG_TRIGGERS_ID);
+  var augSS   = SpreadsheetApp.openById(AUG_TRIGGERS_ID);
   var augData = augSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
 
-  Logger.log('Raw rows: ' + rawData.length + ' | CPL rows: ' + cplData.length +
-    ' | Sep triggers: ' + sepData.length + ' | Aug triggers: ' + augData.length);
+  Logger.log('Raw:'+rawData.length+' CPL:'+cplData.length+' Sep:'+sepData.length+' Aug:'+augData.length);
 
-  // 3. Build Sold_CPL_Val lookup
+  // Build Sold_CPL_Val lookup
   // key: brand||model||channel_norm||month_label  →  {seg, vp, sc}
   var cplMap = {};
   for (var i = 1; i < cplData.length; i++) {
-    var c = cplData[i];
-    var br = trim(c[CC.BR]);
-    var md = trim(c[CC.MD]);
-    var sg = trim(c[CC.SG]);
+    var c  = cplData[i];
+    var br = trim(c[CC.BR]), md = trim(c[CC.MD]), sg = trim(c[CC.SG]);
     var ch = normCh(trim(c[CC.CH]));
-    var vp = parseVP(c[CC.VP]);
-    var sc = parseSC(c[CC.SC]);
+    var vp = parseVP(c[CC.VP]), sc = parseSC(c[CC.SC]);
     var mo = normMo(trim(c[CC.MO]));
     if (!br || !md || !ch || !mo) continue;
     cplMap[br+'||'+md+'||'+ch+'||'+mo] = {seg:sg, vp:vp, sc:sc};
   }
-  Logger.log('CPL map entries: ' + Object.keys(cplMap).length);
 
-  // 4. Build trigger maps (one per month's sheet)
+  // Build trigger maps
   var sepTrigMap = buildTrigMap(sepData);
   var augTrigMap = buildTrigMap(augData);
-  Logger.log('Sep triggers: ' + Object.keys(sepTrigMap).length + ' | Aug: ' + Object.keys(augTrigMap).length);
+  Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length);
 
-  // 5. Aggregate Raw spends by date + brand + model + channel
+  // Aggregate Raw spends by date + brand + model + channel
   var rawMap = {};
   for (var j = 1; j < rawData.length; j++) {
     var r  = rawData[j];
-    var mo  = normMo(trim(r[RC.MO]));
-    var day = r[RC.DAY];
-    var sp  = parseFloat(r[RC.COST])  || 0;
-    var ld  = parseFloat(r[RC.LEADS]) || 0;
-    var br  = trim(r[RC.BRAND]);
-    var md  = trim(r[RC.MODEL]);
-    var ch  = normCh(trim(r[RC.SRC]));
-
-    if (!day || !br || !mo) continue;
+    var mo = normMo(trim(r[RC.MO]));
+    var sp = parseFloat(r[RC.COST])  || 0;
+    var ld = parseFloat(r[RC.LEADS]) || 0;
+    var br = trim(r[RC.BRAND]);
+    var md = trim(r[RC.MODEL]);
+    var ch = normCh(trim(r[RC.SRC]));
+    if (!r[RC.DAY] || !br || !mo) continue;
     if (!sp && !ld) continue;
-
-    var dt = fmtDate(day);
+    var dt = fmtDate(r[RC.DAY]);
     if (!dt) continue;
-
     var key = dt+'||'+br+'||'+md+'||'+ch;
     if (!rawMap[key]) rawMap[key] = {dt:dt, mo:mo, br:br, md:md, ch:ch, sp:0, ld:0};
     rawMap[key].sp += sp;
     rawMap[key].ld += ld;
   }
-  Logger.log('Raw map entries: ' + Object.keys(rawMap).length);
+  Logger.log('Raw map:'+Object.keys(rawMap).length);
 
-  // 6. Merge and build final rows
+  // Merge: join spends with triggers + CPL validation
   var rows = [];
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
-
-    // Triggers from the right month's sheet
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
-    var tKey = r.dt+'||'+r.br+'||'+r.md+'||'+r.ch;
-    var triggers = (trigMap[tKey] || {}).tr || 0;
-
-    // Validation% and sold CPL
-    var cKey = r.br+'||'+r.md+'||'+r.ch+'||'+r.mo;
-    var cplInfo = cplMap[cKey] || {};
-
+    var triggers = (trigMap[r.dt+'||'+r.br+'||'+r.md+'||'+r.ch] || {}).tr || 0;
+    var cplInfo  = cplMap[r.br+'||'+r.md+'||'+r.ch+'||'+r.mo] || {};
     rows.push({
-      dt: r.dt,
-      mo: r.mo,
-      br: r.br,
-      md: r.md,
-      sg: cplInfo.seg || '',
-      ch: r.ch,
-      sp: round2(r.sp),
-      ld: round2(r.ld),
-      tr: triggers,
-      vp: cplInfo.vp != null ? cplInfo.vp : 0,
-      sc: cplInfo.sc || 0
+      dt:r.dt, mo:r.mo, br:r.br, md:r.md,
+      sg:cplInfo.seg||'', ch:r.ch,
+      sp:round2(r.sp), ld:round2(r.ld), tr:triggers,
+      vp:cplInfo.vp!=null?cplInfo.vp:0, sc:cplInfo.sc||0
     });
   });
 
-  // Sort: date ASC, brand, model, channel
   rows.sort(function(a,b){
     return a.dt.localeCompare(b.dt)||a.br.localeCompare(b.br)||a.md.localeCompare(b.md)||a.ch.localeCompare(b.ch);
   });
+  Logger.log('Final rows:'+rows.length);
+  return rows;
+}
 
-  Logger.log('Final rows: ' + rows.length);
-
-  // 7. Serialize DATA_RAW
+// Serialize rows into the DATA_RAW block string
+function serializeRows(rows) {
   var lines = rows.map(function(r){
     return '{dt:'+jstr(r.dt)+',mo:'+jstr(r.mo)+',br:'+jstr(r.br)+',md:'+jstr(r.md)
           +',sg:'+jstr(r.sg)+',ch:'+jstr(r.ch)+',sp:'+r.sp+',ld:'+r.ld
           +',tr:'+r.tr+',vp:'+r.vp+',sc:'+r.sc+'}';
   });
-  var newDataRaw = 'var DATA_RAW = [\n' + lines.join(',\n') + '\n];';
-  var buildTs = new Date().toISOString();
-
-  pushToGitHub(token, newDataRaw, buildTs);
-  Logger.log('Done. Build: ' + buildTs);
+  return 'var DATA_RAW = [\n' + lines.join(',\n') + '\n];';
 }
 
 // ── TRIGGER MAP ────────────────────────────────────────────────
