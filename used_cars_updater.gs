@@ -183,6 +183,7 @@ function updateDashboard() {
     else if (nameLc.indexOf('chd') !== -1 || nameLc.indexOf('chandigarh') !== -1) city = 'Chandigarh';
     else if (nameLc.indexOf('nashik') !== -1 || nameLc.indexOf('nasik') !== -1) city = 'Nashik';
     else if (nameLc.indexOf('mohali') !== -1) city = 'Mohali';
+    else if (nameLc.indexOf('gurugram') !== -1 || nameLc.indexOf('gurgaon') !== -1 || nameLc.indexOf('grg') !== -1) city = 'Gurugram';
 
     // Triggers — exact match, then prefix-based fuzzy match
     var trig = trigByC[campName];
@@ -364,15 +365,25 @@ function _syncToLive() {
   var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
   if (!token) throw new Error('GitHub token not set.');
 
-  // 1. Get the freshly-updated UC_Dashboard/index.html
-  var srcUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/UC_Dashboard/contents/index.html';
-  var srcResp = UrlFetchApp.fetch(srcUrl, {
+  // 1. Get metadata for UC_Dashboard/index.html (for download_url)
+  var srcMetaUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/UC_Dashboard/contents/index.html';
+  var srcMetaResp = UrlFetchApp.fetch(srcMetaUrl, {
     headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'},
     muteHttpExceptions: true
   });
-  if (srcResp.getResponseCode() !== 200) throw new Error('Failed to read UC_Dashboard: ' + srcResp.getContentText());
-  var srcFile = JSON.parse(srcResp.getContentText());
-  var b64Content = srcFile.content.replace(/\n/g, '');
+  if (srcMetaResp.getResponseCode() !== 200) throw new Error('Failed to read UC_Dashboard metadata: ' + srcMetaResp.getContentText());
+  var srcMeta = JSON.parse(srcMetaResp.getContentText());
+  Logger.log('UC_Dashboard size: ' + srcMeta.size + ' bytes');
+
+  // Use download_url to get raw content (bypasses base64/1MB API limit)
+  var rawUrl = srcMeta.download_url;
+  var rawResp = UrlFetchApp.fetch(rawUrl, {
+    headers: {'Authorization':'token '+token},
+    muteHttpExceptions: true
+  });
+  if (rawResp.getResponseCode() !== 200) throw new Error('Failed to download raw UC_Dashboard: ' + rawResp.getResponseCode());
+  var rawBytes = rawResp.getContent(); // byte array
+  var b64Content = Utilities.base64Encode(rawBytes);
 
   // 2. Get sha of marketing-dashboard/used_cars.html
   var dstUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/marketing-dashboard/contents/used_cars.html';
@@ -448,7 +459,13 @@ function _buildAndPush(repoName) {
 
   var fileInfo = JSON.parse(getResp.getContentText());
   var sha = fileInfo.sha;
-  var currentContent = Utilities.newBlob(Utilities.base64Decode(fileInfo.content.replace(/\n/g,''))).getDataAsString();
+  // Use download_url to fetch raw content — avoids GitHub's 1MB base64 limit on large files
+  var rawResp = UrlFetchApp.fetch(fileInfo.download_url, {
+    headers: {'Authorization':'token '+token},
+    muteHttpExceptions: true
+  });
+  if (rawResp.getResponseCode() !== 200) throw new Error('Failed raw download: ' + rawResp.getResponseCode());
+  var currentContent = rawResp.getContentText();
 
   function replaceBlock(content, marker, replacement) {
     var start = content.indexOf(marker);
@@ -565,6 +582,7 @@ function _buildAllData(refData, googleData, fbData, trigData) {
     else if(nameLc.indexOf('chd')!==-1||nameLc.indexOf('chandigarh')!==-1) city='Chandigarh';
     else if(nameLc.indexOf('nashik')!==-1||nameLc.indexOf('nasik')!==-1) city='Nashik';
     else if(nameLc.indexOf('mohali')!==-1) city='Mohali';
+    else if(nameLc.indexOf('gurugram')!==-1||nameLc.indexOf('gurgaon')!==-1||nameLc.indexOf('grg')!==-1) city='Gurugram';
     var trig=trigByC[campName];
     if(!trig){var prefix=campName.substring(0,Math.min(campName.length,12)),trigKeys=Object.keys(trigByC);
       for(var ti=0;ti<trigKeys.length;ti++){if(trigKeys[ti].indexOf(prefix)===0||campName.indexOf(trigKeys[ti].substring(0,12))===0){trig=trigByC[trigKeys[ti]];break;}}}
