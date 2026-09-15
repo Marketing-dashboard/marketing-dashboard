@@ -500,7 +500,7 @@ function aggRows(rows){
     sp+=(r.sp||0);
     ld+=(r.ld||0);
     tr+=(r.tr||0);
-    rev+=((r.vp||0)/100)*(r.ld||0)*(r.sc||0);
+    rev+=((r.vp||0)/100)*(r.tr||0)*(r.sc||0);
   });
   return{
     spend:sp,
@@ -934,7 +934,7 @@ function _renderPredInner(){
     rows.forEach(function(r){
       actSp  += (r.sp||0);
       actTr  += (r.tr||0);
-      actRev += (r.vp/100)*(r.ld||0)*(r.sc||0);
+      actRev += (r.vp/100)*(r.tr||0)*(r.sc||0);
     });
 
     // Last N days daily triggers (summed across sources/models per day)
