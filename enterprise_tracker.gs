@@ -45,6 +45,18 @@ var TC = {DT:0, SRC:2, BR:3, MD:4, TRIG:5, TRIG_LIST:6, BR_MAP:9, MD_MAP:10};
 // Brands that use Triggered + Triggered_in_List_ID (others use only Triggered_in_List_ID)
 var SPECIAL_BRANDS = ['JLR','CITROEN','LEXUS'];
 
+// Brand alias map: normalized variants → canonical key (all lowercase)
+// Add entries here whenever the sheet uses alternate brand names for the same brand
+var BRAND_ALIAS = {
+  'ola electric': 'ola',
+  'ola ev':       'ola'
+};
+
+// Normalize a brand key (post-normStr) to its canonical form
+function normBrand(brk) {
+  return BRAND_ALIAS[brk] || brk;
+}
+
 // ── TOKEN SETUP (run once, only needed for GitHub push mode) ───
 function setGitHubToken(token) {
   PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
@@ -146,7 +158,7 @@ function buildRows() {
     var vp = parseVP(c[CC.VP]), sc = parseSC(c[CC.SC]);
     var mo = normMo(trim(c[CC.MO]));
     if (!br || !md || !ch || !mo) continue;
-    var brKey = normStr(br), mdKey = normStr(md);
+    var brKey = normBrand(normStr(br)), mdKey = normStr(md);
     cplMap[brKey+'||'+mdKey+'||'+ch+'||'+mo] = {seg:sg, vp:vp, sc:sc};
   }
 
@@ -172,7 +184,7 @@ function buildRows() {
     if (!sp && !ld) continue;
     var dt = fmtDate(r[RC.DAY]);
     if (!dt) continue;
-    var brk = normStr(br), mdk = normStr(md);
+    var brk = normBrand(normStr(br)), mdk = normStr(md);
     if (!brandCanon[brk]) brandCanon[brk] = br;  // lock display name on first occurrence
     if (!modelCanon[mdk]) modelCanon[mdk] = md;
     var key = dt+'||'+brk+'||'+mdk+'||'+ch;
@@ -230,7 +242,7 @@ function buildTrigMap(data) {
     // Use Brand_Mapped if present, fall back to brand column; normalize for join
     var brRaw = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
     var mdRaw = trim(r[TC.MD_MAP]) || trim(r[TC.MD]);
-    var brKey = normStr(brRaw);
+    var brKey = normBrand(normStr(brRaw));
     var mdKey = normStr(mdRaw);
     var ch = normCh(trim(r[TC.SRC]));
 
