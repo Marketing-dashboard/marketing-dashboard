@@ -48,10 +48,12 @@ var SPECIAL_BRANDS = ['JLR','CITROEN','LEXUS'];
 // Brand alias map: normalized variants → canonical key (all lowercase)
 // Add entries here whenever the sheet uses alternate brand names for the same brand
 var BRAND_ALIAS = {
-  'ola electric':  'ola',
-  'ola ev':        'ola',
-  'hmsi bigwing':  'bigwing',
-  'hmsi redwing':  'redwing'
+  'ola electric':   'ola',
+  'ola ev':         'ola',
+  'hmsi bigwing':   'bigwing',
+  'hmsi redwing':   'redwing',
+  'mercedes benz':  'mercedes',
+  'mercedes-benz':  'mercedes'
 };
 
 // Normalize a brand key (post-normStr) to its canonical form
@@ -283,7 +285,7 @@ function buildTrigMap(data) {
     var brRaw = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
     var mdRaw = trim(r[TC.MD_MAP]) || trim(r[TC.MD]);
     var brKey = normBrand(normStr(brRaw));
-    var mdKey = normStr(mdRaw);
+    var mdKey = normModelKey(normStr(mdRaw), brKey);
     var ch = normCh(trim(r[TC.SRC]));
 
     var triggered     = parseInt(r[TC.TRIG])      || 0;
@@ -306,14 +308,14 @@ function buildTrigMap(data) {
     if (!map[wkey]) map[wkey] = {tr:0};
     map[wkey].tr += count;
 
-    // Diagnostic accumulator: brand raw name → canonical key → ch → total
-    var diagKey = '"'+brRaw+'" → "'+brKey+'" | '+ch;
+    // Diagnostic: brand+model level total (after normModelKey)
+    var diagKey = '"'+brRaw+'" → "'+brKey+'" | model="'+mdKey+'" | '+ch;
     if (!diagBrCh[diagKey]) diagBrCh[diagKey] = 0;
     diagBrCh[diagKey] += count;
   }
 
-  // Log brand totals so we can spot name/channel mismatches
-  Logger.log('=== TRIGGER SHEET BRAND TOTALS ===');
+  // Log brand+model totals so we can verify trigger counts per model
+  Logger.log('=== TRIGGER SHEET BRAND+MODEL TOTALS (after normalization) ===');
   Object.keys(diagBrCh).sort().forEach(function(k){
     Logger.log('  '+k+' = '+diagBrCh[k]);
   });
@@ -367,6 +369,20 @@ function parseSC(v) {
 // ── UTILITIES ──────────────────────────────────────────────────
 function trim(v) { return String(v||'').trim(); }
 function normStr(s) { return String(s||'').trim().toLowerCase(); }  // for join keys only
+
+// Strip brand-name prefix from a model key so trigger-sheet names like
+// "Honda Elevate" / "Tata Punch" / "Toyota Innova Crysta" normalise to
+// the same short form the raw sheet uses ("elevate" / "punch" / "innova crysta").
+// Tries full brand prefix first, then just the first word (handles cases like
+// brKey="tata pv" but model="tata punch").
+function normModelKey(mdKey, brKey) {
+  if (!mdKey || !brKey) return mdKey;
+  if (mdKey.indexOf(brKey + ' ') === 0) return mdKey.substring(brKey.length + 1);
+  var firstWord = brKey.split(' ')[0];
+  if (firstWord.length > 1 && mdKey.indexOf(firstWord + ' ') === 0)
+    return mdKey.substring(firstWord.length + 1);
+  return mdKey;
+}
 function round2(n) { return Math.round(n * 100) / 100; }
 function jstr(s) { return JSON.stringify(String(s||'')); }
 
