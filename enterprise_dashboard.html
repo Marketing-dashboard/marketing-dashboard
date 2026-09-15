@@ -324,6 +324,9 @@ function fmtVal(kid, v){
   return k.fmt==='money'?fmtMoney(v):k.fmt==='num'?fmtNum(v):fmtPct(v);
 }
 
+/* ── STRING NORM (trim + lowercase, mirrors GS normStr) ─────── */
+function normStr(s){ return String(s||'').trim().toLowerCase(); }
+
 /* ── SOURCE NORM ─────────────────────────────────────────────── */
 function normSrc(s){
   if(!s)return'';
