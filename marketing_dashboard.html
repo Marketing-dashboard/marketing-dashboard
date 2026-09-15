@@ -624,13 +624,14 @@ function chgBadge(cur,prev,dir){
   return '<span class="chg '+cls+'">'+arrow+(up?'+':'')+pct.toFixed(1)+'%</span>';
 }
 
+
 /* ── MoM render ──
-   One section per selected brand.
-   Table: rows = months, cols = Month | Spends | Leads | CPL
-   Leads cell: green if increased, red if decreased vs prev month
-   CPL cell:   green if decreased, red if increased vs prev month     */
+   ONE table. Aggregated totals across all selected brands.
+   Only months where selected brands have data are shown.
+   Leads cell: green if up, red if down vs prev month.
+   CPL cell:   green if down, red if up vs prev month.            */
 function renderMoM(){
-  var months=getMonths();
+  var allMonths=getMonths();
   var selBrands=Array.from(msState['mom']||new Set());
   var container=document.getElementById('mom-content');
   if(!selBrands.length){
@@ -638,71 +639,86 @@ function renderMoM(){
     return;
   }
 
-  var html='';
-  selBrands.forEach(function(brand){
-    var bc=BRAND_COLORS[brand]||'#888';
-
-    // Pre-compute all monthly values
-    var monthData=months.map(function(mo){return {mo:mo,kpis:getMonthlyKpis(brand,mo)};});
-
-    var tbody='';
-    monthData.forEach(function(row,i){
-      var kpis=row.kpis;
-      var prev=i>0?monthData[i-1].kpis:null;
-
-      // Spends: show change badge, no cell coloring
-      var spendVal=kpis.spends!==null?fmt(kpis.spends):'\u2014';
-      var spendBadge=prev?chgBadge(kpis.spends,prev.spends,'higher-good'):'';
-
-      // Leads: green if up, red if down
-      var leadsVal=kpis.leads!==null?fmt(kpis.leads):'\u2014';
-      var leadsBadge=prev?chgBadge(kpis.leads,prev.leads,'higher-good'):'';
-      var leadsCls='';
-      if(prev&&kpis.leads!==null&&prev.leads!==null){
-        if(kpis.leads>prev.leads)leadsCls='cell-good';
-        else if(kpis.leads<prev.leads)leadsCls='cell-bad';
-      }
-
-      // CPL: green if down, red if up
-      var cplVal=kpis.cpl!==null?fmt(kpis.cpl):'\u2014';
-      var cplBadge=prev?chgBadge(kpis.cpl,prev.cpl,'lower-good'):'';
-      var cplCls='';
-      if(prev&&kpis.cpl!==null&&prev.cpl!==null){
-        if(kpis.cpl<prev.cpl)cplCls='cell-good';
-        else if(kpis.cpl>prev.cpl)cplCls='cell-bad';
-      }
-
-      tbody+='<tr>'+
-        '<td style="font-weight:600;color:var(--txt);">'+fmtMo(row.mo)+'</td>'+
-        '<td class="mono">'+spendVal+spendBadge+'</td>'+
-        '<td class="mono '+leadsCls+'">'+leadsVal+leadsBadge+'</td>'+
-        '<td class="mono '+cplCls+'">'+cplVal+cplBadge+'</td>'+
-        '</tr>';
+  // Only months where at least one selected brand has data
+  var activeMos=allMonths.filter(function(mo){
+    return selBrands.some(function(brand){
+      var k=getMonthlyKpis(brand,mo);
+      return k.spends!==null||k.leads!==null;
     });
+  });
+  if(!activeMos.length){
+    container.innerHTML='<div class="tbox"><p class="empty">No data for selected brands.</p></div>';
+    return;
+  }
 
-    html+='<div class="mom-section">'+
-      '<div class="mom-section-title">'+
-        '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+bc+';flex-shrink:0;"></span>'+
-        brand+' <span>— month on month</span>'+
-      '</div>'+
-      '<div class="mom-legend-strip">'+
-        '<span><span class="leg-dot" style="background:var(--grn-bg);border:1px solid var(--grn-bdr);"></span>Leads \u2191 or CPL \u2193 (good)</span>'+
-        '<span><span class="leg-dot" style="background:var(--red-bg);border:1px solid var(--red-bdr);"></span>Leads \u2193 or CPL \u2191 (bad)</span>'+
-      '</div>'+
-      '<div class="mom-tbl-wrap"><table class="mom-tbl">'+
-        '<thead><tr>'+
-          '<th>Month</th>'+
-          '<th class="num">Spends (INR)</th>'+
-          '<th class="num">Leads</th>'+
-          '<th class="num">CPL (INR)</th>'+
-        '</tr></thead>'+
-        '<tbody>'+tbody+'</tbody>'+
-      '</table></div>'+
-      '</div>';
+  // Aggregate across all selected brands per month
+  var monthData=activeMos.map(function(mo){
+    var totS=0,totL=0;
+    selBrands.forEach(function(brand){
+      var k=getMonthlyKpis(brand,mo);
+      if(k.spends)totS+=k.spends;
+      if(k.leads)totL+=k.leads;
+    });
+    return{mo:mo,spends:totS||null,leads:totL||null,cpl:(totS>0&&totL>0)?totS/totL:null};
   });
 
-  container.innerHTML=html||'<div class="tbox"><p class="empty">No data</p></div>';
+  // Build table rows
+  var tbody='';
+  monthData.forEach(function(row,i){
+    var prev=i>0?monthData[i-1]:null;
+
+    var spendVal=row.spends!==null?fmt(row.spends):'\u2014';
+    var spendBadge=prev?chgBadge(row.spends,prev.spends,'higher-good'):'';
+
+    var leadsVal=row.leads!==null?fmt(row.leads):'\u2014';
+    var leadsBadge=prev?chgBadge(row.leads,prev.leads,'higher-good'):'';
+    var leadsCls='';
+    if(prev&&row.leads!==null&&prev.leads!==null){
+      if(row.leads>prev.leads)leadsCls='cell-good';
+      else if(row.leads<prev.leads)leadsCls='cell-bad';
+    }
+
+    var cplVal=row.cpl!==null?fmt(row.cpl):'\u2014';
+    var cplBadge=prev?chgBadge(row.cpl,prev.cpl,'lower-good'):'';
+    var cplCls='';
+    if(prev&&row.cpl!==null&&prev.cpl!==null){
+      if(row.cpl<prev.cpl)cplCls='cell-good';
+      else if(row.cpl>prev.cpl)cplCls='cell-bad';
+    }
+
+    tbody+='<tr>'+
+      '<td style="font-weight:600;color:var(--txt);">'+fmtMo(row.mo)+'</td>'+
+      '<td class="mono">'+spendVal+spendBadge+'</td>'+
+      '<td class="mono '+leadsCls+'">'+leadsVal+leadsBadge+'</td>'+
+      '<td class="mono '+cplCls+'">'+cplVal+cplBadge+'</td>'+
+      '</tr>';
+  });
+
+  // Title shows selected brands
+  var allSel=selBrands.length===DATA.brands.length;
+  var titleLabel=allSel?'All Brands':selBrands.length===1?selBrands[0]:selBrands.join(', ');
+  var dots=selBrands.map(function(b){
+    return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(BRAND_COLORS[b]||'#888')+';margin-right:3px;"></span>';
+  }).join('');
+
+  container.innerHTML='<div class="mom-section">'+
+    '<div class="mom-section-title">'+dots+titleLabel+' <span>\u2014 month on month</span></div>'+
+    '<div class="mom-legend-strip">'+
+      '<span><span class="leg-dot" style="background:var(--grn-bg);border:1px solid var(--grn-bdr);"></span>Leads \u2191 or CPL \u2193 (good)</span>'+
+      '<span><span class="leg-dot" style="background:var(--red-bg);border:1px solid var(--red-bdr);"></span>Leads \u2193 or CPL \u2191 (bad)</span>'+
+    '</div>'+
+    '<div class="mom-tbl-wrap"><table class="mom-tbl">'+
+      '<thead><tr>'+
+        '<th>Month</th>'+
+        '<th class="num">Spends (INR)</th>'+
+        '<th class="num">Leads</th>'+
+        '<th class="num">CPL (INR)</th>'+
+      '</tr></thead>'+
+      '<tbody>'+tbody+'</tbody>'+
+    '</table></div>'+
+    '</div>';
 }
+
 
 /* ── CSV exports ── */
 function downloadCSV(rows,filename){
