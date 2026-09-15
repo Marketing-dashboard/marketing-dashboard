@@ -14,6 +14,12 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:10
 .header p{font-size:11px;color:#94a3b8;margin-top:3px}
 .build-ts{font-size:10px;color:#475569;margin-top:6px}
 
+/* ── TABS ── */
+.tab-bar{display:flex;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 28px;gap:0}
+.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab-btn:hover{color:#0f3460}
+.tab-btn.active{color:#0f3460;border-bottom-color:#0f3460}
+
 /* ── FILTERS ── */
 .filters{display:flex;gap:10px;flex-wrap:wrap;padding:12px 28px;background:#fff;border-bottom:1px solid #e2e8f0;align-items:center}
 .fg{display:flex;align-items:center;gap:5px}
@@ -49,7 +55,7 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:10
 .t1 .tile-val{color:#0f3460} .t2 .tile-val{color:#1d4ed8} .t3 .tile-val{color:#059669}
 .t4 .tile-val{color:#d97706} .t5 .tile-val{color:#7c3aed} .t6 .tile-val{color:#dc2626} .t7 .tile-val{color:#0891b2}
 
-/* ── TABLE ── */
+/* ── TABLE (shared) ── */
 .table-wrap{margin:16px 28px 28px;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden}
 .table-title{padding:11px 18px;font-size:13px;font-weight:700;color:#1a1a2e;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center}
 .row-ct{font-size:11px;font-weight:400;color:#94a3b8}
@@ -57,7 +63,6 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:10
 
 table{width:100%;border-collapse:collapse;font-size:11.5px}
 
-/* Header row 1 – source groups */
 thead tr.hr1 th{
   position:sticky;top:0;z-index:6;padding:9px 10px;text-align:center;
   font-size:11px;font-weight:700;letter-spacing:.4px;white-space:nowrap;color:#fff;
@@ -68,7 +73,6 @@ thead tr.hr1 th.h-fb{background:#1877f2;border-left:2px solid rgba(255,255,255,.
 thead tr.hr1 th.h-ctwa{background:#128C7E;border-left:2px solid rgba(255,255,255,.25)}
 thead tr.hr1 th.h-comb{background:#6d28d9;border-left:2px solid rgba(255,255,255,.25)}
 
-/* Header row 2 – KPI names */
 thead tr.hr2 th{
   position:sticky;z-index:5;padding:6px 9px;
   background:#1e293b;color:#94a3b8;font-size:10px;font-weight:600;
@@ -77,14 +81,12 @@ thead tr.hr2 th{
 thead tr.hr2 th.h-date2{text-align:left;padding-left:14px;background:#1e293b}
 thead tr.hr2 th.gsep{border-left:2px solid #374151}
 
-/* Body */
 tbody tr{border-bottom:1px solid #f1f5f9;transition:background .1s}
 tbody tr:hover{background:#f8fafc}
 tbody td{padding:8px 9px;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 tbody td:first-child{text-align:left;font-weight:600;color:#0f3460;padding-left:14px;min-width:72px}
 tbody td.gsep{border-left:2px solid #e2e8f0}
 
-/* Total row */
 tr.tot{background:#eef2ff !important;border-top:2px solid #c7d2fe;border-bottom:2px solid #c7d2fe}
 tr.tot td{font-weight:700;font-size:12px}
 tr.tot td:first-child{color:#312e81}
@@ -92,6 +94,26 @@ tr.tot td:first-child{color:#312e81}
 .dash{color:#d1d5db}
 .no-data{text-align:center;padding:40px;color:#94a3b8;font-size:13px}
 .footer{padding:10px 28px;font-size:10px;color:#94a3b8;text-align:right}
+
+/* ── MoM SPECIFIC ── */
+.mom-section{display:none}
+.mom-section.active{display:block}
+.daily-section{display:block}
+.daily-section.hidden{display:none}
+
+/* MoM table: KPI column left-aligned */
+#momTbl tbody td:first-child{min-width:90px;font-weight:700;color:#374151}
+#momTbl thead tr.hr2 th{text-align:center}
+#momTbl tbody td{text-align:right}
+#momTbl tbody td.kpi-cell{text-align:left;padding-left:14px;font-weight:700;color:#374151}
+
+/* Change badges */
+.chg-up{color:#059669;font-weight:700}
+.chg-dn{color:#dc2626;font-weight:700}
+.chg-neu{color:#6b7280;font-weight:600}
+
+/* MoM month labels in header */
+.mo-lbl{font-size:10px;opacity:.85}
 </style>
 </head>
 <body>
@@ -102,64 +124,115 @@ tr.tot td:first-child{color:#312e81}
   <div class="build-ts" id="buildTs"></div>
 </div>
 
-<!-- Filters -->
-<div class="filters" id="filterBar">
-  <div class="fg">
-    <label>Month</label>
-    <div class="mdd" id="moDd">
-      <button class="mdd-btn" id="moBtn" onclick="toggleMo(event)">
-        <span id="moLabel">All Months</span><span>▾</span>
-      </button>
-      <div class="mdd-panel" id="moPanel"></div>
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabDailyBtn" onclick="switchTab('daily')">Day-wise Performance</button>
+  <button class="tab-btn" id="tabMomBtn" onclick="switchTab('mom')">MoM Analysis</button>
+</div>
+
+<!-- ═══════════════════════════════════ DAILY SECTION ═══════════════════════════════════ -->
+<div class="daily-section" id="dailySection">
+
+  <div class="filters" id="filterBar">
+    <div class="fg">
+      <label>Month</label>
+      <div class="mdd" id="moDd">
+        <button class="mdd-btn" id="moBtn" onclick="toggleMo(event)">
+          <span id="moLabel">All Months</span><span>▾</span>
+        </button>
+        <div class="mdd-panel" id="moPanel"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Brand</label>
+      <select id="fBrand" onchange="onBrandChange()">
+        <option value="">All Brands</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Model</label>
+      <select id="fModel" onchange="render()">
+        <option value="">All Models</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Segment</label>
+      <select id="fSeg" onchange="render()">
+        <option value="">All Segments</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">Reset</button>
+  </div>
+
+  <div class="kpi-bar" id="kpiBar">
+    <span class="kpi-bar-lbl">Show KPIs:</span>
+  </div>
+
+  <div class="tiles">
+    <div class="tile t1"><div class="tile-lbl">Spend</div><div class="tile-val" id="tv-spend">—</div><div class="tile-sub">₹ Combined</div></div>
+    <div class="tile t2"><div class="tile-lbl">Leads</div><div class="tile-val" id="tv-leads">—</div><div class="tile-sub">Platform leads</div></div>
+    <div class="tile t3"><div class="tile-lbl">CPL</div><div class="tile-val" id="tv-cpl">—</div><div class="tile-sub">Spend ÷ Leads</div></div>
+    <div class="tile t4"><div class="tile-lbl">Triggers</div><div class="tile-val" id="tv-triggers">—</div><div class="tile-sub">Triggered leads</div></div>
+    <div class="tile t5"><div class="tile-lbl">TCPL</div><div class="tile-val" id="tv-tcpl">—</div><div class="tile-sub">Spend ÷ Triggers</div></div>
+    <div class="tile t6"><div class="tile-lbl">Revenue</div><div class="tile-val" id="tv-revenue">—</div><div class="tile-sub">PVL × Sold CPL</div></div>
+    <div class="tile t7"><div class="tile-lbl">Margin</div><div class="tile-val" id="tv-margin">—</div><div class="tile-sub">(1−Spend/Rev)×100</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-title">Day-wise Performance <span class="row-ct" id="rowCt"></span></div>
+    <div class="tscroll">
+      <table id="mainTbl">
+        <thead id="tHead"></thead>
+        <tbody id="tBody"></tbody>
+      </table>
     </div>
   </div>
-  <div class="fg">
-    <label>Brand</label>
-    <select id="fBrand" onchange="onBrandChange()">
-      <option value="">All Brands</option>
-    </select>
-  </div>
-  <div class="fg">
-    <label>Model</label>
-    <select id="fModel" onchange="render()">
-      <option value="">All Models</option>
-    </select>
-  </div>
-  <div class="fg">
-    <label>Segment</label>
-    <select id="fSeg" onchange="render()">
-      <option value="">All Segments</option>
-    </select>
-  </div>
-  <button class="btn-reset" onclick="resetFilters()">Reset</button>
-</div>
 
-<!-- KPI Selector -->
-<div class="kpi-bar" id="kpiBar">
-  <span class="kpi-bar-lbl">Show KPIs:</span>
-</div>
+</div><!-- /dailySection -->
 
-<!-- Summary Tiles -->
-<div class="tiles">
-  <div class="tile t1"><div class="tile-lbl">Spend</div><div class="tile-val" id="tv-spend">—</div><div class="tile-sub">₹ Combined</div></div>
-  <div class="tile t2"><div class="tile-lbl">Leads</div><div class="tile-val" id="tv-leads">—</div><div class="tile-sub">Platform leads</div></div>
-  <div class="tile t3"><div class="tile-lbl">CPL</div><div class="tile-val" id="tv-cpl">—</div><div class="tile-sub">Spend ÷ Leads</div></div>
-  <div class="tile t4"><div class="tile-lbl">Triggers</div><div class="tile-val" id="tv-triggers">—</div><div class="tile-sub">Triggered leads</div></div>
-  <div class="tile t5"><div class="tile-lbl">TCPL</div><div class="tile-val" id="tv-tcpl">—</div><div class="tile-sub">Spend ÷ Triggers</div></div>
-  <div class="tile t6"><div class="tile-lbl">Revenue</div><div class="tile-val" id="tv-revenue">—</div><div class="tile-sub">PVL × Sold CPL</div></div>
-  <div class="tile t7"><div class="tile-lbl">Margin</div><div class="tile-val" id="tv-margin">—</div><div class="tile-sub">(1−Spend/Rev)×100</div></div>
-</div>
+<!-- ═══════════════════════════════════ MoM SECTION ═══════════════════════════════════ -->
+<div class="mom-section" id="momSection">
 
-<!-- Table -->
-<div class="table-wrap">
-  <div class="table-title">Day-wise Performance <span class="row-ct" id="rowCt"></span></div>
-  <div class="tscroll">
-    <table id="mainTbl">
-      <thead id="tHead"></thead>
-      <tbody id="tBody"></tbody>
-    </table>
+  <div class="filters">
+    <div class="fg">
+      <label>Month 1</label>
+      <select id="momM1" onchange="renderMom()">
+        <option value="">Select Month</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Month 2</label>
+      <select id="momM2" onchange="renderMom()">
+        <option value="">Select Month</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Brand</label>
+      <select id="momBrand" onchange="onMomBrandChange()">
+        <option value="">All Brands</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Model</label>
+      <select id="momModel" onchange="renderMom()">
+        <option value="">All Models</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetMomFilters()">Reset</button>
   </div>
-</div>
+
+  <div class="table-wrap">
+    <div class="table-title">Month-over-Month KPI Comparison <span class="row-ct" id="momSubtitle"></span></div>
+    <div class="tscroll">
+      <table id="momTbl">
+        <thead id="momHead"></thead>
+        <tbody id="momBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /momSection -->
+
 <div class="footer" id="footerTs"></div>
 
 <script>
@@ -168,13 +241,13 @@ var DATA_RAW = [];
 
 /* ── KPI DEFINITIONS ─────────────────────────────────────────── */
 var KPIS = [
-  {id:'spend',    lbl:'Spend',    fmt:'money'},
-  {id:'leads',    lbl:'Leads',    fmt:'num'},
-  {id:'cpl',      lbl:'CPL',      fmt:'money'},
-  {id:'triggers', lbl:'Triggers', fmt:'num'},
-  {id:'tcpl',     lbl:'TCPL',     fmt:'money'},
-  {id:'revenue',  lbl:'Revenue',  fmt:'money'},
-  {id:'margin',   lbl:'Margin',   fmt:'pct'}
+  {id:'spend',    lbl:'Spend',    fmt:'money', lowerBetter:true},
+  {id:'leads',    lbl:'Leads',    fmt:'num',   lowerBetter:false},
+  {id:'cpl',      lbl:'CPL',      fmt:'money', lowerBetter:true},
+  {id:'triggers', lbl:'Triggers', fmt:'num',   lowerBetter:false},
+  {id:'tcpl',     lbl:'TCPL',     fmt:'money', lowerBetter:true},
+  {id:'revenue',  lbl:'Revenue',  fmt:'money', lowerBetter:false},
+  {id:'margin',   lbl:'Margin',   fmt:'pct',   lowerBetter:false}
 ];
 
 var SRCS = [
@@ -222,6 +295,16 @@ function dateLbl(dt){
   var p=dt.split('-');
   if(p.length<3)return dt;
   return MO_NAMES[parseInt(p[1])]+' '+parseInt(p[2]);
+}
+
+/* ── TAB SWITCH ─────────────────────────────────────────────── */
+function switchTab(tab){
+  var isDaily = tab === 'daily';
+  document.getElementById('dailySection').className = isDaily ? 'daily-section' : 'daily-section hidden';
+  document.getElementById('momSection').className   = isDaily ? 'mom-section'   : 'mom-section active';
+  document.getElementById('tabDailyBtn').className  = isDaily ? 'tab-btn active' : 'tab-btn';
+  document.getElementById('tabMomBtn').className    = isDaily ? 'tab-btn'        : 'tab-btn active';
+  if(!isDaily) renderMom();
 }
 
 /* ── MONTH MULTI-SELECT ─────────────────────────────────────── */
@@ -398,7 +481,7 @@ function renderTiles(rows){
   s('margin',  tot.margin!=null?fmtPct(tot.margin):'—');
 }
 
-/* ── TABLE HEAD ──────────────────────────────────────────────── */
+/* ── TABLE HEAD (day-wise) ───────────────────────────────────── */
 function renderHead(kpis){
   var thead=document.getElementById('tHead');
   thead.innerHTML='';
@@ -407,21 +490,18 @@ function renderHead(kpis){
   var r1=document.createElement('tr');r1.className='hr1';
   var r2=document.createElement('tr');r2.className='hr2';
 
-  // Date cell (rowspan 2)
   var thd=document.createElement('th');
   thd.className='h-date';thd.rowSpan=2;thd.textContent='Date';
   r1.appendChild(thd);
 
   var thd2=document.createElement('th');
-  thd2.className='h-date2';thd2.style.display='none'; // placeholder to keep rowspan intact
+  thd2.className='h-date2';thd2.style.display='none';
   r2.appendChild(thd2);
 
   SRCS.forEach(function(src,si){
-    // Group header
     var th1=document.createElement('th');
     th1.className=src.hcls;th1.colSpan=kpis.length;th1.textContent=src.lbl;
     r1.appendChild(th1);
-    // KPI sub-headers
     kpis.forEach(function(k,ki){
       var th2=document.createElement('th');
       th2.textContent=k.lbl;
@@ -433,14 +513,13 @@ function renderHead(kpis){
   thead.appendChild(r1);
   thead.appendChild(r2);
 
-  // Fix sticky top for row2
   requestAnimationFrame(function(){
     var h=r1.getBoundingClientRect().height||36;
     r2.querySelectorAll('th').forEach(function(th){th.style.top=h+'px';});
   });
 }
 
-/* ── TABLE ROW ───────────────────────────────────────────────── */
+/* ── TABLE ROW (day-wise) ────────────────────────────────────── */
 function makeRow(label,srcMap,kpis,isTot){
   var tr=document.createElement('tr');
   if(isTot)tr.className='tot';
@@ -467,7 +546,7 @@ function makeRow(label,srcMap,kpis,isTot){
   return tr;
 }
 
-/* ── TABLE BODY ──────────────────────────────────────────────── */
+/* ── TABLE BODY (day-wise) ───────────────────────────────────── */
 function renderTable(rows){
   var kpis=activeKPIs();
   renderHead(kpis);
@@ -488,14 +567,12 @@ function renderTable(rows){
 
   var byDate=aggByDate(rows);
 
-  // Total row
   var totAw=aggRows(rows.filter(function(r){return normSrc(r.ch)==='adwords';}));
   var totFb=aggRows(rows.filter(function(r){return normSrc(r.ch)==='fb';}));
   var totCt=aggRows(rows.filter(function(r){return normSrc(r.ch)==='ctwa';}));
   var totAll=aggRows(rows);
   tbody.appendChild(makeRow('TOTAL',{adwords:totAw,fb:totFb,ctwa:totCt,combined:totAll},kpis,true));
 
-  // Date rows
   byDate.forEach(function(d){
     tbody.appendChild(makeRow(dateLbl(d.date),
       {adwords:d.adwords,fb:d.fb,ctwa:d.ctwa,combined:d.combined},kpis,false));
@@ -504,11 +581,177 @@ function renderTable(rows){
   document.getElementById('rowCt').textContent=byDate.length+' days';
 }
 
-/* ── MAIN RENDER ─────────────────────────────────────────────── */
+/* ── MAIN RENDER (day-wise) ──────────────────────────────────── */
 function render(){
   var f=getFiltered();
   renderTiles(f);
   renderTable(f);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MoM ANALYSIS
+══════════════════════════════════════════════════════════════ */
+
+function initMomSection(){
+  var months=[];
+  DATA_RAW.forEach(function(r){var m=normMo(r.mo);if(m&&months.indexOf(m)===-1)months.push(m);});
+  months.sort();
+
+  var m1Sel=document.getElementById('momM1');
+  var m2Sel=document.getElementById('momM2');
+  m1Sel.innerHTML='<option value="">Select Month</option>';
+  m2Sel.innerHTML='<option value="">Select Month</option>';
+  months.forEach(function(m){
+    [m1Sel,m2Sel].forEach(function(sel){
+      var o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);
+    });
+  });
+  // Default: last two months
+  if(months.length>=2){m1Sel.value=months[months.length-2];m2Sel.value=months[months.length-1];}
+  else if(months.length===1){m1Sel.value=months[0];}
+
+  // Brand
+  var brands=[];
+  DATA_RAW.forEach(function(r){if(r.br&&brands.indexOf(r.br)===-1)brands.push(r.br);});
+  brands.sort();
+  var bSel=document.getElementById('momBrand');
+  bSel.innerHTML='<option value="">All Brands</option>';
+  brands.forEach(function(b){var o=document.createElement('option');o.value=b;o.textContent=b;bSel.appendChild(o);});
+  buildMomModels('');
+}
+
+function buildMomModels(brand){
+  var models=[];
+  DATA_RAW.forEach(function(r){
+    if((!brand||r.br===brand)&&r.md&&models.indexOf(r.md)===-1)models.push(r.md);
+  });
+  models.sort();
+  var sel=document.getElementById('momModel');
+  sel.innerHTML='<option value="">All Models</option>';
+  models.forEach(function(m){var o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
+}
+
+function onMomBrandChange(){buildMomModels(document.getElementById('momBrand').value);renderMom();}
+
+function resetMomFilters(){
+  document.getElementById('momBrand').value='';
+  document.getElementById('momModel').value='';
+  buildMomModels('');
+  renderMom();
+}
+
+function getMomRows(month){
+  var brand=document.getElementById('momBrand').value;
+  var model=document.getElementById('momModel').value;
+  return DATA_RAW.filter(function(r){
+    if(normMo(r.mo)!==month)return false;
+    if(brand&&r.br!==brand)return false;
+    if(model&&r.md!==model)return false;
+    return true;
+  });
+}
+
+function aggForSrc(rows, srcId){
+  var f = srcId==='combined' ? rows : rows.filter(function(r){return normSrc(r.ch)===srcId;});
+  return aggRows(f);
+}
+
+function fmtChange(v1, v2, lowerBetter){
+  if(v1==null||v2==null||v1===0)return{html:'<span class="dash">—</span>'};
+  var pct=((v2-v1)/Math.abs(v1))*100;
+  var improved = lowerBetter ? (pct<=0) : (pct>=0);
+  var arrow = pct>=0 ? '▲' : '▼';
+  var cls   = Math.abs(pct)<0.05 ? 'chg-neu' : (improved ? 'chg-up' : 'chg-dn');
+  return{html:'<span class="'+cls+'">'+arrow+' '+Math.abs(pct).toFixed(1)+'%</span>'};
+}
+
+function renderMom(){
+  var m1=document.getElementById('momM1').value;
+  var m2=document.getElementById('momM2').value;
+  var thead=document.getElementById('momHead');
+  var tbody=document.getElementById('momBody');
+
+  if(!m1||!m2){
+    thead.innerHTML='';
+    tbody.innerHTML='<tr><td colspan="13" class="no-data">Select two months to compare.</td></tr>';
+    document.getElementById('momSubtitle').textContent='';
+    return;
+  }
+
+  document.getElementById('momSubtitle').textContent=m1+' vs '+m2;
+
+  var rows1=getMomRows(m1);
+  var rows2=getMomRows(m2);
+
+  // ── Build header ──
+  thead.innerHTML='';
+  var hr1=document.createElement('tr');hr1.className='hr1';
+  var hr2=document.createElement('tr');hr2.className='hr2';
+
+  var thKpi=document.createElement('th');
+  thKpi.className='h-date';thKpi.rowSpan=2;thKpi.textContent='KPI';thKpi.style.minWidth='90px';
+  hr1.appendChild(thKpi);
+
+  SRCS.forEach(function(src,si){
+    var th1=document.createElement('th');
+    th1.className=src.hcls;th1.colSpan=3;th1.textContent=src.lbl;
+    hr1.appendChild(th1);
+
+    [m1, m2, 'Δ Change'].forEach(function(lbl,i){
+      var th2=document.createElement('th');
+      th2.textContent=lbl;
+      if(i===0&&si>0)th2.className='gsep';
+      hr2.appendChild(th2);
+    });
+  });
+
+  thead.appendChild(hr1);
+  thead.appendChild(hr2);
+  requestAnimationFrame(function(){
+    var h=hr1.getBoundingClientRect().height||36;
+    hr2.querySelectorAll('th').forEach(function(th){th.style.top=h+'px';});
+  });
+
+  // ── Build body ──
+  tbody.innerHTML='';
+
+  KPIS.forEach(function(kpi){
+    var tr=document.createElement('tr');
+
+    // KPI label
+    var tdKpi=document.createElement('td');
+    tdKpi.className='kpi-cell';
+    tdKpi.textContent=kpi.lbl;
+    tr.appendChild(tdKpi);
+
+    SRCS.forEach(function(src,si){
+      var a1=aggForSrc(rows1,src.id);
+      var a2=aggForSrc(rows2,src.id);
+      var v1=a1[kpi.id];
+      var v2=a2[kpi.id];
+
+      // M1
+      var td1=document.createElement('td');
+      if(si>0)td1.className='gsep';
+      td1.textContent=fmtVal(kpi.id,v1);
+      if(v1==null||v1===0)td1.innerHTML='<span class="dash">—</span>';
+      tr.appendChild(td1);
+
+      // M2
+      var td2=document.createElement('td');
+      td2.textContent=fmtVal(kpi.id,v2);
+      if(v2==null||v2===0)td2.innerHTML='<span class="dash">—</span>';
+      tr.appendChild(td2);
+
+      // Δ Change
+      var tdC=document.createElement('td');
+      var chg=fmtChange(v1,v2,kpi.lowerBetter);
+      tdC.innerHTML=chg.html;
+      tr.appendChild(tdC);
+    });
+
+    tbody.appendChild(tr);
+  });
 }
 
 /* ── INIT ────────────────────────────────────────────────────── */
@@ -520,6 +763,7 @@ window.addEventListener('load',function(){
   }
   buildKpiBar();
   initFilters();
+  initMomSection();
   render();
 });
 </script>
