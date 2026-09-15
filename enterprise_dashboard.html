@@ -820,6 +820,34 @@ function renderMom(){
 // Days in each month (non-leap)
 var MONTH_DAYS = {Jan:31,Feb:28,Mar:31,Apr:30,May:31,Jun:30,Jul:31,Aug:31,Sep:30,Oct:31,Nov:30,Dec:31};
 
+// Brand-specific campaign end dates per month (lowercase brand key → month → last day)
+var BRAND_END_DAYS = {
+  'tata pv':       {Sep:18},
+  'tata ev':       {Sep:18},
+  'honda':         {Sep:24},
+  'skoda':         {Sep:18},
+  'toyota':        {Sep:30},
+  'volkswagen':    {Sep:22},
+  'mahindra pv':   {Sep:30},
+  'nissan':        {Sep:30},
+  'citroen':       {Sep:30},
+  'jlr':           {Sep:30},
+  'volvo':         {Sep:30},
+  'audi':          {Sep:30},
+  'bmw':           {Sep:30},
+  'redwing':       {Sep:30},
+  'bigwing':       {Sep:28},
+  'royal enfield': {Sep:25},
+  'harley':        {Sep:8},
+  'ola':           {Sep:30}
+};
+
+function getBrandEndDay(br, mo, totalDays){
+  var key = normStr(br);
+  var mo_map = BRAND_END_DAYS[key];
+  return (mo_map && mo_map[mo]!=null) ? mo_map[mo] : totalDays;
+}
+
 function initPredSection(){
   // Populate month dropdown from available data months
   var months=[];
@@ -859,13 +887,12 @@ function renderPred(){
   var lastDate = allDates[allDates.length-1];
   var lastDay  = parseInt(lastDate.split('-')[2]);
   var totalDays = MONTH_DAYS[mo] || 30;
-  var daysLeft  = Math.max(0, totalDays - lastDay);
 
   infoEl.innerHTML =
     'Data through <strong>'+lastDate+'</strong> &nbsp;·&nbsp; '+
     '<span class="badge">'+lastDay+' days recorded</span> &nbsp;·&nbsp; '+
-    '<span class="badge">'+daysLeft+' days remaining</span> &nbsp;·&nbsp; '+
-    'Trigger avg based on last <strong>'+nDays+' days</strong>';
+    'Trigger avg based on last <strong>'+nDays+' days</strong> &nbsp;·&nbsp; '+
+    'Days remaining = brand end date − '+lastDay;
 
   // Apply source filter
   var srcRows = (srcF==='combined')
@@ -903,6 +930,10 @@ function renderPred(){
     var nSum   = lastNDates.reduce(function(s,d){return s+byDate[d];},0);
     var avgDay = lastNDates.length>0 ? nSum/lastNDates.length : 0;
 
+    // Brand-specific end date → days left
+    var brandEndDay = getBrandEndDay(br, mo, totalDays);
+    var daysLeft    = Math.max(0, brandEndDay - lastDay);
+
     // Projected & expected triggers
     var projTr = avgDay * daysLeft;
     var expTr  = actTr + projTr;
@@ -920,9 +951,9 @@ function renderPred(){
     // Expected margin
     var expMargin = (expSp!=null && expRev>0) ? (1-expSp/expRev)*100 : null;
 
-    results.push({br:br, actTr:actTr, avgDay:avgDay, daysLeft:daysLeft,
-                  projTr:projTr, expTr:expTr, tcpl:tcpl, expSp:expSp,
-                  expRev:expRev, expMargin:expMargin});
+    results.push({br:br, endDay:brandEndDay, actTr:actTr, avgDay:avgDay,
+                  daysLeft:daysLeft, projTr:projTr, expTr:expTr,
+                  tcpl:tcpl, expSp:expSp, expRev:expRev, expMargin:expMargin});
   });
 
   subtitle.textContent = mo+' · '+results.length+' brands';
@@ -930,16 +961,17 @@ function renderPred(){
   // ── Build header ──
   thead.innerHTML='';
   var PCOLS = [
-    {lbl:'Brand'},
-    {lbl:'Act. Triggers'},
-    {lbl:'Avg / Day\n(last '+nDays+'d)'},
-    {lbl:'Days Left'},
-    {lbl:'Proj. Triggers'},
-    {lbl:'Exp. Total Triggers'},
-    {lbl:'TCPL ('+mo+')'},
-    {lbl:'Exp. Spend'},
-    {lbl:'Exp. Revenue'},
-    {lbl:'Pred. Margin'}
+    {lbl:'Brand',                sep:false},
+    {lbl:'Month End',            sep:true},
+    {lbl:'Act. Triggers',        sep:false},
+    {lbl:'Avg/Day\n(last '+nDays+'d)', sep:false},
+    {lbl:'Days Left',            sep:false},
+    {lbl:'Proj. Triggers',       sep:false},
+    {lbl:'Exp. Total Triggers',  sep:false},
+    {lbl:'TCPL ('+mo+')',        sep:true},
+    {lbl:'Exp. Spend',           sep:false},
+    {lbl:'Exp. Revenue',         sep:true},
+    {lbl:'Pred. Margin',         sep:false}
   ];
   var hr=document.createElement('tr');hr.className='hr1';
   PCOLS.forEach(function(c,i){
@@ -950,9 +982,7 @@ function renderPred(){
     th.style.textAlign= i===0?'left':'right';
     th.style.paddingLeft= i===0?'14px':'9px';
     th.style.fontSize='11px';
-    if(i===1)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
-    if(i===6)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
-    if(i===8)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
+    if(c.sep)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
     thead.appendChild(hr);
     hr.appendChild(th);
   });
@@ -999,15 +1029,22 @@ function renderPred(){
     if(!isTot){tdB.style.color='#0f3460';tdB.style.fontWeight='600';}
     tr.appendChild(tdB);
 
-    tr.appendChild(cell(d.actTr, 'num',  true));
-    tr.appendChild(cell(d.avgDay,'dec1', false));
-    tr.appendChild(cell(d.daysLeft,'num',false));
-    tr.appendChild(cell(d.projTr,'num',  false));
-    tr.appendChild(cell(d.expTr, 'num',  false));
-    tr.appendChild(cell(d.tcpl,  'money',true));
-    tr.appendChild(cell(d.expSp, 'money',false));
-    tr.appendChild(cell(d.expRev,'money',true));
-    tr.appendChild(cell(d.expMargin,'pct',false,function(td,v){
+    // Month End date cell
+    var tdEnd=document.createElement('td');
+    tdEnd.style.borderLeft='2px solid #e2e8f0';
+    tdEnd.textContent = d.endDay ? ('Sep '+d.endDay) : '—';
+    tdEnd.style.color='#475569';tdEnd.style.fontWeight='600';
+    tr.appendChild(tdEnd);
+
+    tr.appendChild(cell(d.actTr,    'num',  false));
+    tr.appendChild(cell(d.avgDay,   'dec1', false));
+    tr.appendChild(cell(d.daysLeft, 'num',  false));
+    tr.appendChild(cell(d.projTr,   'num',  false));
+    tr.appendChild(cell(d.expTr,    'num',  false));
+    tr.appendChild(cell(d.tcpl,     'money',true));
+    tr.appendChild(cell(d.expSp,    'money',false));
+    tr.appendChild(cell(d.expRev,   'money',true));
+    tr.appendChild(cell(d.expMargin,'pct',  false,function(td,v){
       if(v==null)return;
       td.className = v>=40?'mg-hi':v>=20?'mg-mid':'mg-lo';
     }));
@@ -1016,7 +1053,7 @@ function renderPred(){
 
   // Total row first
   tbody.appendChild(makeRow('TOTAL',{
-    actTr:totActTr, avgDay:totAvgDay, daysLeft:daysLeft,
+    endDay:null, actTr:totActTr, avgDay:totAvgDay, daysLeft:null,
     projTr:totProjTr, expTr:totExpTr, tcpl:totTcpl,
     expSp:totExpSp, expRev:totExpRev, expMargin:totMargin
   }, true));
