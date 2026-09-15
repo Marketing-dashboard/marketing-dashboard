@@ -48,8 +48,10 @@ var SPECIAL_BRANDS = ['JLR','CITROEN','LEXUS'];
 // Brand alias map: normalized variants → canonical key (all lowercase)
 // Add entries here whenever the sheet uses alternate brand names for the same brand
 var BRAND_ALIAS = {
-  'ola electric': 'ola',
-  'ola ev':       'ola'
+  'ola electric':  'ola',
+  'ola ev':        'ola',
+  'hmsi bigwing':  'bigwing',
+  'hmsi redwing':  'redwing'
 };
 
 // Normalize a brand key (post-normStr) to its canonical form
@@ -195,18 +197,33 @@ function buildRows() {
   Logger.log('Raw map:'+Object.keys(rawMap).length);
 
   // Merge: join spends with triggers + CPL validation (use normalized keys for lookup)
+  // usedWildcard prevents assigning brand-level triggers to every model row on the same day
   var rows = [];
+  var usedWildcard = {};
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
     var brk = r.brk, mdk = r.mdk;
     var br = brandCanon[brk] || brk;  // canonical display name
     var md = modelCanon[mdk] || mdk;
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
-    // Try exact brand+model+channel match first; fall back to wildcard (brand+channel only)
-    // Wildcard is used when the trigger sheet has no model breakdown for a brand
-    var triggers = (trigMap[r.dt+'||'+brk+'||'+mdk+'||'+r.ch]
-                 || trigMap[r.dt+'||'+brk+'||*||'+r.ch]
-                 || {}).tr || 0;
+
+    var triggers = 0;
+    var exactEntry = trigMap[r.dt+'||'+brk+'||'+mdk+'||'+r.ch];
+    if (exactEntry) {
+      // Exact brand+model+channel match
+      triggers = exactEntry.tr || 0;
+    } else {
+      // Wildcard fallback: assign brand-level triggers only to the FIRST model row
+      // per date+brand+channel to avoid double-counting across multiple models
+      var wkey     = r.dt+'||'+brk+'||*||'+r.ch;
+      var wEntry   = trigMap[wkey];
+      var groupKey = r.dt+'||'+brk+'||'+r.ch;
+      if (wEntry && !usedWildcard[groupKey]) {
+        triggers = wEntry.tr || 0;
+        usedWildcard[groupKey] = true;
+      }
+    }
+
     var cplInfo  = cplMap[brk+'||'+mdk+'||'+r.ch+'||'+r.mo] || {};
     rows.push({
       dt:r.dt, mo:r.mo, br:br, md:md,
