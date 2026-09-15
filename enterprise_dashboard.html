@@ -864,6 +864,14 @@ function initPredSection(){
 }
 
 function renderPred(){
+  try { _renderPredInner(); }
+  catch(e){
+    var tbody=document.getElementById('predBody');
+    if(tbody) tbody.innerHTML='<tr><td colspan="11" style="color:red;padding:16px;font-size:12px">JS Error in renderPred: '+e.message+'</td></tr>';
+    console.error('renderPred error:',e);
+  }
+}
+function _renderPredInner(){
   var mo    = document.getElementById('predMonth').value;
   var srcF  = document.getElementById('predSrc').value;
   var nDays = parseInt(document.getElementById('predDays').value)||3;
@@ -876,7 +884,7 @@ function renderPred(){
   // Filter to selected month
   var moRows = DATA_RAW.filter(function(r){return normMo(r.mo)===mo;});
   if(!moRows.length){
-    infoEl.textContent='No data available for '+mo+'.';
+    infoEl.textContent='No data available for '+mo+'. (DATA_RAW has '+DATA_RAW.length+' total rows)';
     thead.innerHTML=''; tbody.innerHTML='<tr><td class="no-data" colspan="11">No data.</td></tr>';
     subtitle.textContent='';
     return;
