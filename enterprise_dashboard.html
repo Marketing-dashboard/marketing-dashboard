@@ -101,6 +101,19 @@ tr.tot td:first-child{color:#312e81}
 .daily-section{display:block}
 .daily-section.hidden{display:none}
 
+/* ── PREDICTION TAB ── */
+.pred-section{display:none}
+.pred-section.active{display:block}
+
+.pred-info{display:flex;gap:16px;flex-wrap:wrap;padding:10px 28px;background:#fffbeb;border-bottom:1px solid #fde68a;align-items:center;font-size:12px;color:#92400e}
+.pred-info strong{color:#78350f}
+.pred-info .badge{background:#fef3c7;border:1px solid #fde68a;border-radius:5px;padding:3px 8px;font-weight:600}
+
+/* Margin color cells */
+.mg-hi{color:#059669;font-weight:700}
+.mg-mid{color:#d97706;font-weight:700}
+.mg-lo{color:#dc2626;font-weight:700}
+
 /* MoM table: KPI column left-aligned */
 #momTbl tbody td:first-child{min-width:90px;font-weight:700;color:#374151}
 #momTbl thead tr.hr2 th{text-align:center}
@@ -128,6 +141,7 @@ tr.tot td:first-child{color:#312e81}
 <div class="tab-bar">
   <button class="tab-btn active" id="tabDailyBtn" onclick="switchTab('daily')">Day-wise Performance</button>
   <button class="tab-btn" id="tabMomBtn" onclick="switchTab('mom')">MoM Analysis</button>
+  <button class="tab-btn" id="tabPredBtn" onclick="switchTab('pred')">Sep Prediction</button>
 </div>
 
 <!-- ═══════════════════════════════════ DAILY SECTION ═══════════════════════════════════ -->
@@ -233,6 +247,49 @@ tr.tot td:first-child{color:#312e81}
 
 </div><!-- /momSection -->
 
+<!-- ═══════════════════════════════════ PREDICTION SECTION ═══════════════════════════════════ -->
+<div class="pred-section" id="predSection">
+
+  <div class="filters">
+    <div class="fg">
+      <label>Month</label>
+      <select id="predMonth" onchange="renderPred()">
+        <option value="Sep">September</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Source</label>
+      <select id="predSrc" onchange="renderPred()">
+        <option value="combined">Combined</option>
+        <option value="adwords">Adwords (Google)</option>
+        <option value="fb">Meta / FB</option>
+        <option value="ctwa">CTWA</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Avg Window</label>
+      <select id="predDays" onchange="renderPred()">
+        <option value="3">Last 3 Days</option>
+        <option value="5">Last 5 Days</option>
+        <option value="7">Last 7 Days</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="pred-info" id="predInfo">Select a month with data to see prediction.</div>
+
+  <div class="table-wrap">
+    <div class="table-title">Month-End Predicted Margin — Brand-wise <span class="row-ct" id="predSubtitle"></span></div>
+    <div class="tscroll">
+      <table id="predTbl">
+        <thead id="predHead"></thead>
+        <tbody id="predBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /predSection -->
+
 <div class="footer" id="footerTs"></div>
 
 <script>
@@ -299,12 +356,14 @@ function dateLbl(dt){
 
 /* ── TAB SWITCH ─────────────────────────────────────────────── */
 function switchTab(tab){
-  var isDaily = tab === 'daily';
-  document.getElementById('dailySection').className = isDaily ? 'daily-section' : 'daily-section hidden';
-  document.getElementById('momSection').className   = isDaily ? 'mom-section'   : 'mom-section active';
-  document.getElementById('tabDailyBtn').className  = isDaily ? 'tab-btn active' : 'tab-btn';
-  document.getElementById('tabMomBtn').className    = isDaily ? 'tab-btn'        : 'tab-btn active';
-  if(!isDaily) renderMom();
+  document.getElementById('dailySection').className = tab==='daily' ? 'daily-section'       : 'daily-section hidden';
+  document.getElementById('momSection').className   = tab==='mom'   ? 'mom-section active'   : 'mom-section';
+  document.getElementById('predSection').className  = tab==='pred'  ? 'pred-section active'  : 'pred-section';
+  document.getElementById('tabDailyBtn').className  = tab==='daily' ? 'tab-btn active' : 'tab-btn';
+  document.getElementById('tabMomBtn').className    = tab==='mom'   ? 'tab-btn active' : 'tab-btn';
+  document.getElementById('tabPredBtn').className   = tab==='pred'  ? 'tab-btn active' : 'tab-btn';
+  if(tab==='mom')  renderMom();
+  if(tab==='pred') renderPred();
 }
 
 /* ── MONTH MULTI-SELECT ─────────────────────────────────────── */
@@ -754,6 +813,220 @@ function renderMom(){
   });
 }
 
+/* ══════════════════════════════════════════════════════════════
+   PREDICTION TAB
+══════════════════════════════════════════════════════════════ */
+
+// Days in each month (non-leap)
+var MONTH_DAYS = {Jan:31,Feb:28,Mar:31,Apr:30,May:31,Jun:30,Jul:31,Aug:31,Sep:30,Oct:31,Nov:30,Dec:31};
+
+function initPredSection(){
+  // Populate month dropdown from available data months
+  var months=[];
+  DATA_RAW.forEach(function(r){var m=normMo(r.mo);if(m&&months.indexOf(m)===-1)months.push(m);});
+  months.sort();
+  var sel=document.getElementById('predMonth');
+  sel.innerHTML='';
+  months.forEach(function(m){
+    var o=document.createElement('option');o.value=m;o.textContent=m;
+    if(m==='Sep')o.selected=true;
+    sel.appendChild(o);
+  });
+  if(months.length&&!sel.value)sel.value=months[months.length-1];
+}
+
+function renderPred(){
+  var mo    = document.getElementById('predMonth').value;
+  var srcF  = document.getElementById('predSrc').value;
+  var nDays = parseInt(document.getElementById('predDays').value)||3;
+
+  var infoEl   = document.getElementById('predInfo');
+  var thead    = document.getElementById('predHead');
+  var tbody    = document.getElementById('predBody');
+  var subtitle = document.getElementById('predSubtitle');
+
+  // Filter to selected month
+  var moRows = DATA_RAW.filter(function(r){return normMo(r.mo)===mo;});
+  if(!moRows.length){
+    infoEl.textContent='No data available for '+mo+'.';
+    thead.innerHTML=''; tbody.innerHTML='<tr><td class="no-data" colspan="11">No data.</td></tr>';
+    subtitle.textContent='';
+    return;
+  }
+
+  // Last date available and days remaining
+  var allDates = moRows.map(function(r){return r.dt;}).sort();
+  var lastDate = allDates[allDates.length-1];
+  var lastDay  = parseInt(lastDate.split('-')[2]);
+  var totalDays = MONTH_DAYS[mo] || 30;
+  var daysLeft  = Math.max(0, totalDays - lastDay);
+
+  infoEl.innerHTML =
+    'Data through <strong>'+lastDate+'</strong> &nbsp;·&nbsp; '+
+    '<span class="badge">'+lastDay+' days recorded</span> &nbsp;·&nbsp; '+
+    '<span class="badge">'+daysLeft+' days remaining</span> &nbsp;·&nbsp; '+
+    'Trigger avg based on last <strong>'+nDays+' days</strong>';
+
+  // Apply source filter
+  var srcRows = (srcF==='combined')
+    ? moRows
+    : moRows.filter(function(r){return normSrc(r.ch)===srcF;});
+
+  // Group by brand
+  var brandMap = {};
+  srcRows.forEach(function(r){
+    if(!brandMap[r.br]) brandMap[r.br]=[];
+    brandMap[r.br].push(r);
+  });
+
+  // Build per-brand prediction
+  var results = [];
+  Object.keys(brandMap).sort().forEach(function(br){
+    var rows = brandMap[br];
+
+    // Actual September totals for this brand
+    var actSp=0, actTr=0, actRev=0;
+    rows.forEach(function(r){
+      actSp  += (r.sp||0);
+      actTr  += (r.tr||0);
+      actRev += (r.vp/100)*(r.tr||0)*(r.sc||0);
+    });
+
+    // Last N days daily triggers (summed across sources/models per day)
+    var byDate={};
+    rows.forEach(function(r){
+      if(!byDate[r.dt])byDate[r.dt]=0;
+      byDate[r.dt]+=(r.tr||0);
+    });
+    var sortedDates = Object.keys(byDate).sort();
+    var lastNDates  = sortedDates.slice(-nDays);
+    var nSum   = lastNDates.reduce(function(s,d){return s+byDate[d];},0);
+    var avgDay = lastNDates.length>0 ? nSum/lastNDates.length : 0;
+
+    // Projected & expected triggers
+    var projTr = avgDay * daysLeft;
+    var expTr  = actTr + projTr;
+
+    // TCPL from actual September data for this brand
+    var tcpl = actTr>0 ? actSp/actTr : null;
+
+    // Expected spend = expected triggers × TCPL
+    var expSp = (tcpl!=null) ? expTr*tcpl : null;
+
+    // Expected revenue: scale actual revenue by trigger ratio
+    // (preserves model/channel mix for vp & soldCPL weighting)
+    var expRev = (actTr>0 && actRev>0) ? actRev*(expTr/actTr) : 0;
+
+    // Expected margin
+    var expMargin = (expSp!=null && expRev>0) ? (1-expSp/expRev)*100 : null;
+
+    results.push({br:br, actTr:actTr, avgDay:avgDay, daysLeft:daysLeft,
+                  projTr:projTr, expTr:expTr, tcpl:tcpl, expSp:expSp,
+                  expRev:expRev, expMargin:expMargin});
+  });
+
+  subtitle.textContent = mo+' · '+results.length+' brands';
+
+  // ── Build header ──
+  thead.innerHTML='';
+  var PCOLS = [
+    {lbl:'Brand'},
+    {lbl:'Act. Triggers'},
+    {lbl:'Avg / Day\n(last '+nDays+'d)'},
+    {lbl:'Days Left'},
+    {lbl:'Proj. Triggers'},
+    {lbl:'Exp. Total Triggers'},
+    {lbl:'TCPL ('+mo+')'},
+    {lbl:'Exp. Spend'},
+    {lbl:'Exp. Revenue'},
+    {lbl:'Pred. Margin'}
+  ];
+  var hr=document.createElement('tr');hr.className='hr1';
+  PCOLS.forEach(function(c,i){
+    var th=document.createElement('th');
+    th.textContent=c.lbl;
+    th.style.background= i===0?'#0f3460':'#1e293b';
+    th.style.whiteSpace='pre-line';
+    th.style.textAlign= i===0?'left':'right';
+    th.style.paddingLeft= i===0?'14px':'9px';
+    th.style.fontSize='11px';
+    if(i===1)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
+    if(i===6)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
+    if(i===8)th.style.borderLeft='2px solid rgba(255,255,255,.25)';
+    thead.appendChild(hr);
+    hr.appendChild(th);
+  });
+
+  // ── Compute TOTAL ──
+  var totActTr=0,totProjTr=0,totExpTr=0,totExpSp=0,totExpRev=0;
+  results.forEach(function(d){
+    totActTr  += d.actTr;
+    totProjTr += d.projTr;
+    totExpTr  += d.expTr;
+    if(d.expSp!=null) totExpSp  += d.expSp;
+    totExpRev += d.expRev;
+  });
+  var totAvgDay = results.length>0 ? results.reduce(function(s,d){return s+d.avgDay;},0) : 0;
+  var totTcpl   = totExpTr>0 ? totExpSp/totExpTr : null;
+  var totMargin = (totExpSp>0&&totExpRev>0)?(1-totExpSp/totExpRev)*100:null;
+
+  // ── Build body ──
+  tbody.innerHTML='';
+
+  function makeRow(label, d, isTot){
+    var tr=document.createElement('tr');
+    if(isTot)tr.className='tot';
+
+    function cell(v,fmt,isSep,clsCb){
+      var td=document.createElement('td');
+      if(isSep)td.style.borderLeft='2px solid #e2e8f0';
+      var txt;
+      if(v==null||v===undefined){txt='<span class="dash">—</span>';}
+      else if(fmt==='money') txt='₹'+Math.round(v).toLocaleString('en-IN');
+      else if(fmt==='num')   txt=Math.round(v).toLocaleString('en-IN');
+      else if(fmt==='dec1')  txt=v.toFixed(1);
+      else if(fmt==='pct')   txt=v.toFixed(1)+'%';
+      else txt=v;
+      td.innerHTML=txt;
+      if(clsCb) clsCb(td,v);
+      return td;
+    }
+
+    // Brand label
+    var tdB=document.createElement('td');
+    tdB.textContent=label;
+    tdB.style.paddingLeft='14px';
+    if(!isTot){tdB.style.color='#0f3460';tdB.style.fontWeight='600';}
+    tr.appendChild(tdB);
+
+    tr.appendChild(cell(d.actTr, 'num',  true));
+    tr.appendChild(cell(d.avgDay,'dec1', false));
+    tr.appendChild(cell(d.daysLeft,'num',false));
+    tr.appendChild(cell(d.projTr,'num',  false));
+    tr.appendChild(cell(d.expTr, 'num',  false));
+    tr.appendChild(cell(d.tcpl,  'money',true));
+    tr.appendChild(cell(d.expSp, 'money',false));
+    tr.appendChild(cell(d.expRev,'money',true));
+    tr.appendChild(cell(d.expMargin,'pct',false,function(td,v){
+      if(v==null)return;
+      td.className = v>=40?'mg-hi':v>=20?'mg-mid':'mg-lo';
+    }));
+    return tr;
+  }
+
+  // Total row first
+  tbody.appendChild(makeRow('TOTAL',{
+    actTr:totActTr, avgDay:totAvgDay, daysLeft:daysLeft,
+    projTr:totProjTr, expTr:totExpTr, tcpl:totTcpl,
+    expSp:totExpSp, expRev:totExpRev, expMargin:totMargin
+  }, true));
+
+  // Brand rows
+  results.forEach(function(d){
+    tbody.appendChild(makeRow(d.br, d, false));
+  });
+}
+
 /* ── INIT ────────────────────────────────────────────────────── */
 window.addEventListener('load',function(){
   if(BUILD_TS){
@@ -764,6 +1037,7 @@ window.addEventListener('load',function(){
   buildKpiBar();
   initFilters();
   initMomSection();
+  initPredSection();
   render();
 });
 </script>
