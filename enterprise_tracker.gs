@@ -220,6 +220,22 @@ function buildRows() {
     return a.dt.localeCompare(b.dt)||a.br.localeCompare(b.br)||a.md.localeCompare(b.md)||a.ch.localeCompare(b.ch);
   });
   Logger.log('Final rows:'+rows.length);
+
+  // ── DIAGNOSTIC: Sep brand-level totals (compare with sheet) ──
+  Logger.log('=== SEP BRAND SUMMARY (dashboard view) ===');
+  var sepSum = {};
+  rows.forEach(function(r){
+    if(r.mo!=='Sep') return;
+    if(!sepSum[r.br]) sepSum[r.br]={ld:0,tr:0,sp:0};
+    sepSum[r.br].ld += r.ld;
+    sepSum[r.br].tr += r.tr;
+    sepSum[r.br].sp += r.sp;
+  });
+  Object.keys(sepSum).sort().forEach(function(b){
+    var s=sepSum[b];
+    Logger.log('  '+b+': leads='+Math.round(s.ld)+' triggers='+s.tr+' spend='+Math.round(s.sp));
+  });
+
   return rows;
 }
 
@@ -236,6 +252,9 @@ function serializeRows(rows) {
 // ── TRIGGER MAP ────────────────────────────────────────────────
 function buildTrigMap(data) {
   var map = {};
+  // Track brand+ch totals for diagnostic logging
+  var diagBrCh = {};
+
   for (var i = 1; i < data.length; i++) {
     var r = data[i];
     var dateVal = r[TC.DT];
@@ -269,7 +288,19 @@ function buildTrigMap(data) {
     var wkey = dt+'||'+brKey+'||*||'+ch;
     if (!map[wkey]) map[wkey] = {tr:0};
     map[wkey].tr += count;
+
+    // Diagnostic accumulator: brand raw name → canonical key → ch → total
+    var diagKey = '"'+brRaw+'" → "'+brKey+'" | '+ch;
+    if (!diagBrCh[diagKey]) diagBrCh[diagKey] = 0;
+    diagBrCh[diagKey] += count;
   }
+
+  // Log brand totals so we can spot name/channel mismatches
+  Logger.log('=== TRIGGER SHEET BRAND TOTALS ===');
+  Object.keys(diagBrCh).sort().forEach(function(k){
+    Logger.log('  '+k+' = '+diagBrCh[k]);
+  });
+
   return map;
 }
 
