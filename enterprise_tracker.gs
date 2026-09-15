@@ -202,7 +202,11 @@ function buildRows() {
     var br = brandCanon[brk] || brk;  // canonical display name
     var md = modelCanon[mdk] || mdk;
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
-    var triggers = (trigMap[r.dt+'||'+brk+'||'+mdk+'||'+r.ch] || {}).tr || 0;
+    // Try exact brand+model+channel match first; fall back to wildcard (brand+channel only)
+    // Wildcard is used when the trigger sheet has no model breakdown for a brand
+    var triggers = (trigMap[r.dt+'||'+brk+'||'+mdk+'||'+r.ch]
+                 || trigMap[r.dt+'||'+brk+'||*||'+r.ch]
+                 || {}).tr || 0;
     var cplInfo  = cplMap[brk+'||'+mdk+'||'+r.ch+'||'+r.mo] || {};
     rows.push({
       dt:r.dt, mo:r.mo, br:br, md:md,
@@ -259,6 +263,12 @@ function buildTrigMap(data) {
     var key = dt+'||'+brKey+'||'+mdKey+'||'+ch;
     if (!map[key]) map[key] = {tr:0};
     map[key].tr += count;
+
+    // Also accumulate into a model-agnostic wildcard key so that
+    // raw rows whose model doesn't match the trigger sheet still pick up triggers
+    var wkey = dt+'||'+brKey+'||*||'+ch;
+    if (!map[wkey]) map[wkey] = {tr:0};
+    map[wkey].tr += count;
   }
   return map;
 }

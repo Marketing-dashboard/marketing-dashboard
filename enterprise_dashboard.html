@@ -829,11 +829,10 @@ var BRAND_END_DAYS = {
   'tata pv':       {Sep:18},
   'tata ev':       {Sep:18},
   'honda':         {Sep:24},
-  'skoda':         {Sep:18},
   'toyota':        {Sep:30},
   'volkswagen':    {Sep:22},
   'mahindra pv':   {Sep:30},
-  'nissan':        {Sep:30},
+  'nissan':        {Sep:14},
   'citroen':       {Sep:30},
   'jlr':           {Sep:30},
   'volvo':         {Sep:30},
@@ -841,15 +840,22 @@ var BRAND_END_DAYS = {
   'bmw':           {Sep:30},
   'redwing':       {Sep:30},
   'bigwing':       {Sep:28},
-  'royal enfield': {Sep:25},
+  'royal enfield': {Sep:30},
   'harley':        {Sep:8},
   'ola':           {Sep:30}
 };
+
+// Brands whose campaigns are paused — show MTD actuals as expected, no projection
+var PAUSED_BRANDS = ['skoda'];
 
 function getBrandEndDay(br, mo, totalDays){
   var key = normStr(br);
   var mo_map = BRAND_END_DAYS[key];
   return (mo_map && mo_map[mo]!=null) ? mo_map[mo] : totalDays;
+}
+
+function isBrandPaused(br){
+  return PAUSED_BRANDS.indexOf(normStr(br)) !== -1;
 }
 
 function initPredSection(){
@@ -942,30 +948,30 @@ function _renderPredInner(){
     var nSum   = lastNDates.reduce(function(s,d){return s+byDate[d];},0);
     var avgDay = lastNDates.length>0 ? nSum/lastNDates.length : 0;
 
-    // Brand-specific end date → days left
-    var brandEndDay = getBrandEndDay(br, mo, totalDays);
-    var daysLeft    = Math.max(0, brandEndDay - lastDay);
+    // Paused brands: use MTD actuals as expected, no projection
+    var paused = isBrandPaused(br);
+    var brandEndDay = paused ? lastDay : getBrandEndDay(br, mo, totalDays);
+    var daysLeft    = paused ? 0 : Math.max(0, brandEndDay - lastDay);
 
     // Projected & expected triggers
-    var projTr = avgDay * daysLeft;
+    var projTr = paused ? 0 : (avgDay * daysLeft);
     var expTr  = actTr + projTr;
 
     // TCPL from actual September data for this brand
     var tcpl = actTr>0 ? actSp/actTr : null;
 
-    // Expected spend = expected triggers × TCPL
-    var expSp = (tcpl!=null) ? expTr*tcpl : null;
+    // Expected spend: paused → actuals; active → TCPL × expTr
+    var expSp = paused ? actSp : ((tcpl!=null) ? expTr*tcpl : null);
 
-    // Expected revenue: scale actual revenue by trigger ratio
-    // (preserves model/channel mix for vp & soldCPL weighting)
-    var expRev = (actTr>0 && actRev>0) ? actRev*(expTr/actTr) : 0;
+    // Expected revenue: paused → actuals; active → scale by trigger ratio
+    var expRev = paused ? actRev : ((actTr>0 && actRev>0) ? actRev*(expTr/actTr) : 0);
 
     // Expected margin
-    var expMargin = (expSp!=null && expRev>0) ? (1-expSp/expRev)*100 : null;
+    var expMargin = (expSp!=null && expSp>0 && expRev>0) ? (1-expSp/expRev)*100 : null;
 
     results.push({br:br, endDay:brandEndDay, actTr:actTr, avgDay:avgDay,
                   daysLeft:daysLeft, projTr:projTr, expTr:expTr,
-                  tcpl:tcpl, expSp:expSp, expRev:expRev, expMargin:expMargin});
+                  tcpl:tcpl, expSp:expSp, expRev:expRev, expMargin:expMargin, paused:paused});
   });
 
   subtitle.textContent = mo+' · '+results.length+' brands';
@@ -1050,8 +1056,14 @@ function _renderPredInner(){
 
     // Month End
     var tdE=document.createElement('td');
-    tdE.style.cssText='text-align:center;border-left:2px solid #e2e8f0;font-weight:600;color:#475569;padding:8px 9px;';
-    tdE.textContent = d.endDay ? (mo+' '+d.endDay) : '—';
+    tdE.style.cssText='text-align:center;border-left:2px solid #e2e8f0;font-weight:600;padding:8px 9px;';
+    if(d.paused){
+      tdE.textContent='Paused';
+      tdE.style.color='#dc2626';
+    } else {
+      tdE.textContent = d.endDay ? (mo+' '+d.endDay) : '—';
+      tdE.style.color='#475569';
+    }
     tr.appendChild(tdE);
 
     tr.appendChild(predCell(d.actTr,    'num',  false));
