@@ -204,7 +204,8 @@ function buildRows() {
   // usedWildcard prevents brand-level triggers from being assigned to every model row
   var rows = [];
   var usedWildcard = {};
-  var claimedTrigKeys = {};  // track which exact trigger keys were consumed
+  var claimedSepKeys = {};
+  var claimedAugKeys = {};
 
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
@@ -212,15 +213,16 @@ function buildRows() {
     var br = brandCanon[brk] || brk;
     var md = modelCanon[mdk] || mdk;
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
+    var claimed = r.mo === 'Sep' ? claimedSepKeys : (r.mo === 'Aug' ? claimedAugKeys : {});
 
     var triggers = 0;
     var tKey = r.dt+'||'+brk+'||'+mdk+'||'+r.ch;
     var exactEntry = trigMap[tKey];
     if (exactEntry) {
       triggers = exactEntry.tr || 0;
-      claimedTrigKeys[tKey] = true;
+      claimed[tKey] = true;
     } else {
-      // Wildcard fallback: only fires when trigger sheet had brand-level (empty model) rows
+      // Wildcard fallback: only for brand-level (empty model) trigger rows
       var wkey     = r.dt+'||'+brk+'||*||'+r.ch;
       var wEntry   = trigMap[wkey];
       var groupKey = r.dt+'||'+brk+'||'+r.ch;
@@ -239,14 +241,50 @@ function buildRows() {
     });
   });
 
-  // Diagnostic: list Sep trigger map keys that were never claimed by any raw row
-  Logger.log('=== SEP UNCLAIMED TRIGGER ENTRIES (no matching raw row) ===');
-  Object.keys(sepTrigMap).sort().forEach(function(k){
-    if (k.indexOf('||*||') !== -1) return;  // skip wildcard entries
-    if (!claimedTrigKeys[k]) {
-      Logger.log('  UNCLAIMED: '+k+' = '+sepTrigMap[k].tr+' triggers');
-    }
-  });
+  // Add trigger-only rows for trigger entries that had no matching raw spend row.
+  // This ensures brands like BMW/Kia/Maruti (no spend data) still show up with triggers.
+  function addUnclaimedRows(trigMap, claimedKeys, mo) {
+    // Exact (model-level) unclaimed entries
+    Object.keys(trigMap).forEach(function(k) {
+      if (k.indexOf('||*||') !== -1) return; // skip wildcards
+      if (claimedKeys[k]) return;
+      var parts = k.split('||');
+      var dt = parts[0], brk = parts[1], mdk = parts[2], ch = parts[3];
+      var entry = trigMap[k];
+      var br = entry.br || brandCanon[brk] || brk;
+      var md = entry.md || modelCanon[mdk] || mdk;
+      var cplInfo = cplMap[brk+'||'+mdk+'||'+ch+'||'+mo] || {};
+      Logger.log('  UNCLAIMED→ROW: '+k+' = '+entry.tr+' triggers ('+mo+')');
+      rows.push({
+        dt:dt, mo:mo, br:br, md:md,
+        sg:cplInfo.seg||'', ch:ch,
+        sp:0, ld:0, tr:entry.tr,
+        vp:cplInfo.vp!=null?cplInfo.vp:0, sc:cplInfo.sc||0
+      });
+    });
+    // Wildcard (brand-level) unclaimed entries — brand had no raw rows at all
+    Object.keys(trigMap).forEach(function(k) {
+      if (k.indexOf('||*||') === -1) return; // only wildcards
+      var parts = k.split('||');
+      var dt = parts[0], brk = parts[1], ch = parts[3];
+      var groupKey = dt+'||'+brk+'||'+ch;
+      if (usedWildcard[groupKey]) return; // already claimed during merge
+      var entry = trigMap[k];
+      var br = entry.br || brandCanon[brk] || brk;
+      var cplInfo = cplMap[brk+'||'+'||'+ch+'||'+mo] || {};
+      Logger.log('  UNCLAIMED WILDCARD→ROW: '+k+' = '+entry.tr+' triggers ('+mo+')');
+      rows.push({
+        dt:dt, mo:mo, br:br, md:'',
+        sg:cplInfo.seg||'', ch:ch,
+        sp:0, ld:0, tr:entry.tr,
+        vp:cplInfo.vp!=null?cplInfo.vp:0, sc:cplInfo.sc||0
+      });
+    });
+  }
+
+  Logger.log('=== ADDING UNCLAIMED TRIGGER ROWS ===');
+  addUnclaimedRows(sepTrigMap, claimedSepKeys, 'Sep');
+  addUnclaimedRows(augTrigMap, claimedAugKeys, 'Aug');
 
   rows.sort(function(a,b){
     return a.dt.localeCompare(b.dt)||a.br.localeCompare(b.br)||a.md.localeCompare(b.md)||a.ch.localeCompare(b.ch);
@@ -313,16 +351,13 @@ function buildTrigMap(data) {
 
     if (mdKey === '') {
       // Brand-level entry (no model): goes to wildcard only.
-      // Claimed by the first unmatched raw row for this brand+date+channel.
       var wkey = dt+'||'+brKey+'||*||'+ch;
-      if (!map[wkey]) map[wkey] = {tr:0};
+      if (!map[wkey]) map[wkey] = {tr:0, br:brRaw, md:''};
       map[wkey].tr += count;
     } else {
       // Model-level entry: exact key only.
-      // Wildcard is NOT inflated by model-level entries, so an unmatched raw model
-      // never accidentally claims another model's triggers.
       var key = dt+'||'+brKey+'||'+mdKey+'||'+ch;
-      if (!map[key]) map[key] = {tr:0};
+      if (!map[key]) map[key] = {tr:0, br:brRaw, md:mdRaw};
       map[key].tr += count;
     }
 
