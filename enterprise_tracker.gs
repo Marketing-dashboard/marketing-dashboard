@@ -415,6 +415,62 @@ function fmtDate(val) {
   return '';
 }
 
+// ── TRIGGER DIAGNOSTIC (run standalone to check brand totals) ─
+// Reads Sep & Aug trigger sheets and prints:
+//   brand = trigger_count   (what the sheet actually contains)
+// Then prints the same from the final merged rows (what the dashboard shows).
+// Compare the two to find any gaps.
+function diagTriggerCounts() {
+  var sepSS  = SpreadsheetApp.openById(SEP_TRIGGERS_ID);
+  var sepData = sepSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
+  var augSS  = SpreadsheetApp.openById(AUG_TRIGGERS_ID);
+  var augData = augSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
+
+  function sheetTotals(data, label) {
+    var totals = {};
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i];
+      if (!r[TC.DT]) continue;
+      var brRaw  = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
+      var brKey  = normBrand(normStr(brRaw));
+      if (!brKey) continue;
+      var isSpecial = ['jlr','citroen','lexus'].indexOf(brKey) !== -1;
+      var count = isSpecial
+        ? ((parseInt(r[TC.TRIG]) || 0) + (parseInt(r[TC.TRIG_LIST]) || 0))
+        : (parseInt(r[TC.TRIG]) || 0);
+      if (count <= 0) continue;
+      if (!totals[brRaw]) totals[brRaw] = 0;
+      totals[brRaw] += count;
+    }
+    Logger.log('=== '+label+' TRIGGER SHEET — brand totals ===');
+    Object.keys(totals).sort().forEach(function(b) {
+      Logger.log('  ' + b + ' = ' + totals[b]);
+    });
+    Logger.log('  GRAND TOTAL = ' + Object.keys(totals).reduce(function(s,b){return s+totals[b];},0));
+  }
+
+  sheetTotals(sepData, 'SEP');
+  sheetTotals(augData, 'AUG');
+
+  // Also show what the dashboard assigns after full merge
+  Logger.log('');
+  Logger.log('=== DASHBOARD ASSIGNED TRIGGERS (after mapping) ===');
+  var rows = buildRows();
+  ['Sep','Aug'].forEach(function(mo) {
+    var sum = {};
+    rows.forEach(function(r) {
+      if (r.mo !== mo) return;
+      if (!sum[r.br]) sum[r.br] = 0;
+      sum[r.br] += r.tr;
+    });
+    Logger.log('-- ' + mo + ' --');
+    Object.keys(sum).sort().forEach(function(b) {
+      Logger.log('  ' + b + ' = ' + sum[b]);
+    });
+    Logger.log('  GRAND TOTAL = ' + Object.keys(sum).reduce(function(s,b){return s+sum[b];},0));
+  });
+}
+
 // ── GITHUB PUSH ───────────────────────────────────────────────
 function pushToGitHub(token, newDataRaw, buildTs) {
   var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + FILE_PATH;
