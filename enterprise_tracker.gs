@@ -395,10 +395,23 @@ function normStr(s) { return String(s||'').trim().toLowerCase(); }  // for join 
 // brKey="tata pv" but model="tata punch").
 function normModelKey(mdKey, brKey) {
   if (!mdKey || !brKey) return mdKey;
+  // 1. Exact brand key prefix  e.g. "mercedes " stripped from "mercedes gle"
   if (mdKey.indexOf(brKey + ' ') === 0) return mdKey.substring(brKey.length + 1);
+  // 2. First word of brand key e.g. "tata " stripped from "tata punch" when brKey="tata pv"
   var firstWord = brKey.split(' ')[0];
   if (firstWord.length > 1 && mdKey.indexOf(firstWord + ' ') === 0)
     return mdKey.substring(firstWord.length + 1);
+  // 3. Brand alias prefixes e.g. "mercedes-benz " stripped when brKey="mercedes"
+  //    Handles raw model names like "Mercedes-Benz C-Class" that normStr gives "mercedes-benz c-class"
+  var aliases = Object.keys(BRAND_ALIAS).filter(function(a){ return BRAND_ALIAS[a] === brKey; });
+  for (var i = 0; i < aliases.length; i++) {
+    var alias = aliases[i];
+    if (mdKey.indexOf(alias + ' ') === 0) return mdKey.substring(alias.length + 1);
+    // also try first word of the alias (e.g. "mercedes" from "mercedes-benz")
+    var aliasFirst = alias.split(/[\s\-]/)[0];
+    if (aliasFirst.length > 1 && aliasFirst !== firstWord && mdKey.indexOf(aliasFirst + ' ') === 0)
+      return mdKey.substring(aliasFirst.length + 1);
+  }
   return mdKey;
 }
 function round2(n) { return Math.round(n * 100) / 100; }
@@ -413,6 +426,103 @@ function fmtDate(val) {
   var d = new Date(s);
   if (!isNaN(d)) return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
   return '';
+}
+
+// ── BRAND-SPECIFIC TRIGGER DIAGNOSTIC ─────────────────────────
+// Paste a brand name below, run this to see every trigger key vs raw key for that brand.
+// Change DIAG_BRAND to whichever brand you want to debug.
+var DIAG_BRAND = 'mercedes'; // normalized brand key (lowercase)
+
+function diagBrandTriggers() {
+  var sepSS  = SpreadsheetApp.openById(SEP_TRIGGERS_ID);
+  var sepData = sepSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
+  var entSS  = SpreadsheetApp.openById(ENTERPRISE_SS_ID);
+  var rawData = entSS.getSheetByName(SHEET_RAW).getDataRange().getValues();
+
+  var brand = DIAG_BRAND.toLowerCase().trim();
+
+  // --- Trigger sheet rows for this brand ---
+  Logger.log('=== TRIGGER SHEET ROWS for "' + brand + '" ===');
+  var trigTotal = 0;
+  for (var i = 1; i < sepData.length; i++) {
+    var r = sepData[i];
+    if (!r[TC.DT]) continue;
+    var brRaw = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
+    var brKey = normBrand(normStr(brRaw));
+    if (brKey !== brand) continue;
+    var mdRaw = trim(r[TC.MD_MAP]) || trim(r[TC.MD]);
+    var mdKey = normModelKey(normStr(mdRaw), brKey);
+    var ch    = normCh(trim(r[TC.SRC]));
+    var dt    = fmtDate(r[TC.DT]);
+    var isSpecial = ['jlr','citroen','lexus'].indexOf(brKey) !== -1;
+    var count = isSpecial
+      ? ((parseInt(r[TC.TRIG])||0) + (parseInt(r[TC.TRIG_LIST])||0))
+      : (parseInt(r[TC.TRIG])||0);
+    trigTotal += count;
+    Logger.log('  TRIG  dt='+dt+' model="'+mdRaw+'"→"'+mdKey+'" ch='+ch+' count='+count);
+  }
+  Logger.log('  TRIG TOTAL = ' + trigTotal);
+
+  // --- Raw sheet rows for this brand ---
+  Logger.log('');
+  Logger.log('=== RAW SHEET ROWS for "' + brand + '" ===');
+  var rawTotal = {sp:0, ld:0};
+  var rawKeys = {};
+  for (var j = 1; j < rawData.length; j++) {
+    var rv = rawData[j];
+    var br = trim(rv[RC.BRAND]);
+    if (!br) continue;
+    var brk = normBrand(normStr(br));
+    if (brk !== brand) continue;
+    var md  = trim(rv[RC.MODEL]);
+    var mdk = normModelKey(normStr(md), brk);
+    var ch  = normCh(trim(rv[RC.SRC]));
+    var mo  = normMo(trim(rv[RC.MO]));
+    if (mo !== 'Sep') continue;
+    var dt  = fmtDate(rv[RC.DAY]);
+    if (!dt) continue;
+    var sp  = parseFloat(rv[RC.COST]) || 0;
+    var ld  = parseFloat(rv[RC.LEADS]) || 0;
+    var key = dt+'||'+brk+'||'+mdk+'||'+ch;
+    if (!rawKeys[key]) rawKeys[key] = {sp:0,ld:0,br:br,md:md};
+    rawKeys[key].sp += sp;
+    rawKeys[key].ld += ld;
+  }
+  Object.keys(rawKeys).sort().forEach(function(k) {
+    var v = rawKeys[k];
+    Logger.log('  RAW   key='+k+'  br="'+v.br+'" md="'+v.md+'"  ld='+Math.round(v.ld)+' sp='+Math.round(v.sp));
+    rawTotal.sp += v.sp; rawTotal.ld += v.ld;
+  });
+  Logger.log('  RAW TOTAL leads=' + Math.round(rawTotal.ld) + ' spend=' + Math.round(rawTotal.sp));
+
+  // --- Build trigMap and show what each raw key matched ---
+  Logger.log('');
+  Logger.log('=== TRIGGER MATCH for "' + brand + '" ===');
+  var sepTrigMap = buildTrigMap(sepData);
+  var usedWildcard = {};
+  var assignedTotal = 0;
+  Object.keys(rawKeys).sort().forEach(function(key) {
+    var parts = key.split('||');
+    var dt = parts[0], brk2 = parts[1], mdk2 = parts[2], ch2 = parts[3];
+    var exactEntry = sepTrigMap[key];
+    var assigned = 0, matchType = 'NONE';
+    if (exactEntry) {
+      assigned = exactEntry.tr || 0;
+      matchType = 'EXACT';
+    } else {
+      var wkey = dt+'||'+brk2+'||*||'+ch2;
+      var wEntry = sepTrigMap[wkey];
+      var gk = dt+'||'+brk2+'||'+ch2;
+      if (wEntry && !usedWildcard[gk]) {
+        assigned = wEntry.tr || 0;
+        matchType = 'WILDCARD';
+        usedWildcard[gk] = true;
+      }
+    }
+    assignedTotal += assigned;
+    Logger.log('  MATCH key='+key+'  → '+matchType+' triggers='+assigned);
+  });
+  Logger.log('  ASSIGNED TOTAL = ' + assignedTotal + '  (sheet has ' + trigTotal + ')');
 }
 
 // ── TRIGGER DIAGNOSTIC (run standalone to check brand totals) ─
