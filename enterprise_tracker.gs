@@ -232,7 +232,9 @@ function buildRows() {
       }
     }
 
-    var cplInfo  = cplMap[brk+'||'+mdk+'||'+r.ch+'||'+r.mo] || {};
+    var cplInfo  = cplMap[brk+'||'+mdk+'||'+r.ch+'||'+r.mo]
+                || cplMap[brk+'||'+brk+'||'+r.ch+'||'+r.mo]
+                || {};
     rows.push({
       dt:r.dt, mo:r.mo, br:br, md:md,
       sg:cplInfo.seg||'', ch:r.ch,
@@ -253,7 +255,9 @@ function buildRows() {
       var entry = trigMap[k];
       var br = entry.br || brandCanon[brk] || brk;
       var md = entry.md || modelCanon[mdk] || mdk;
-      var cplInfo = cplMap[brk+'||'+mdk+'||'+ch+'||'+mo] || {};
+      var cplInfo = cplMap[brk+'||'+mdk+'||'+ch+'||'+mo]
+                 || cplMap[brk+'||'+brk+'||'+ch+'||'+mo]
+                 || {};
       Logger.log('  UNCLAIMED→ROW: '+k+' = '+entry.tr+' triggers ('+mo+')');
       rows.push({
         dt:dt, mo:mo, br:br, md:md,
@@ -271,7 +275,9 @@ function buildRows() {
       if (usedWildcard[groupKey]) return; // already claimed during merge
       var entry = trigMap[k];
       var br = entry.br || brandCanon[brk] || brk;
-      var cplInfo = cplMap[brk+'||'+'||'+ch+'||'+mo] || {};
+      var cplInfo = cplMap[brk+'||'+'||'+ch+'||'+mo]
+                 || cplMap[brk+'||'+brk+'||'+ch+'||'+mo]
+                 || {};
       Logger.log('  UNCLAIMED WILDCARD→ROW: '+k+' = '+entry.tr+' triggers ('+mo+')');
       rows.push({
         dt:dt, mo:mo, br:br, md:'',
