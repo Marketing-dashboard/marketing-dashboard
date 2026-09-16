@@ -162,7 +162,8 @@ function buildRows() {
     var vp = parseVP(c[CC.VP]), sc = parseSC(c[CC.SC]);
     var mo = normMo(trim(c[CC.MO]));
     if (!br || !md || !ch || !mo) continue;
-    var brKey = normBrand(normStr(br)), mdKey = normStr(md);
+    var brKey = normBrand(normStr(br));
+    var mdKey = normModelKey(normStr(md), brKey);
     cplMap[brKey+'||'+mdKey+'||'+ch+'||'+mo] = {seg:sg, vp:vp, sc:sc};
   }
 
@@ -188,8 +189,9 @@ function buildRows() {
     if (!sp && !ld) continue;
     var dt = fmtDate(r[RC.DAY]);
     if (!dt) continue;
-    var brk = normBrand(normStr(br)), mdk = normStr(md);
-    if (!brandCanon[brk]) brandCanon[brk] = br;  // lock display name on first occurrence
+    var brk = normBrand(normStr(br));
+    var mdk = normModelKey(normStr(md), brk);
+    if (!brandCanon[brk]) brandCanon[brk] = br;
     if (!modelCanon[mdk]) modelCanon[mdk] = md;
     var key = dt+'||'+brk+'||'+mdk+'||'+ch;
     if (!rawMap[key]) rawMap[key] = {dt:dt, mo:mo, brk:brk, mdk:mdk, ch:ch, sp:0, ld:0};
@@ -198,25 +200,27 @@ function buildRows() {
   }
   Logger.log('Raw map:'+Object.keys(rawMap).length);
 
-  // Merge: join spends with triggers + CPL validation (use normalized keys for lookup)
-  // usedWildcard prevents assigning brand-level triggers to every model row on the same day
+  // Merge: join spends with triggers + CPL validation
+  // usedWildcard prevents brand-level triggers from being assigned to every model row
   var rows = [];
   var usedWildcard = {};
+  var claimedTrigKeys = {};  // track which exact trigger keys were consumed
+
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
     var brk = r.brk, mdk = r.mdk;
-    var br = brandCanon[brk] || brk;  // canonical display name
+    var br = brandCanon[brk] || brk;
     var md = modelCanon[mdk] || mdk;
     var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
 
     var triggers = 0;
-    var exactEntry = trigMap[r.dt+'||'+brk+'||'+mdk+'||'+r.ch];
+    var tKey = r.dt+'||'+brk+'||'+mdk+'||'+r.ch;
+    var exactEntry = trigMap[tKey];
     if (exactEntry) {
-      // Exact brand+model+channel match
       triggers = exactEntry.tr || 0;
+      claimedTrigKeys[tKey] = true;
     } else {
-      // Wildcard fallback: assign brand-level triggers only to the FIRST model row
-      // per date+brand+channel to avoid double-counting across multiple models
+      // Wildcard fallback: only fires when trigger sheet had brand-level (empty model) rows
       var wkey     = r.dt+'||'+brk+'||*||'+r.ch;
       var wEntry   = trigMap[wkey];
       var groupKey = r.dt+'||'+brk+'||'+r.ch;
@@ -233,6 +237,15 @@ function buildRows() {
       sp:round2(r.sp), ld:round2(r.ld), tr:triggers,
       vp:cplInfo.vp!=null?cplInfo.vp:0, sc:cplInfo.sc||0
     });
+  });
+
+  // Diagnostic: list Sep trigger map keys that were never claimed by any raw row
+  Logger.log('=== SEP UNCLAIMED TRIGGER ENTRIES (no matching raw row) ===');
+  Object.keys(sepTrigMap).sort().forEach(function(k){
+    if (k.indexOf('||*||') !== -1) return;  // skip wildcard entries
+    if (!claimedTrigKeys[k]) {
+      Logger.log('  UNCLAIMED: '+k+' = '+sepTrigMap[k].tr+' triggers');
+    }
   });
 
   rows.sort(function(a,b){
@@ -298,15 +311,20 @@ function buildTrigMap(data) {
 
     if (!brKey || !ch || count <= 0) continue;
 
-    var key = dt+'||'+brKey+'||'+mdKey+'||'+ch;
-    if (!map[key]) map[key] = {tr:0};
-    map[key].tr += count;
-
-    // Also accumulate into a model-agnostic wildcard key so that
-    // raw rows whose model doesn't match the trigger sheet still pick up triggers
-    var wkey = dt+'||'+brKey+'||*||'+ch;
-    if (!map[wkey]) map[wkey] = {tr:0};
-    map[wkey].tr += count;
+    if (mdKey === '') {
+      // Brand-level entry (no model): goes to wildcard only.
+      // Claimed by the first unmatched raw row for this brand+date+channel.
+      var wkey = dt+'||'+brKey+'||*||'+ch;
+      if (!map[wkey]) map[wkey] = {tr:0};
+      map[wkey].tr += count;
+    } else {
+      // Model-level entry: exact key only.
+      // Wildcard is NOT inflated by model-level entries, so an unmatched raw model
+      // never accidentally claims another model's triggers.
+      var key = dt+'||'+brKey+'||'+mdKey+'||'+ch;
+      if (!map[key]) map[key] = {tr:0};
+      map[key].tr += count;
+    }
 
     // Diagnostic: brand+model level total (after normModelKey)
     var diagKey = '"'+brRaw+'" → "'+brKey+'" | model="'+mdKey+'" | '+ch;
