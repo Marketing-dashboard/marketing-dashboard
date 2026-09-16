@@ -44,6 +44,8 @@ body{font-family:Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:10
 .kpi-bar-lbl{font-size:11px;font-weight:600;color:#64748b}
 .kpi-check{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#475569;cursor:pointer;padding:4px 9px;border-radius:5px;border:1.5px solid #e2e8f0;background:#fff;transition:all .12s;user-select:none}
 .kpi-check.on{background:#eff6ff;border-color:#3b82f6;color:#1d4ed8;font-weight:600}
+.kpi-check.locked{opacity:0.38;cursor:not-allowed;pointer-events:none}
+.kpi-check.model-tag{font-size:9px;margin-left:3px;background:#e0f2fe;color:#0369a1;border-radius:3px;padding:1px 4px;vertical-align:middle;font-weight:700}
 .kpi-check input{display:none}
 
 /* ── TILES ── */
@@ -165,7 +167,7 @@ tr.tot td:first-child{color:#312e81}
     </div>
     <div class="fg">
       <label>Model</label>
-      <select id="fModel" onchange="render()">
+      <select id="fModel" onchange="updateModelOnlyKpis();render()">
         <option value="">All Models</option>
       </select>
     </div>
@@ -305,7 +307,9 @@ var KPIS = [
   {id:'triggers', lbl:'Triggers', fmt:'num',   lowerBetter:false},
   {id:'tcpl',     lbl:'TCPL',     fmt:'money', lowerBetter:true},
   {id:'revenue',  lbl:'Revenue',  fmt:'money', lowerBetter:false},
-  {id:'margin',   lbl:'Margin',   fmt:'pct',   lowerBetter:false}
+  {id:'margin',   lbl:'Margin',   fmt:'pct',   lowerBetter:false},
+  {id:'val_pct',  lbl:'Val %',    fmt:'pct',   lowerBetter:false, modelOnly:true},
+  {id:'sold_cpl', lbl:'Sold CPL', fmt:'money', lowerBetter:false, modelOnly:true}
 ];
 
 var SRCS = [
@@ -422,17 +426,40 @@ function buildKpiBar(){
   bar.appendChild(lbl);
   KPIS.forEach(function(k){
     var lb=document.createElement('label');
-    lb.className='kpi-check on';
-    lb.title=k.lbl;
+    lb.className='kpi-check'+(k.modelOnly?' locked':'  on');
+    lb.title=k.modelOnly?k.lbl+' (select a model to enable)':k.lbl;
+    lb.id='kl-'+k.id;
     var cb=document.createElement('input');
-    cb.type='checkbox';cb.id='kc-'+k.id;cb.checked=true;
+    cb.type='checkbox';cb.id='kc-'+k.id;cb.checked=!k.modelOnly;
     cb.addEventListener('change',function(){
       lb.classList.toggle('on',cb.checked);
       render();
     });
     lb.appendChild(cb);
     lb.appendChild(document.createTextNode(k.lbl));
+    if(k.modelOnly){
+      var tag=document.createElement('span');
+      tag.className='model-tag';tag.textContent='MODEL';
+      lb.appendChild(tag);
+    }
     bar.appendChild(lb);
+  });
+}
+
+function updateModelOnlyKpis(){
+  var hasModel=!!(document.getElementById('fModel').value);
+  KPIS.forEach(function(k){
+    if(!k.modelOnly)return;
+    var lb=document.getElementById('kl-'+k.id);
+    var cb=document.getElementById('kc-'+k.id);
+    if(!lb||!cb)return;
+    if(hasModel){
+      lb.classList.remove('locked');
+    } else {
+      lb.classList.add('locked');
+      cb.checked=false;
+      lb.classList.remove('on');
+    }
   });
 }
 
@@ -495,12 +522,15 @@ function getFiltered(){
 
 /* ── AGGREGATION ─────────────────────────────────────────────── */
 function aggRows(rows){
-  var sp=0,ld=0,tr=0,rev=0;
+  var sp=0,ld=0,tr=0,rev=0,vp=null,sc=null;
   rows.forEach(function(r){
     sp+=(r.sp||0);
     ld+=(r.ld||0);
     tr+=(r.tr||0);
     rev+=((r.vp||0)/100)*(r.tr||0)*(r.sc||0);
+    // pick first non-zero vp / sc (model-level constants, not sums)
+    if(vp==null&&(r.vp||0)>0)vp=r.vp;
+    if(sc==null&&(r.sc||0)>0)sc=r.sc;
   });
   return{
     spend:sp,
@@ -509,7 +539,9 @@ function aggRows(rows){
     cpl:   ld>0  ?sp/ld  :null,
     tcpl:  tr>0  ?sp/tr  :null,
     revenue:rev,
-    margin:(sp>0&&rev>0)?(1-sp/rev)*100:null
+    margin:(sp>0&&rev>0)?(1-sp/rev)*100:null,
+    val_pct: vp,
+    sold_cpl:sc
   };
 }
 
@@ -634,6 +666,11 @@ function renderTable(rows){
   var totFb=aggRows(rows.filter(function(r){return normSrc(r.ch)==='fb';}));
   var totCt=aggRows(rows.filter(function(r){return normSrc(r.ch)==='ctwa';}));
   var totAll=aggRows(rows);
+  // val_pct / sold_cpl are model-level constants; only meaningful when a single model is selected
+  var singleModel=!!(document.getElementById('fModel').value);
+  if(!singleModel){
+    [totAw,totFb,totCt,totAll].forEach(function(a){a.val_pct=null;a.sold_cpl=null;});
+  }
   tbody.appendChild(makeRow('TOTAL',{adwords:totAw,fb:totFb,ctwa:totCt,combined:totAll},kpis,true));
 
   byDate.forEach(function(d){
