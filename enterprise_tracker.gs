@@ -30,8 +30,8 @@ var SHEET_CPL_VAL = 'Sold_CPL_Val';
 var SHEET_TRIG    = 'Triggers';
 
 // Raw tab columns (0-based)
-// Month(0) Day(1) Account(2) Campaign(3) CampType(4) Currency(5) Cost(6) Conversions(7) Brand(8) Model(9) Source(10)
-var RC = {MO:0, DAY:1, COST:6, LEADS:7, BRAND:8, MODEL:9, SRC:10};
+// Month(0) Day(1) Account(2) Campaign(3) Currency(4) Cost(5) Conversions(6) Brand(7) Model(8) Source(9)
+var RC = {MO:0, DAY:1, COST:5, LEADS:6, BRAND:7, MODEL:8, SRC:9};
 
 // Sold_CPL_Val tab columns (0-based)
 // Brand(0) Model(1) Segment(2) Channel(3) Validation%(4) SoldCPL(5) Month(6)
