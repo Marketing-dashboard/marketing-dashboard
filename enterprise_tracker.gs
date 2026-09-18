@@ -436,24 +436,27 @@ function normStr(s) { return String(s||'').trim().toLowerCase(); }  // for join 
 // brKey="tata pv" but model="tata punch").
 function normModelKey(mdKey, brKey) {
   if (!mdKey || !brKey) return mdKey;
-  // 1. Exact brand key prefix  e.g. "mercedes " stripped from "mercedes gle"
-  if (mdKey.indexOf(brKey + ' ') === 0) return mdKey.substring(brKey.length + 1);
-  // 2. First word of brand key e.g. "tata " stripped from "tata punch" when brKey="tata pv"
-  var firstWord = brKey.split(' ')[0];
-  if (firstWord.length > 1 && mdKey.indexOf(firstWord + ' ') === 0)
-    return mdKey.substring(firstWord.length + 1);
-  // 3. Brand alias prefixes e.g. "mercedes-benz " stripped when brKey="mercedes"
-  //    Handles raw model names like "Mercedes-Benz C-Class" that normStr gives "mercedes-benz c-class"
-  var aliases = Object.keys(BRAND_ALIAS).filter(function(a){ return BRAND_ALIAS[a] === brKey; });
-  for (var i = 0; i < aliases.length; i++) {
-    var alias = aliases[i];
-    if (mdKey.indexOf(alias + ' ') === 0) return mdKey.substring(alias.length + 1);
-    // also try first word of the alias (e.g. "mercedes" from "mercedes-benz")
-    var aliasFirst = alias.split(/[\s\-]/)[0];
-    if (aliasFirst.length > 1 && aliasFirst !== firstWord && mdKey.indexOf(aliasFirst + ' ') === 0)
-      return mdKey.substring(aliasFirst.length + 1);
+  // Build all candidate prefixes to strip, then try longest first so
+  // "mercedes benz " wins over "mercedes " and avoids "benz v class" leftovers.
+  var seen = {};
+  var prefixes = [];
+  function addPfx(p) {
+    if (p && p.length > 1 && !seen[p]) { seen[p] = true; prefixes.push(p); }
   }
-  return mdKey;
+  var aliases = Object.keys(BRAND_ALIAS).filter(function(a){ return BRAND_ALIAS[a] === brKey; });
+  aliases.forEach(function(a) {
+    addPfx(a);
+    addPfx(a.split(/[\s\-]/)[0]);
+  });
+  addPfx(brKey);
+  addPfx(brKey.split(' ')[0]);
+  prefixes.sort(function(a, b) { return b.length - a.length; });
+  for (var i = 0; i < prefixes.length; i++) {
+    if (mdKey.indexOf(prefixes[i] + ' ') === 0)
+      return mdKey.substring(prefixes[i].length + 1).replace(/-/g, ' ');
+  }
+  // No prefix stripped — still normalise hyphens so "v-class" and "v class" share one key
+  return mdKey.replace(/-/g, ' ');
 }
 function round2(n) { return Math.round(n * 100) / 100; }
 function jstr(s) { return JSON.stringify(String(s||'')); }
