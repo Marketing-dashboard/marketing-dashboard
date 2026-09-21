@@ -1282,7 +1282,7 @@ onAuthStateChanged(auth, async (user) => {
 
 <script>
 
-var BUILD_TS = '2026-09-21T10:49:56.113Z'; // replaced by Apps Script on each push
+var BUILD_TS = '2026-09-21T10:57:05.554Z'; // replaced by Apps Script on each push
 
 
 
@@ -19960,7 +19960,7 @@ function cityFromCampaign(camp) {
   if (lc.indexOf('chd') !== -1 || lc.indexOf('chandigarh') !== -1) return 'Chandigarh';
   if (lc.indexOf('nashik') !== -1 || lc.indexOf('nasik') !== -1) return 'Nashik';
   if (lc.indexOf('mohali') !== -1) return 'Mohali';
-  if (lc.indexOf('gurugram') !== -1 || lc.indexOf('gurgaon') !== -1 || lc.indexOf('grg') !== -1) return 'Gurugram';
+  if (lc.indexOf('gurugram') !== -1 || lc.indexOf('gurgaon') !== -1 || lc.indexOf('grg') !== -1 || lc.indexOf('ggn') !== -1) return 'Gurugram';
   return null;
 }
 
@@ -20083,7 +20083,7 @@ function buildWeeklyCityPerfTable(s, e) {
 
   DATA_TRIGGERS.forEach(function(d) {
     if (!d.Date) return;
-    var city = cityFromCampaign(d.Campaign || '');
+    var city = campToCity[d.Campaign] || cityFromCampaign(d.Campaign || '');
     if (!city) return;
     var w = weeks.find(function(wk) { return d.Date >= wk.start && d.Date <= wk.end; });
     if (!w || !data[w.key][city]) return;
@@ -20091,16 +20091,16 @@ function buildWeeklyCityPerfTable(s, e) {
     data[w.key][city].dt += (d.Dealer_Triggers || 0);
   });
 
-  var html = '<div class="tbl-card" style="margin-top:16px"><div class="tbl-toolbar"><span class="tbl-title">Week-wise City Campaign Performance</span><span class="tbl-sub">Spends · Triggered Leads · Dealer Triggers · WoW CPL % change</span></div>';
+  var html = '<div class="tbl-card" style="margin-top:16px"><div class="tbl-toolbar"><span class="tbl-title">Week-wise City Campaign Performance</span><span class="tbl-sub">Spends · Dealer Triggers · WoW CPL % change</span></div>';
   html += '<div class="tbl-wrap"><table><thead><tr>';
   html += '<th class="left sticky" style="left:0;min-width:130px">Week</th>';
   CITIES.forEach(function(c) {
-    html += '<th colspan="5" style="text-align:center;border-left:2px solid var(--border2)">' + c + '</th>';
+    html += '<th colspan="4" style="text-align:center;border-left:2px solid var(--border2)">' + c + '</th>';
   });
-  html += '<th colspan="5" style="text-align:center;border-left:2px solid var(--border2)">Total</th>';
+  html += '<th colspan="4" style="text-align:center;border-left:2px solid var(--border2)">Total</th>';
   html += '</tr><tr><th class="left sticky" style="left:0"></th>';
-  var perfCols = ['Spends','Trig. Leads','Dealer Trig.','Dealer CPL','WoW CPL %'];
-  for (var pi = 0; pi < 4; pi++) {
+  var perfCols = ['Spends','Dealer Trig.','Dealer CPL','WoW CPL %'];
+  for (var pi = 0; pi < CITIES.length + 1; pi++) {
     perfCols.forEach(function(pc, psi) {
       html += '<th style="font-size:11px;color:var(--text2);' + (psi===0 ? 'border-left:2px solid var(--border2)' : '') + '">' + pc + '</th>';
     });
@@ -20130,7 +20130,6 @@ function buildWeeklyCityPerfTable(s, e) {
             ? '<span style="color:#16a34a;font-weight:600">' + wowPct.toFixed(1) + '%</span>'
             : '<span style="color:#dc2626;font-weight:600">+' + wowPct.toFixed(1) + '%</span>');
       html += '<td style="border-left:2px solid var(--border2)">' + (v.sp ? INR(v.sp) : '—') + '</td>';
-      html += '<td>' + (v.gl || '—') + '</td>';
       html += '<td>' + (v.dt || '—') + '</td>';
       html += '<td>' + (dcpl ? '₹' + dcpl.toLocaleString('en-IN') : '—') + '</td>';
       html += '<td style="font-size:12px">' + wowCell + '</td>';
@@ -20142,7 +20141,6 @@ function buildWeeklyCityPerfTable(s, e) {
           ? '<span style="color:#16a34a;font-weight:600">' + rowWow.toFixed(1) + '%</span>'
           : '<span style="color:#dc2626;font-weight:600">+' + rowWow.toFixed(1) + '%</span>');
     html += '<td style="border-left:2px solid var(--border2);font-weight:600">' + (rowSp ? INR(rowSp) : '—') + '</td>';
-    html += '<td style="font-weight:600">' + (rowGl || '—') + '</td>';
     html += '<td style="font-weight:600">' + (rowDt || '—') + '</td>';
     html += '<td style="font-weight:600">' + (rowDcpl ? '₹' + rowDcpl.toLocaleString('en-IN') : '—') + '</td>';
     html += '<td style="font-size:12px">' + rowWowCell + '</td>';
@@ -20157,14 +20155,12 @@ function buildWeeklyCityPerfTable(s, e) {
     var dcpl = cityTotals[c].sp > 0 && cityTotals[c].dt > 0 ? Math.round(cityTotals[c].sp / cityTotals[c].dt) : null;
     grandSp += cityTotals[c].sp; grandGl += cityTotals[c].gl; grandDt += cityTotals[c].dt;
     html += '<td style="font-weight:700;border-left:2px solid var(--border2)">' + (cityTotals[c].sp ? INR(cityTotals[c].sp) : '—') + '</td>';
-    html += '<td style="font-weight:700">' + (cityTotals[c].gl || '—') + '</td>';
     html += '<td style="font-weight:700">' + (cityTotals[c].dt || '—') + '</td>';
     html += '<td style="font-weight:700">' + (dcpl ? '₹' + dcpl.toLocaleString('en-IN') : '—') + '</td>';
     html += '<td></td>';
   });
   var grandDcpl = grandSp > 0 && grandDt > 0 ? Math.round(grandSp / grandDt) : null;
   html += '<td style="font-weight:700;border-left:2px solid var(--border2)">' + (grandSp ? INR(grandSp) : '—') + '</td>';
-  html += '<td style="font-weight:700">' + (grandGl || '—') + '</td>';
   html += '<td style="font-weight:700">' + (grandDt || '—') + '</td>';
   html += '<td style="font-weight:700">' + (grandDcpl ? '₹' + grandDcpl.toLocaleString('en-IN') : '—') + '</td>';
   html += '<td></td>';
