@@ -258,7 +258,6 @@ function buildRows() {
       var cplInfo = cplMap[brk+'||'+mdk+'||'+ch+'||'+mo]
                  || cplMap[brk+'||'+brk+'||'+ch+'||'+mo]
                  || {};
-      Logger.log('  UNCLAIMED→ROW: '+k+' = '+entry.tr+' triggers ('+mo+')');
       rows.push({
         dt:dt, mo:mo, br:br, md:md,
         sg:cplInfo.seg||'', ch:ch,
@@ -278,7 +277,6 @@ function buildRows() {
       var cplInfo = cplMap[brk+'||'+'||'+ch+'||'+mo]
                  || cplMap[brk+'||'+brk+'||'+ch+'||'+mo]
                  || {};
-      Logger.log('  UNCLAIMED WILDCARD→ROW: '+k+' = '+entry.tr+' triggers ('+mo+')');
       rows.push({
         dt:dt, mo:mo, br:br, md:'',
         sg:cplInfo.seg||'', ch:ch,
@@ -288,29 +286,13 @@ function buildRows() {
     });
   }
 
-  Logger.log('=== ADDING UNCLAIMED TRIGGER ROWS ===');
   addUnclaimedRows(sepTrigMap, claimedSepKeys, 'Sep');
   addUnclaimedRows(augTrigMap, claimedAugKeys, 'Aug');
 
   rows.sort(function(a,b){
     return a.dt.localeCompare(b.dt)||a.br.localeCompare(b.br)||a.md.localeCompare(b.md)||a.ch.localeCompare(b.ch);
   });
-  Logger.log('Final rows:'+rows.length);
-
-  // ── DIAGNOSTIC: Sep brand-level totals (compare with sheet) ──
-  Logger.log('=== SEP BRAND SUMMARY (dashboard view) ===');
-  var sepSum = {};
-  rows.forEach(function(r){
-    if(r.mo!=='Sep') return;
-    if(!sepSum[r.br]) sepSum[r.br]={ld:0,tr:0,sp:0};
-    sepSum[r.br].ld += r.ld;
-    sepSum[r.br].tr += r.tr;
-    sepSum[r.br].sp += r.sp;
-  });
-  Object.keys(sepSum).sort().forEach(function(b){
-    var s=sepSum[b];
-    Logger.log('  '+b+': leads='+Math.round(s.ld)+' triggers='+s.tr+' spend='+Math.round(s.sp));
-  });
+  Logger.log('Final rows: '+rows.length);
 
   return rows;
 }
@@ -328,8 +310,6 @@ function serializeRows(rows) {
 // ── TRIGGER MAP ────────────────────────────────────────────────
 function buildTrigMap(data) {
   var map = {};
-  // Track brand+ch totals for diagnostic logging
-  var diagBrCh = {};
 
   for (var i = 1; i < data.length; i++) {
     var r = data[i];
@@ -338,7 +318,6 @@ function buildTrigMap(data) {
     var dt = fmtDate(dateVal);
     if (!dt) continue;
 
-    // Use Brand_Mapped if present, fall back to brand column; normalize for join
     var brRaw = trim(r[TC.BR_MAP]) || trim(r[TC.BR]);
     var mdRaw = trim(r[TC.MD_MAP]) || trim(r[TC.MD]);
     var brKey = normBrand(normStr(brRaw));
@@ -348,36 +327,21 @@ function buildTrigMap(data) {
     var triggered     = parseInt(r[TC.TRIG])      || 0;
     var triggeredList = parseInt(r[TC.TRIG_LIST]) || 0;
 
-    // Special brands (JLR/Citroen/Lexus): Triggered + Triggered_in_List_ID
-    // Standard brands: Triggered only
     var isSpecial = ['jlr','citroen','lexus'].indexOf(brKey) !== -1;
     var count = isSpecial ? (triggered + triggeredList) : triggered;
 
     if (!brKey || !ch || count <= 0) continue;
 
     if (mdKey === '') {
-      // Brand-level entry (no model): goes to wildcard only.
       var wkey = dt+'||'+brKey+'||*||'+ch;
       if (!map[wkey]) map[wkey] = {tr:0, br:brRaw, md:''};
       map[wkey].tr += count;
     } else {
-      // Model-level entry: exact key only.
       var key = dt+'||'+brKey+'||'+mdKey+'||'+ch;
       if (!map[key]) map[key] = {tr:0, br:brRaw, md:mdRaw};
       map[key].tr += count;
     }
-
-    // Diagnostic: brand+model level total (after normModelKey)
-    var diagKey = '"'+brRaw+'" → "'+brKey+'" | model="'+mdKey+'" | '+ch;
-    if (!diagBrCh[diagKey]) diagBrCh[diagKey] = 0;
-    diagBrCh[diagKey] += count;
   }
-
-  // Log brand+model totals so we can verify trigger counts per model
-  Logger.log('=== TRIGGER SHEET BRAND+MODEL TOTALS (after normalization) ===');
-  Object.keys(diagBrCh).sort().forEach(function(k){
-    Logger.log('  '+k+' = '+diagBrCh[k]);
-  });
 
   return map;
 }
