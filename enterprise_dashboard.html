@@ -863,11 +863,10 @@ var MONTH_DAYS = {Jan:31,Feb:28,Mar:31,Apr:30,May:31,Jun:30,Jul:31,Aug:31,Sep:30
 
 // Brand-specific campaign end dates per month (lowercase brand key → month → last day)
 var BRAND_END_DAYS = {
-  'tata pv':       {Sep:18},
-  'tata ev':       {Sep:18},
+  'tata ev':       {Sep:25},
   'honda':         {Sep:24},
   'toyota':        {Sep:30},
-  'volkswagen':    {Sep:22},
+  'volkswagen':    {Sep:25},
   'mahindra pv':   {Sep:30},
   'nissan':        {Sep:14},
   'citroen':       {Sep:30},
@@ -883,7 +882,7 @@ var BRAND_END_DAYS = {
 };
 
 // Brands whose campaigns are paused — show MTD actuals as expected, no projection
-var PAUSED_BRANDS = ['skoda', 'volvo'];
+var PAUSED_BRANDS = ['skoda', 'volvo', 'tata pv'];
 
 function getBrandEndDay(br, mo, totalDays){
   var key = normStr(br);
