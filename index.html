@@ -13943,11 +13943,11 @@ var CITY_LIGHT  = {Ahmedabad:'#F5F3FF', Chandigarh:'#EFF6FF', Nashik:'#ECFDF5', 
 
 var CITY_BORDER = {Ahmedabad:'#C4B5FD', Chandigarh:'#BAE6FD', Nashik:'#6EE7B7', Mohali:'#FCD34D', Gurugram:'#67E8F9'};
 
-var PLAT_COLOR  = {Google:'#EA4335', Meta:'#1877F2'};
+var PLAT_COLOR  = {Google:'#EA4335', Meta:'#1877F2', ChatGPT:'#10A37F'};
 
-var PLAT_LIGHT  = {Google:'#FEF2F2', Meta:'#EFF6FF'};
+var PLAT_LIGHT  = {Google:'#FEF2F2', Meta:'#EFF6FF', ChatGPT:'#ECFDF5'};
 
-var PLAT_BDR    = {Google:'#FCA5A5', Meta:'#93C5FD'};
+var PLAT_BDR    = {Google:'#FCA5A5', Meta:'#93C5FD', ChatGPT:'#6EE7B7'};
 
 var TYPE_COLOR  = {Search:'#7C3AED', Catalogue:'#D97706', LeadForm:'#0891B2', 'Demand Gen':'#059669', 'Performance Max':'#9333EA', 'Website Conversion':'#0369A1', WhatsApp:'#25D366', YouTube:'#FF0000', Other:'#64748B'};
 
@@ -15668,7 +15668,7 @@ function renderCampaigns() {
 
   html+='<select id="f-plat" class="fsel" onchange="renderCampaigns()"><option value="All">All Platforms</option>';
 
-  ['Google','Meta'].forEach(function(p){html+='<option'+(p===platF?' selected':'')+'>'+p+'</option>';});
+  ['Google','Meta','ChatGPT'].forEach(function(p){html+='<option'+(p===platF?' selected':'')+'>'+p+'</option>';});
 
   html+='</select>';
 
