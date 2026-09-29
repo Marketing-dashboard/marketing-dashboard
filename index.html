@@ -14347,6 +14347,8 @@ function renderComparison() {
 
   var selType = (document.getElementById('comp-type')||{value:'All'}).value||'All';
 
+  var selPlat = (document.getElementById('comp-plat')||{value:'All'}).value||'All';
+
 
 
   var CITIES_ALL = ['Ahmedabad','Chandigarh','Nashik','Mohali','Gurugram'];
@@ -14397,13 +14399,15 @@ function renderComparison() {
 
 
 
-  // Build city → campaign set (filtered by type)
+  // Build city → campaign set (filtered by type and platform)
 
   var cityCamps = {}; CITIES_ALL.forEach(function(c){cityCamps[c]={};});
 
   DATA_RAW.forEach(function(r){
 
     if (selType!=='All' && r.Type!==selType) return;
+
+    if (selPlat!=='All' && r.Platform!==selPlat) return;
 
     if (cityCamps[r.City]) cityCamps[r.City][r.Campaign]=1;
 
@@ -14722,6 +14726,24 @@ function renderComparison() {
   html+='<select onchange="setCompType(encodeURIComponent(this.value))" style="font-size:12px;font-family:inherit;padding:5px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:140px;outline:none">';
 
   allTypes.forEach(function(t){ html+='<option value="'+t+'"'+(t===selType?' selected':'')+'>'+t+'</option>'; });
+
+  html+='</select></div>';
+
+
+
+  html+='<div style="width:1px;height:26px;background:var(--border);flex-shrink:0"></div>';
+
+
+
+  // Platform filter
+
+  html+='<div style="display:flex;align-items:center;gap:7px">';
+
+  html+='<span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap">Source</span>';
+
+  html+='<select onchange="setCompPlat(this.value)" style="font-size:12px;font-family:inherit;padding:5px 10px;border-radius:8px;border:1px solid var(--border2);background:#fff;color:var(--text);cursor:pointer;min-width:110px;outline:none">';
+
+  ['All','Google','Meta','ChatGPT'].forEach(function(p){ html+='<option value="'+p+'"'+(p===selPlat?' selected':'')+'>'+p+'</option>'; });
 
   html+='</select></div>';
 
@@ -15116,6 +15138,28 @@ function setCompType(t) {
 }
 
 window.setCompType = setCompType;
+
+
+
+function setCompPlat(p) {
+
+  var el = document.createElement('input');
+
+  el.id = 'comp-plat'; el.type = 'hidden'; el.value = p;
+
+  var old = document.getElementById('comp-plat');
+
+  if (old) old.parentNode.replaceChild(el, old);
+
+  else document.body.appendChild(el);
+
+  document.getElementById('pane-comparison').dataset.done = '';
+
+  renderComparison();
+
+}
+
+window.setCompPlat = setCompPlat;
 
 
 
