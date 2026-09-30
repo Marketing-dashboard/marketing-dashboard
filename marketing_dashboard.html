@@ -352,7 +352,7 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
       <button class="csv-btn" onclick="exportBrandSummary()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
     </div>
     <table>
-      <thead><tr><th>Brand</th><th class="num">Spends</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Triggers</th></tr></thead>
+      <thead><tr><th>Brand</th><th class="num">Spends</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Triggers</th><th class="num">TCPL</th><th class="num">Trigger %</th></tr></thead>
       <tbody id="summary-body"></tbody>
     </table>
   </div>
@@ -560,19 +560,25 @@ function renderSummary(){
     var c=BRAND_COLORS[brand]||'#888';
     var cpl=(v.spends>0&&v.leads>0)?fmt(v.spends/v.leads):'\u2014';
     var trig=brandTrig[brand]||0;
+    var tcpl=(v.spends>0&&trig>0)?fmt(v.spends/trig):'\u2014';
+    var trigPct=(trig>0&&v.leads>0)?(trig/v.leads*100).toFixed(1)+'%':'\u2014';
     rows+='<tr>'+
       '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
       '<td class="num">'+(v.spends>0?fmt(v.spends):'<span class="na">\u2014</span>')+'</td>'+
       '<td class="num">'+(v.leads>0?fmt(v.leads):'<span class="na">\u2014</span>')+'</td>'+
       '<td class="num">'+cpl+'</td>'+
-      '<td class="num">'+(trig>0?fmt(trig):'<span class="na">\u2014</span>')+'</td></tr>';
+      '<td class="num">'+(trig>0?fmt(trig):'<span class="na">\u2014</span>')+'</td>'+
+      '<td class="num">'+tcpl+'</td>'+
+      '<td class="num">'+trigPct+'</td></tr>';
   });
   var totTrig=Object.values(brandTrig).reduce(function(a,b){return a+b;},0);
   rows+='<tr class="total-row"><td>TOTAL</td>'+
     '<td class="num">'+fmt(totS)+'</td><td class="num">'+fmt(totL)+'</td>'+
     '<td class="num">'+(totL>0?fmt(totS/totL):'\u2014')+'</td>'+
-    '<td class="num">'+(totTrig>0?fmt(totTrig):'\u2014')+'</td></tr>';
-  document.getElementById('summary-body').innerHTML=rows||'<tr><td colspan="5" class="empty">No data</td></tr>';
+    '<td class="num">'+(totTrig>0?fmt(totTrig):'\u2014')+'</td>'+
+    '<td class="num">'+(totTrig>0?fmt(totS/totTrig):'\u2014')+'</td>'+
+    '<td class="num">'+(totTrig>0&&totL>0?(totTrig/totL*100).toFixed(1)+'%':'\u2014')+'</td></tr>';
+  document.getElementById('summary-body').innerHTML=rows||'<tr><td colspan="7" class="empty">No data</td></tr>';
 
   var byCT={};
   filteredCT.forEach(function(r){
@@ -618,6 +624,15 @@ function getMonthlyKpis(brand,mo){
   });
   return {spends:spends||null,leads:leads||null,cpl:(spends>0&&leads>0)?spends/leads:null};
 }
+function getMonthTriggers(brand,mo){
+  if(TRIGGER_OVERRIDES[brand]&&TRIGGER_OVERRIDES[brand][mo]!==undefined)
+    return TRIGGER_OVERRIDES[brand][mo];
+  var t=0;
+  DATA.daily.forEach(function(r){
+    if(r.brand===brand&&r.date.slice(0,7)===mo) t+=(r.total_triggers||0);
+  });
+  return t;
+}
 
 /* chgBadge: returns HTML badge for pct change.
    dir = 'higher-good' (green when up, red when down)  e.g. Leads
@@ -662,13 +677,17 @@ function renderMoM(){
 
   // Aggregate across all selected brands per month
   var monthData=activeMos.map(function(mo){
-    var totS=0,totL=0;
+    var totS=0,totL=0,totT=0;
     selBrands.forEach(function(brand){
       var k=getMonthlyKpis(brand,mo);
       if(k.spends)totS+=k.spends;
       if(k.leads)totL+=k.leads;
+      totT+=getMonthTriggers(brand,mo);
     });
-    return{mo:mo,spends:totS||null,leads:totL||null,cpl:(totS>0&&totL>0)?totS/totL:null};
+    return{mo:mo,spends:totS||null,leads:totL||null,
+      cpl:(totS>0&&totL>0)?totS/totL:null,
+      trig:totT||null,
+      tcpl:(totS>0&&totT>0)?totS/totT:null};
   });
 
   // Build table rows
@@ -695,11 +714,29 @@ function renderMoM(){
       else if(row.cpl>prev.cpl)cplCls='cell-bad';
     }
 
+    var trigVal=row.trig!==null?fmt(row.trig):'\u2014';
+    var trigBadge=prev?chgBadge(row.trig,prev.trig,'higher-good'):'';
+    var trigCls='';
+    if(prev&&row.trig!==null&&prev.trig!==null){
+      if(row.trig>prev.trig)trigCls='cell-good';
+      else if(row.trig<prev.trig)trigCls='cell-bad';
+    }
+
+    var tcplVal=row.tcpl!==null?fmt(row.tcpl):'\u2014';
+    var tcplBadge=prev?chgBadge(row.tcpl,prev.tcpl,'lower-good'):'';
+    var tcplCls='';
+    if(prev&&row.tcpl!==null&&prev.tcpl!==null){
+      if(row.tcpl<prev.tcpl)tcplCls='cell-good';
+      else if(row.tcpl>prev.tcpl)tcplCls='cell-bad';
+    }
+
     tbody+='<tr>'+
       '<td style="font-weight:600;color:var(--txt);">'+fmtMo(row.mo)+'</td>'+
       '<td class="mono">'+spendVal+spendBadge+'</td>'+
       '<td class="mono '+leadsCls+'">'+leadsVal+leadsBadge+'</td>'+
       '<td class="mono '+cplCls+'">'+cplVal+cplBadge+'</td>'+
+      '<td class="mono '+trigCls+'">'+trigVal+trigBadge+'</td>'+
+      '<td class="mono '+tcplCls+'">'+tcplVal+tcplBadge+'</td>'+
       '</tr>';
   });
 
@@ -722,6 +759,8 @@ function renderMoM(){
         '<th class="num">Spends (INR)</th>'+
         '<th class="num">Leads</th>'+
         '<th class="num">CPL (INR)</th>'+
+        '<th class="num">Triggers</th>'+
+        '<th class="num">TCPL (INR)</th>'+
       '</tr></thead>'+
       '<tbody>'+tbody+'</tbody>'+
     '</table></div>'+
@@ -743,14 +782,19 @@ function downloadCSV(rows,filename){
   setTimeout(function(){URL.revokeObjectURL(url);},1000);
 }
 function exportBrandSummary(){
-  var hdr=['Brand','Spends','Leads','CPL','Triggers'],rows=[hdr];
+  var hdr=['Brand','Spends','Leads','CPL','Triggers','TCPL','Trigger %'],rows=[hdr];
   var byBrand={};
   DATA.brands.forEach(function(b){byBrand[b]={spends:0,leads:0};});
   filtered.forEach(function(r){byBrand[r.brand].spends+=r.spends;byBrand[r.brand].leads+=r.leads;});
   var brandTrig=computeBrandTriggers(filtered);
   DATA.brands.forEach(function(brand){
     var v=byBrand[brand];if(!v||(v.spends===0&&v.leads===0))return;
-    rows.push([brand,v.spends,v.leads,v.leads>0?(v.spends/v.leads).toFixed(2):'',brandTrig[brand]||0]);
+    var trig=brandTrig[brand]||0;
+    rows.push([brand,v.spends,v.leads,
+      v.leads>0?(v.spends/v.leads).toFixed(2):'',
+      trig,
+      trig>0?(v.spends/trig).toFixed(2):'',
+      trig>0&&v.leads>0?(trig/v.leads*100).toFixed(1)+'%':'']);
   });
   downloadCSV(rows,'brand_summary.csv');
 }
