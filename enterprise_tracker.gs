@@ -23,6 +23,7 @@ var TEMPLATE_URL = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REP
 var ENTERPRISE_SS_ID  = '1c5mtbsRiA6axOKMA87KIPiCUvnjAXZGSELW2-jLt-Fk';
 var SEP_TRIGGERS_ID   = '1KXaUoUsEIrMHajuMGegVSYCnfeVmCLEfQFX9eujavp0';
 var AUG_TRIGGERS_ID   = '1kD6z8CpeaII8Ls545_ZSLv4hqQrwUeWoPWgegtzyka8';
+var OCT_TRIGGERS_ID   = '1-zfVWep63EUMuedKEAcXAEV4gawJ1R3zYzvuadb8QLk';
 
 // Sheet / tab names
 var SHEET_RAW     = 'Raw';
@@ -150,7 +151,10 @@ function buildRows() {
   var augSS   = SpreadsheetApp.openById(AUG_TRIGGERS_ID);
   var augData = augSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
 
-  Logger.log('Raw:'+rawData.length+' CPL:'+cplData.length+' Sep:'+sepData.length+' Aug:'+augData.length);
+  var octSS   = SpreadsheetApp.openById(OCT_TRIGGERS_ID);
+  var octData = octSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
+
+  Logger.log('Raw:'+rawData.length+' CPL:'+cplData.length+' Sep:'+sepData.length+' Aug:'+augData.length+' Oct:'+octData.length);
 
   // Build Sold_CPL_Val lookup
   // key: normStr(brand)||normStr(model)||channel_norm||month_label  →  {seg, vp, sc}
@@ -170,7 +174,8 @@ function buildRows() {
   // Build trigger maps
   var sepTrigMap = buildTrigMap(sepData);
   var augTrigMap = buildTrigMap(augData);
-  Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length);
+  var octTrigMap = buildTrigMap(octData);
+  Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length+' Oct trig:'+Object.keys(octTrigMap).length);
 
   // Aggregate Raw spends by date + normStr(brand) + normStr(model) + channel
   // brandCanon / modelCanon: pick the first-seen display name for each normalized key
@@ -206,14 +211,15 @@ function buildRows() {
   var usedWildcard = {};
   var claimedSepKeys = {};
   var claimedAugKeys = {};
+  var claimedOctKeys = {};
 
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
     var brk = r.brk, mdk = r.mdk;
     var br = brandCanon[brk] || brk;
     var md = modelCanon[mdk] || mdk;
-    var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : {});
-    var claimed = r.mo === 'Sep' ? claimedSepKeys : (r.mo === 'Aug' ? claimedAugKeys : {});
+    var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : (r.mo === 'Oct' ? octTrigMap : {}));
+    var claimed = r.mo === 'Sep' ? claimedSepKeys : (r.mo === 'Aug' ? claimedAugKeys : (r.mo === 'Oct' ? claimedOctKeys : {}));
 
     var triggers = 0;
     var tKey = r.dt+'||'+brk+'||'+mdk+'||'+r.ch;
@@ -288,6 +294,7 @@ function buildRows() {
 
   addUnclaimedRows(sepTrigMap, claimedSepKeys, 'Sep');
   addUnclaimedRows(augTrigMap, claimedAugKeys, 'Aug');
+  addUnclaimedRows(octTrigMap, claimedOctKeys, 'Oct');
 
   rows.sort(function(a,b){
     return a.dt.localeCompare(b.dt)||a.br.localeCompare(b.br)||a.md.localeCompare(b.md)||a.ch.localeCompare(b.ch);

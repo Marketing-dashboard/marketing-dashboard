@@ -143,7 +143,7 @@ tr.tot td:first-child{color:#312e81}
 <div class="tab-bar">
   <button class="tab-btn active" id="tabDailyBtn" onclick="switchTab('daily')">Day-wise Performance</button>
   <button class="tab-btn" id="tabMomBtn" onclick="switchTab('mom')">MoM Analysis</button>
-  <button class="tab-btn" id="tabPredBtn" onclick="switchTab('pred')">Sep Prediction</button>
+  <button class="tab-btn" id="tabPredBtn" onclick="switchTab('pred')">Oct Prediction</button>
 </div>
 
 <!-- ═══════════════════════════════════ DAILY SECTION ═══════════════════════════════════ -->
@@ -863,26 +863,28 @@ var MONTH_DAYS = {Jan:31,Feb:28,Mar:31,Apr:30,May:31,Jun:30,Jul:31,Aug:31,Sep:30
 
 // Brand-specific campaign end dates per month (lowercase brand key → month → last day)
 var BRAND_END_DAYS = {
-  'tata ev':       {Sep:25},
-  'honda':         {Sep:24},
-  'toyota':        {Sep:30},
-  'volkswagen':    {Sep:25},
-  'mahindra pv':   {Sep:30},
-  'nissan':        {Sep:14},
-  'citroen':       {Sep:30},
-  'jlr':           {Sep:30},
-  'volvo':         {Sep:30},
-  'audi':          {Sep:30},
-  'bmw':           {Sep:30},
-  'redwing':       {Sep:30},
-  'bigwing':       {Sep:28},
-  'royal enfield': {Sep:30},
-  'harley':        {Sep:8},
-  'ola':           {Sep:30}
+  'tata pv':       {Sep:18, Oct:31},
+  'tata ev':       {Sep:25, Oct:31},
+  'honda':         {Sep:24, Oct:31},
+  'toyota':        {Sep:30, Oct:31},
+  'volkswagen':    {Sep:25, Oct:31},
+  'mahindra pv':   {Sep:30, Oct:31},
+  'nissan':        {Sep:14, Oct:31},
+  'citroen':       {Sep:30, Oct:31},
+  'jlr':           {Sep:30, Oct:31},
+  'volvo':         {Sep:30, Oct:31},
+  'audi':          {Sep:30, Oct:31},
+  'bmw':           {Sep:30, Oct:31},
+  'redwing':       {Sep:30, Oct:31},
+  'bigwing':       {Sep:28, Oct:31},
+  'royal enfield': {Sep:30, Oct:31},
+  'harley':        {Sep:8,  Oct:31},
+  'ola':           {Sep:30, Oct:31},
+  'skoda':         {Sep:30, Oct:31}
 };
 
 // Brands whose campaigns are paused — show MTD actuals as expected, no projection
-var PAUSED_BRANDS = ['skoda', 'volvo', 'tata pv', 'tata ev', 'volkswagen', 'royal enfield'];
+var PAUSED_BRANDS = [];
 
 function getBrandEndDay(br, mo, totalDays){
   var key = normStr(br);
