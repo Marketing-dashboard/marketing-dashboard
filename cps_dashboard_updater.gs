@@ -29,6 +29,14 @@ function isExcluded(brand) {
   return !brand || EXCLUDED_BRANDS.indexOf(brand.toLowerCase().trim()) !== -1;
 }
 
+// ── GENERIC MODEL MAP: triggers redistributed to real models ──
+// Key = model name (lowercase) that has no spend data.
+// Value = brand name (lowercase) whose specific models receive those triggers
+// proportionally (based on each model's share of that brand's existing triggers).
+var GENERIC_MODEL_MAP = {
+  'jawa/generic': 'jawa'
+};
+
 // ── ONE-TIME TOKEN SETUP ──────────────────────────────────────
 function setGitHubToken(token) {
   PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
@@ -208,11 +216,15 @@ function processTriggers(rawData) {
   var fbByModel = {}, waByModel = {}, gaByModel = {}, otByModel = {};
   var fbByDateModel = {}, waByDateModel = {}, gaByDateModel = {}, otByDateModel = {};
   var modelToBrand = {};
+  // Generic-model buckets: brand_lc → {fb,wa,ga,ot} and 'date||brand_lc' → {fb,wa,ga,ot}
+  var brandGenericByBrand = {};
+  var brandGenericByDateBrand = {};
 
   var empty = {
     fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel, otByModel: otByModel,
     fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel, otByDateModel: otByDateModel,
-    modelToBrand: modelToBrand
+    modelToBrand: modelToBrand,
+    brandGenericByBrand: brandGenericByBrand, brandGenericByDateBrand: brandGenericByDateBrand
   };
   if (rawData.length === 0) return empty;
 
@@ -268,6 +280,19 @@ function processTriggers(rawData) {
     var mk = model.toLowerCase();
     if (brand && !modelToBrand[mk]) modelToBrand[mk] = brand;
 
+    // Redirect generic-model triggers into the brand-level generic bucket
+    if (GENERIC_MODEL_MAP.hasOwnProperty(mk)) {
+      var genericBrand = GENERIC_MODEL_MAP[mk];
+      var dbk = dateStr + '||' + genericBrand;
+      if (!brandGenericByBrand[genericBrand])    brandGenericByBrand[genericBrand]    = {fb:0, wa:0, ga:0, ot:0};
+      if (!brandGenericByDateBrand[dbk])         brandGenericByDateBrand[dbk]         = {fb:0, wa:0, ga:0, ot:0};
+      if (isFB)      { brandGenericByBrand[genericBrand].fb += count; brandGenericByDateBrand[dbk].fb += count; }
+      else if (isWA) { brandGenericByBrand[genericBrand].wa += count; brandGenericByDateBrand[dbk].wa += count; }
+      else if (isGA) { brandGenericByBrand[genericBrand].ga += count; brandGenericByDateBrand[dbk].ga += count; }
+      else if (isOT) { brandGenericByBrand[genericBrand].ot += count; brandGenericByDateBrand[dbk].ot += count; }
+      continue;
+    }
+
     var dk = dateStr + '||' + mk;
     if (isFB) {
       fbByModel[mk]     = (fbByModel[mk]     || 0) + count;
@@ -284,10 +309,17 @@ function processTriggers(rawData) {
     }
   }
 
+  // Log generic trigger totals for diagnostics
+  Object.keys(brandGenericByBrand).forEach(function(b) {
+    var g = brandGenericByBrand[b];
+    Logger.log('Generic triggers for brand "' + b + '": fb=' + g.fb + ' wa=' + g.wa + ' ga=' + g.ga + ' ot=' + g.ot);
+  });
+
   return {
     fbByModel: fbByModel, waByModel: waByModel, gaByModel: gaByModel, otByModel: otByModel,
     fbByDateModel: fbByDateModel, waByDateModel: waByDateModel, gaByDateModel: gaByDateModel, otByDateModel: otByDateModel,
-    modelToBrand: modelToBrand
+    modelToBrand: modelToBrand,
+    brandGenericByBrand: brandGenericByBrand, brandGenericByDateBrand: brandGenericByDateBrand
   };
 }
 
@@ -388,12 +420,31 @@ function processFBandWASpends(fbData) {
 // ── BUILD DAYWISE RECORDS ─────────────────────────────────────
 // One row per date+brand+model. Triggers are only attached to models
 // that have spend/lead data — trigger-only models are excluded.
+// Generic-model triggers (e.g. Jawa/Generic) are redistributed proportionally
+// to specific models of the same brand on the same date.
 function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
   // Keys come from spend maps only — no trigger-only rows
   var allKeys = {};
   Object.keys(fbSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(gaSpends).forEach(function(k) { allKeys[k] = true; });
   Object.keys(waSpends).forEach(function(k) { allKeys[k] = true; });
+
+  // Pre-pass: compute per-(date+brand) trigger totals for proportional redistribution
+  var dateBrandTrigTotals = {}; // 'date||brand_lc' → {fb,wa,ga,ot}
+  Object.keys(allKeys).forEach(function(key) {
+    var parts = key.split('||');
+    var dateStr = parts[0], brand = parts[1], model = parts[2];
+    if (isExcluded(brand)) return;
+    var bl = brand.toLowerCase();
+    var dbk = dateStr + '||' + bl;
+    var mk = model.toLowerCase();
+    var dk = dateStr + '||' + mk;
+    if (!dateBrandTrigTotals[dbk]) dateBrandTrigTotals[dbk] = {fb:0, wa:0, ga:0, ot:0};
+    dateBrandTrigTotals[dbk].fb += (triggers.fbByDateModel[dk] || 0);
+    dateBrandTrigTotals[dbk].wa += (triggers.waByDateModel[dk] || 0);
+    dateBrandTrigTotals[dbk].ga += (triggers.gaByDateModel[dk] || 0);
+    dateBrandTrigTotals[dbk].ot += (triggers.otByDateModel[dk] || 0);
+  });
 
   var rows = [];
 
@@ -404,11 +455,29 @@ function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
     var fb = fbSpends[key] || {spends: 0, leads: 0};
     var ga = gaSpends[key] || {spends: 0, leads: 0};
     var wa = waSpends[key] || {spends: 0, leads: 0};
-    var dk = dateStr + '||' + model.toLowerCase();
+    var mk  = model.toLowerCase();
+    var bl  = brand.toLowerCase();
+    var dk  = dateStr + '||' + mk;
+    var dbk = dateStr + '||' + bl;
     var fbTrig = triggers.fbByDateModel[dk] || 0;
     var waTrig = triggers.waByDateModel[dk] || 0;
     var gaTrig = triggers.gaByDateModel[dk] || 0;
     var otTrig = triggers.otByDateModel[dk] || 0;
+
+    // Add proportional share of generic triggers for this brand+date
+    var gen = triggers.brandGenericByDateBrand[dbk];
+    if (gen) {
+      var tot = dateBrandTrigTotals[dbk] || {fb:0, wa:0, ga:0, ot:0};
+      var modelFB = triggers.fbByDateModel[dk] || 0;
+      var modelWA = triggers.waByDateModel[dk] || 0;
+      var modelGA = triggers.gaByDateModel[dk] || 0;
+      var modelOT = triggers.otByDateModel[dk] || 0;
+      fbTrig += (tot.fb > 0 ? Math.round(gen.fb * modelFB / tot.fb) : (gen.fb > 0 ? Math.round(gen.fb / countDateBrandModels(allKeys, dateStr, brand)) : 0));
+      waTrig += (tot.wa > 0 ? Math.round(gen.wa * modelWA / tot.wa) : (gen.wa > 0 ? Math.round(gen.wa / countDateBrandModels(allKeys, dateStr, brand)) : 0));
+      gaTrig += (tot.ga > 0 ? Math.round(gen.ga * modelGA / tot.ga) : (gen.ga > 0 ? Math.round(gen.ga / countDateBrandModels(allKeys, dateStr, brand)) : 0));
+      otTrig += (tot.ot > 0 ? Math.round(gen.ot * modelOT / tot.ot) : (gen.ot > 0 ? Math.round(gen.ot / countDateBrandModels(allKeys, dateStr, brand)) : 0));
+    }
+
     rows.push(makeRow(dateStr, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,
@@ -416,6 +485,17 @@ function buildDaywise(fbSpends, gaSpends, waSpends, triggers) {
   });
 
   return rows;
+}
+
+// Count distinct models for a given date+brand combination (used for equal split fallback)
+function countDateBrandModels(allKeys, dateStr, brand) {
+  var bl = brand.toLowerCase();
+  var count = 0;
+  Object.keys(allKeys).forEach(function(key) {
+    var parts = key.split('||');
+    if (parts[0] === dateStr && parts[1].toLowerCase() === bl) count++;
+  });
+  return count || 1;
 }
 
 // ── BUILD MTD SUMMARY ─────────────────────────────────────────
@@ -445,6 +525,31 @@ function buildMTD(fbSpends, gaSpends, waSpends, triggers) {
   Object.keys(gaBM).forEach(function(k) { allBMKeys[k] = true; });
   Object.keys(waBM).forEach(function(k) { allBMKeys[k] = true; });
 
+  // Pre-pass: compute per-brand trigger totals for proportional redistribution
+  var brandTrigTotals = {}; // brand_lc → {fb,wa,ga,ot}
+  Object.keys(allBMKeys).forEach(function(bmKey) {
+    var parts = bmKey.split('||');
+    var brand = parts[0], model = parts[1];
+    if (isExcluded(brand)) return;
+    var bl = brand.toLowerCase();
+    var mk = model.toLowerCase();
+    if (!brandTrigTotals[bl]) brandTrigTotals[bl] = {fb:0, wa:0, ga:0, ot:0};
+    brandTrigTotals[bl].fb += (triggers.fbByModel[mk] || 0);
+    brandTrigTotals[bl].wa += (triggers.waByModel[mk] || 0);
+    brandTrigTotals[bl].ga += (triggers.gaByModel[mk] || 0);
+    brandTrigTotals[bl].ot += (triggers.otByModel[mk] || 0);
+  });
+
+  // Count models per brand for equal-split fallback
+  var brandModelCount = {};
+  Object.keys(allBMKeys).forEach(function(bmKey) {
+    var parts = bmKey.split('||');
+    var brand = parts[0];
+    if (isExcluded(brand)) return;
+    var bl = brand.toLowerCase();
+    brandModelCount[bl] = (brandModelCount[bl] || 0) + 1;
+  });
+
   var rows = [];
 
   Object.keys(allBMKeys).forEach(function(bmKey) {
@@ -455,10 +560,23 @@ function buildMTD(fbSpends, gaSpends, waSpends, triggers) {
     var ga = gaBM[bmKey] || {spends: 0, leads: 0};
     var wa = waBM[bmKey] || {spends: 0, leads: 0};
     var mk = model.toLowerCase();
+    var bl = brand.toLowerCase();
     var fbTrig = triggers.fbByModel[mk] || 0;
     var waTrig = triggers.waByModel[mk] || 0;
     var gaTrig = triggers.gaByModel[mk] || 0;
     var otTrig = triggers.otByModel[mk] || 0;
+
+    // Add proportional share of generic triggers for this brand
+    var gen = triggers.brandGenericByBrand[bl];
+    if (gen) {
+      var tot = brandTrigTotals[bl] || {fb:0, wa:0, ga:0, ot:0};
+      var nModels = brandModelCount[bl] || 1;
+      fbTrig += (tot.fb > 0 ? Math.round(gen.fb * (triggers.fbByModel[mk]||0) / tot.fb) : Math.round(gen.fb / nModels));
+      waTrig += (tot.wa > 0 ? Math.round(gen.wa * (triggers.waByModel[mk]||0) / tot.wa) : Math.round(gen.wa / nModels));
+      gaTrig += (tot.ga > 0 ? Math.round(gen.ga * (triggers.gaByModel[mk]||0) / tot.ga) : Math.round(gen.ga / nModels));
+      otTrig += (tot.ot > 0 ? Math.round(gen.ot * (triggers.otByModel[mk]||0) / tot.ot) : Math.round(gen.ot / nModels));
+    }
+
     rows.push(makeRow(null, brand, model,
       fb.spends, fb.leads, fbTrig,
       ga.spends, ga.leads, gaTrig,

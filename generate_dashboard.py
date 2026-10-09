@@ -115,7 +115,7 @@ def build_data_js(filepath):
     for key, sheet_name in SHEET_MAP.items():
         rows = read_mp_sheet(wb, sheet_name)
         if not rows:
-            print(f"  ⚠ Sheet '{sheet_name}' not found or empty — skipping.")
+            print(f"  WARN Sheet '{sheet_name}' not found or empty -- skipping.")
             continue
 
         parsed_rows = []
@@ -322,28 +322,28 @@ def main():
     with open(template_path, encoding="utf-8") as f:
         template = f.read()
 
-    print("📊 Reading Marketing_Performance.xlsx ...")
+    print("Reading Marketing_Performance.xlsx ...")
     if mp_path.exists():
         data_js = build_data_js(mp_path)
         current_month = detect_current_month(mp_path)
-        print(f"   ✓ Done  (current partial month: {current_month})")
+        print(f"   OK Done  (current partial month: {current_month})")
     else:
         raise FileNotFoundError(f"Marketing_Performance.xlsx not found in {base_dir}")
 
-    print("🚗 Reading Enterprise_Comparison.xlsx ...")
+    print("Reading Enterprise_Comparison.xlsx ...")
     if ent_path.exists():
         model_tree_js = build_model_tree(ent_path)
-        print("   ✓ Done")
+        print("   OK Done")
     else:
-        print("   ⚠ Not found — keeping existing MODEL_TREE in template.")
+        print("   WARN Not found -- keeping existing MODEL_TREE in template.")
         model_tree_js = None
 
-    print("🚛 Reading CV_Comparison.xlsx ...")
+    print("Reading CV_Comparison.xlsx ...")
     if cv_path.exists():
         cv_tree_js = build_cv_tree(cv_path)
-        print("   ✓ Done")
+        print("   OK Done")
     else:
-        print("   ⚠ Not found — keeping existing CV_TREE in template.")
+        print("   WARN Not found -- keeping existing CV_TREE in template.")
         cv_tree_js = None
 
     # Inject all blocks into template
@@ -359,7 +359,7 @@ def main():
         f.write(html)
 
     kb = len(html) // 1024
-    print(f"\n✅ index.html generated ({kb} KB)  →  {output_path}")
+    print(f"\nOK index.html generated ({kb} KB) -> {output_path}")
     print(f"   Current partial month: {current_month}")
     print(f"   Dashboard auto-detects last complete month for summary KPI cards.")
 
