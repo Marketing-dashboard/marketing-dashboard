@@ -49,12 +49,14 @@ var SPECIAL_BRANDS = ['JLR','CITROEN','LEXUS'];
 // Brand alias map: normalized variants → canonical key (all lowercase)
 // Add entries here whenever the sheet uses alternate brand names for the same brand
 var BRAND_ALIAS = {
-  'ola electric':   'ola',
-  'ola ev':         'ola',
-  'hmsi bigwing':   'bigwing',
-  'hmsi redwing':   'redwing',
-  'mercedes benz':  'mercedes',
-  'mercedes-benz':  'mercedes'
+  'ola electric':    'ola',
+  'ola ev':          'ola',
+  'hmsi bigwing':    'bigwing',
+  'hmsi redwing':    'redwing',
+  'mercedes benz':   'mercedes',
+  'mercedes-benz':   'mercedes',
+  'harley davidson': 'harley',
+  'harley-davidson': 'harley'
 };
 
 // Normalize a brand key (post-normStr) to its canonical form
