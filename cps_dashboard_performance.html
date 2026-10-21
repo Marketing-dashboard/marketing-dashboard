@@ -423,7 +423,7 @@ const BRAND_BG = { 'Bajaj':'#DBEAFE','TVS':'#DCFCE7','Jawa':'#FEE2E2','KTM':'#FF
 const brandFg = b => BRAND_FG[b] || '#374151';
 const brandBg = b => BRAND_BG[b] || '#F3F4F6';
 
-const fmtINR = n => (!n || isNaN(n)) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
+const fmtINR = n => (n == null || isNaN(n)) ? '—' : '₹' + Math.round(n).toLocaleString('en-IN');
 const fmtNum = (n, d=0) => (n == null || isNaN(n)) ? '—' : parseFloat(n.toFixed(d)).toLocaleString('en-IN');
 const fmtPct = n => (n == null || isNaN(n)) ? '—' : n.toFixed(1) + '%';
 const fmtDate = s => { const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); };
@@ -543,25 +543,18 @@ function renderDaywise() {
 
   const tbody = document.getElementById('daywise-tbody');
 
-  if (!selectedBrand) {
-    document.getElementById('record-count').textContent = `${brandRows.length} records — select a brand to drill down`;
-    document.getElementById('pag-info').textContent = '';
-    document.getElementById('pag-btns').innerHTML = '';
-    tbody.innerHTML = `<tr><td colspan="27" style="text-align:center;padding:48px;color:var(--text-muted);font-size:13px">
-      Select a brand above to view model breakdown</td></tr>`;
-    return;
-  }
-
-  // Group by model
+  // Group by model (show all brands when none selected)
   const modelMap = {};
   brandRows.forEach(r => {
-    if (!modelMap[r.model]) modelMap[r.model] = [];
-    modelMap[r.model].push(r);
+    const key = selectedBrand ? r.model : (r.brand + ' — ' + r.model);
+    if (!modelMap[key]) modelMap[key] = [];
+    modelMap[key].push(r);
   });
   const models = Object.keys(modelMap).sort();
 
-  document.getElementById('record-count').textContent =
-    `${models.length} model${models.length !== 1 ? 's' : ''} · click to expand dates`;
+  document.getElementById('record-count').textContent = selectedBrand
+    ? `${models.length} model${models.length !== 1 ? 's' : ''} · click to expand dates`
+    : `${brandRows.length} records · select a brand to filter`;
   document.getElementById('pag-info').textContent = '';
   document.getElementById('pag-btns').innerHTML = '';
 
