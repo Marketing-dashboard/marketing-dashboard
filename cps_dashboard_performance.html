@@ -488,14 +488,6 @@ function init() {
       renderMTD();
     });
 
-    // Tracker brand dropdown
-    const tBrands = [...new Set(DATA.mtd_summary.map(r => r.brand))].sort();
-    const tBSel = document.getElementById('tracker-brand-select');
-    tBrands.forEach(b => { const o = document.createElement('option'); o.value = o.textContent = b; tBSel.appendChild(o); });
-    tBSel.addEventListener('change', () => { trackerBrand = tBSel.value; renderTracker(); });
-    document.getElementById('tracker-reset-btn').addEventListener('click', () => {
-      trackerBrand = ''; tBSel.value = ''; renderTracker();
-    });
 
     bSel.addEventListener('change', () => {
       selectedBrand = bSel.value;
