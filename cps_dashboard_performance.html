@@ -229,7 +229,6 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
     <button class="tab-btn active" data-tab="daywise">Daywise Analysis</button>
     <button class="tab-btn" data-tab="brand-daywise">Brand Daywise</button>
     <button class="tab-btn" data-tab="mtd">MTD Summary</button>
-    <button class="tab-btn" data-tab="tracker">Tracker</button>
   </div>
 </div>
 
@@ -242,6 +241,14 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
       <div class="filter-group">
         <label>Brand</label>
         <select id="brand-select"><option value="">All Brands</option></select>
+      </div>
+      <div class="filter-group">
+        <label>From</label>
+        <input type="date" id="date-from" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--surface)">
+      </div>
+      <div class="filter-group">
+        <label>To</label>
+        <input type="date" id="date-to" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text);background:var(--surface)">
       </div>
       <button class="filter-reset" id="reset-btn">Reset</button>
     </div>
@@ -305,43 +312,6 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
       <div class="pagination">
         <div id="pag-info">—</div>
         <div class="pag-btns" id="pag-btns"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TRACKER TAB -->
-  <div id="panel-tracker" class="tab-panel">
-    <div class="filters">
-      <div class="filter-group">
-        <label>Brand</label>
-        <select id="tracker-brand-select"><option value="">All Brands</option></select>
-      </div>
-      <button class="filter-reset" id="tracker-reset-btn">Reset</button>
-    </div>
-    <div class="table-card">
-      <div class="table-header">
-        <div class="table-title">Demand Tracker · MTD</div>
-        <div class="record-count tracker-meta">
-          Active days: <span id="tracker-active-days" class="tracker-active">—</span>
-          &nbsp;·&nbsp; Days remaining: enter manually per model
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="tracker-tbl">
-          <thead>
-            <tr>
-              <th style="text-align:left">Model</th>
-              <th>Brand</th>
-              <th>Triggered Till Date</th>
-              <th>Demand</th>
-              <th>Remaining</th>
-              <th>Days Remaining</th>
-              <th>Current DRR</th>
-              <th>Required DRR</th>
-            </tr>
-          </thead>
-          <tbody id="tracker-tbody"></tbody>
-        </table>
       </div>
     </div>
   </div>
@@ -418,6 +388,7 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
 <script>
 let DATA = null, selectedBrand = '', bdSelectedBrand = '';
 let expandedBrands = new Set(), expandedModels = new Set();
+let dateFrom = '', dateTo = '';
 
 const BRAND_FG = { 'Bajaj':'#1D4ED8','TVS':'#15803D','Jawa':'#B91C1C','KTM':'#C2410C',
   'Triumph':'#6D28D9','Ampere':'#0369A1','BGauss':'#92400E','Bajaj Chetak':'#7E22CE','Ather':'#0F766E' };
@@ -484,8 +455,13 @@ async function init() {
       expandedModels.clear();
       renderDaywise();
     });
+    document.getElementById('date-from').addEventListener('change', e => { dateFrom = e.target.value; expandedModels.clear(); renderDaywise(); });
+    document.getElementById('date-to').addEventListener('change',   e => { dateTo   = e.target.value; expandedModels.clear(); renderDaywise(); });
     document.getElementById('reset-btn').addEventListener('click', () => {
       selectedBrand = ''; bSel.value = '';
+      dateFrom = ''; dateTo = '';
+      document.getElementById('date-from').value = '';
+      document.getElementById('date-to').value = '';
       expandedModels.clear(); renderDaywise();
     });
 
@@ -498,9 +474,12 @@ async function init() {
 }
 
 function renderDaywise() {
-  const brandRows = selectedBrand
-    ? DATA.daywise.filter(r => r.brand === selectedBrand)
-    : DATA.daywise;
+  const brandRows = DATA.daywise.filter(r => {
+    if (selectedBrand && r.brand !== selectedBrand) return false;
+    if (dateFrom && r.date < dateFrom) return false;
+    if (dateTo   && r.date > dateTo)   return false;
+    return true;
+  });
 
   // KPI cards reflect current brand selection
   const T = brandRows.reduce((a, r) => ({
@@ -518,7 +497,7 @@ function renderDaywise() {
   const tbody = document.getElementById('daywise-tbody');
 
   if (!selectedBrand) {
-    document.getElementById('record-count').textContent = `${DATA.daywise.length} records — select a brand to drill down`;
+    document.getElementById('record-count').textContent = `${brandRows.length} records — select a brand to drill down`;
     document.getElementById('pag-info').textContent = '';
     document.getElementById('pag-btns').innerHTML = '';
     tbody.innerHTML = `<tr><td colspan="27" style="text-align:center;padding:48px;color:var(--text-muted);font-size:13px">

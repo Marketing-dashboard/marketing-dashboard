@@ -23,6 +23,16 @@ function normBrand(brand) {
   return BRAND_ALIAS[brand.toLowerCase().trim()] || brand;
 }
 
+// ── MODEL ALIASES: merge variant model names → canonical name ──
+// Key = model name (lowercase) to remap; Value = canonical display name.
+var MODEL_ALIAS = {
+  'hero glamour x 125': 'Hero Glamour'
+};
+function normModel(model) {
+  if (!model) return model;
+  return MODEL_ALIAS[model.toLowerCase().trim()] || model;
+}
+
 // ── EXCLUDED BRANDS: drop these from all output ───────────────
 var EXCLUDED_BRANDS = ['others', '#n/a', ''];
 function isExcluded(brand) {
@@ -258,7 +268,7 @@ function processTriggers(rawData) {
       medium = iMedium >= 0 ? String(row[iMedium] || '').trim().toLowerCase() : '';
     }
 
-    var model      = iModel   >= 0 ? String(row[iModel]   || '').trim() : '';
+    var model      = normModel(iModel >= 0 ? String(row[iModel] || '').trim() : '');
     var processVal = iProcess >= 0 ? String(row[iProcess] || '').trim() : '';
     var brandVal   = iBrand   >= 0 ? String(row[iBrand]   || '').trim() : '';
     // When Process = "Others", use the Brand column for the real brand
@@ -350,7 +360,7 @@ function processGASpends(gaData, tvsData) {
       var r = gaData[i];
       var d = gDate  >= 0 ? fmtDate(r[gDate])                        : '';
       var b = normBrand(gBrand >= 0 ? String(r[gBrand]||'').trim() : '');
-      var m = gModel >= 0 ? String(r[gModel]||'').trim()            : '';
+      var m = normModel(gModel >= 0 ? String(r[gModel]||'').trim() : '');
       var s = gCost  >= 0 ? (parseFloat(r[gCost])  || 0)           : 0;
       var l = gConv  >= 0 ? (parseFloat(r[gConv])  || 0)           : 0;
       add(d, b, m, s, l);
@@ -371,7 +381,7 @@ function processGASpends(gaData, tvsData) {
       var r = tvsData[j];
       var d = tDate  >= 0 ? fmtDate(r[tDate])                        : '';
       var b = normBrand(tBrand >= 0 ? String(r[tBrand]||'').trim() : '');
-      var m = tModel >= 0 ? String(r[tModel]||'').trim()            : '';
+      var m = normModel(tModel >= 0 ? String(r[tModel]||'').trim() : '');
       var s = tCost  >= 0 ? (parseFloat(r[tCost])  || 0)           : 0;
       var l = tConv  >= 0 ? (parseFloat(r[tConv])  || 0)           : 0;
       add(d, b, m, s, l);
@@ -401,7 +411,7 @@ function processFBandWASpends(fbData) {
     var r      = fbData[i];
     var d      = fDate   >= 0 ? fmtDate(r[fDate])                          : '';
     var brand  = normBrand(fBrand >= 0 ? String(r[fBrand]||'').trim()    : '');
-    var model  = fModel  >= 0 ? String(r[fModel]||'').trim()              : '';
+    var model  = normModel(fModel >= 0 ? String(r[fModel]||'').trim() : '');
     var spends = fSpend  >= 0 ? (parseFloat(r[fSpend]) || 0)   : 0;
     var leads  = fLead   >= 0 ? (parseFloat(r[fLead])  || 0)   : 0;
     var source = fSource >= 0 ? String(r[fSource]||'').trim().toLowerCase() : '';

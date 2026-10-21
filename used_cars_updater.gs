@@ -1,620 +1,303 @@
-// ============================================================
-// Used Cars Dashboard Auto-Updater
-// Install in Google Sheet: Extensions → Apps Script
-// ============================================================
-
-// ── CONFIGURATION ─────────────────────────────────────────────
 var REPO_OWNER = 'Marketing-dashboard';
-var REPO_NAME  = 'used_cars_dashboard';
-var FILE_PATH  = 'index.html';
 
-// Run this once to store your GitHub token:
-//   setGitHubToken('ghp_yourTokenHere')
 function setGitHubToken(token) {
   PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
   Logger.log('Token saved.');
 }
 
-// ── ENTRY POINT (also set as time-driven trigger) ─────────────
-function updateDashboard() {
+// ── RUN THIS to update dashboard with latest sheet data ──────
+function _run() {
+  var newBlobSha = _buildAndPush('UC_Dashboard');
+  _syncToLive(newBlobSha);
+}
+
+// ── ONE-TIME recovery when UC_Dashboard is empty ─────────────
+function _restoreFromHistory() {
   var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
-  if (!token) throw new Error('GitHub token not set. Run setGitHubToken("ghp_...") first.');
+  if (!token) throw new Error('GitHub token not set.');
+  var owner = REPO_OWNER, repo = 'UC_Dashboard';
+  var hdr = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'};
+
+  var commits = JSON.parse(UrlFetchApp.fetch(
+    'https://api.github.com/repos/'+owner+'/'+repo+'/commits?per_page=20',
+    {headers:hdr,muteHttpExceptions:true}
+  ).getContentText());
+
+  var goodBlobSha = null, goodBlobSize = 0;
+  for (var i = 0; i < commits.length; i++) {
+    var tree = JSON.parse(UrlFetchApp.fetch(
+      'https://api.github.com/repos/'+owner+'/'+repo+'/git/trees/'+commits[i].sha,
+      {headers:hdr,muteHttpExceptions:true}
+    ).getContentText()).tree;
+    for (var j = 0; j < tree.length; j++) {
+      if (tree[j].path === 'index.html') {
+        Logger.log('Commit '+commits[i].sha.substring(0,7)+': index.html = '+tree[j].size+' bytes');
+        if (tree[j].size > 500000 && !goodBlobSha) { goodBlobSha = tree[j].sha; goodBlobSize = tree[j].size; }
+        break;
+      }
+    }
+    if (goodBlobSha) break;
+  }
+  if (!goodBlobSha) throw new Error('No good commit found.');
+  Logger.log('Restoring blob '+goodBlobSha+' ('+goodBlobSize+' bytes)');
+
+  var hdrJson = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  var base = 'https://api.github.com/repos/'+owner+'/'+repo;
+
+  // Read blob content
+  var b64Content = JSON.parse(UrlFetchApp.fetch(base+'/git/blobs/'+goodBlobSha,{headers:hdr,muteHttpExceptions:true}).getContentText()).content.replace(/\n/g,'');
+  if (!b64Content) throw new Error('Blob empty.');
+
+  // Write back via git Data API
+  var headSha = JSON.parse(UrlFetchApp.fetch(base+'/git/ref/heads/main',{headers:hdr,muteHttpExceptions:true}).getContentText()).object.sha;
+  var baseTreeSha = JSON.parse(UrlFetchApp.fetch(base+'/git/commits/'+headSha,{headers:hdr,muteHttpExceptions:true}).getContentText()).tree.sha;
+  var newTreeSha = JSON.parse(UrlFetchApp.fetch(base+'/git/trees',
+    {method:'POST',headers:hdrJson,payload:JSON.stringify({base_tree:baseTreeSha,tree:[{path:'index.html',mode:'100644',type:'blob',sha:goodBlobSha}]}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  var newCommitSha = JSON.parse(UrlFetchApp.fetch(base+'/git/commits',
+    {method:'POST',headers:hdrJson,payload:JSON.stringify({message:'Restore from history',tree:newTreeSha,parents:[headSha]}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  UrlFetchApp.fetch(base+'/git/refs/heads/main',
+    {method:'PATCH',headers:hdrJson,payload:JSON.stringify({sha:newCommitSha}),muteHttpExceptions:true});
+  Logger.log('UC_Dashboard restored. Now syncing live...');
+  _syncToLive(goodBlobSha);
+  Logger.log('Done.');
+}
+
+// ── Sync UC_Dashboard → marketing-dashboard/used_cars.html ───
+// blobSha: if passed, uses that blob directly (no CDN cache issue)
+//          if not passed, looks up UC_Dashboard's current blob SHA
+function _syncToLive(blobSha) {
+  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) throw new Error('GitHub token not set.');
+  var dstOwner = REPO_OWNER, dstRepo = 'marketing-dashboard', dstFile = 'used_cars.html';
+  var hdr = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  var base = 'https://api.github.com/repos/'+dstOwner+'/'+dstRepo;
+
+  // Fetch content from UC_Dashboard via git blobs API (no CDN cache, no 1MB limit)
+  var srcBlobSha = blobSha;
+  if (!srcBlobSha) {
+    var srcMeta = JSON.parse(UrlFetchApp.fetch(
+      'https://api.github.com/repos/'+REPO_OWNER+'/UC_Dashboard/contents/index.html',
+      {headers:hdr,muteHttpExceptions:true}
+    ).getContentText());
+    Logger.log('UC_Dashboard size: '+srcMeta.size+' bytes');
+    if (!srcMeta.size || srcMeta.size < 10000) throw new Error('UC_Dashboard empty. Run _restoreFromHistory first.');
+    srcBlobSha = srcMeta.sha;
+  }
+  Logger.log('Fetching source blob: '+srcBlobSha);
+  var srcBlobData = JSON.parse(UrlFetchApp.fetch(
+    'https://api.github.com/repos/'+REPO_OWNER+'/UC_Dashboard/git/blobs/'+srcBlobSha,
+    {headers:hdr,muteHttpExceptions:true}
+  ).getContentText());
+
+  // Re-create blob in destination repo (blobs are repo-specific)
+  var dstBlobSha = JSON.parse(UrlFetchApp.fetch(base+'/git/blobs',
+    {method:'POST',headers:hdr,payload:JSON.stringify({content:srcBlobData.content.replace(/\n/g,''),encoding:'base64'}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  Logger.log('Created dst blob: '+dstBlobSha);
+
+  var headSha = JSON.parse(UrlFetchApp.fetch(base+'/git/ref/heads/main',{headers:hdr,muteHttpExceptions:true}).getContentText()).object.sha;
+  var baseTreeSha = JSON.parse(UrlFetchApp.fetch(base+'/git/commits/'+headSha,{headers:hdr,muteHttpExceptions:true}).getContentText()).tree.sha;
+  var newTreeSha = JSON.parse(UrlFetchApp.fetch(base+'/git/trees',
+    {method:'POST',headers:hdr,payload:JSON.stringify({base_tree:baseTreeSha,tree:[{path:dstFile,mode:'100644',type:'blob',sha:dstBlobSha}]}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  var newCommitSha = JSON.parse(UrlFetchApp.fetch(base+'/git/commits',
+    {method:'POST',headers:hdr,payload:JSON.stringify({message:'Sync → used_cars.html ['+new Date().toISOString().split('T')[0]+']',tree:newTreeSha,parents:[headSha]}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  Logger.log('Commit: '+newCommitSha);
+  var refR = UrlFetchApp.fetch(base+'/git/refs/heads/main',
+    {method:'PATCH',headers:hdr,payload:JSON.stringify({sha:newCommitSha}),muteHttpExceptions:true});
+  Logger.log(refR.getResponseCode()===200 ? 'Synced to marketing-dashboard/used_cars.html' : 'WARN: '+refR.getContentText());
+}
+
+// ── Build data from sheets and push to UC_Dashboard ──────────
+// Returns the new blob SHA so _syncToLive can use it directly
+function _buildAndPush(repoName) {
+  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) throw new Error('GitHub token not set.');
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-
   var refData    = ss.getSheetByName('Reference').getDataRange().getValues();
   var googleData = ss.getSheetByName('Google').getDataRange().getValues();
   var fbData     = ss.getSheetByName('Facebook').getDataRange().getValues();
   var trigData   = ss.getSheetByName('Triggers').getDataRange().getValues();
+  var orgSheet   = ss.getSheetByName('Triggers_organic') || ss.getSheetByName('Organic_triggers') || ss.getSheetByName('Organic');
+  var orgData    = orgSheet ? orgSheet.getDataRange().getValues() : [];
 
-  // ── 1. Build campaign → type map from Reference tab ──────────
-  // Reference cols: [0]=Campaign, [1]=Campaign_type
-  var KNOWN_TYPES = {
-    'Search':true, 'Catalogue':true, 'Demand Gen':true,
-    'Performance Max':true, 'LeadForm':true, 'Website Conversion':true, 'WhatsApp':true, 'YouTube':true
-  };
-  var typeMap = {};
-  for (var i = 1; i < refData.length; i++) {
-    var n = String(refData[i][0] || '').trim();
-    var t = String(refData[i][1] || '').trim();
-    if (n && !typeMap[n]) typeMap[n] = t;
-  }
-  // Fix any rows where col B was accidentally filled with wrong data
-  for (var campKey in typeMap) {
-    if (!KNOWN_TYPES[typeMap[campKey]]) {
-      var nl = campKey.toLowerCase();
-      if (nl.indexOf('leadform') !== -1 || nl.indexOf('lead-form') !== -1) typeMap[campKey] = 'LeadForm';
-      else if (nl.indexOf('catalogue') !== -1) typeMap[campKey] = 'Catalogue';
-      else if (nl.indexOf('whatsup') !== -1 || nl.indexOf('whatsapp') !== -1) typeMap[campKey] = 'WhatsApp';
-      else if (nl.indexOf('pmax') !== -1) typeMap[campKey] = 'Performance Max';
-      else if (nl.indexOf('static') !== -1 || nl.indexOf('website') !== -1) typeMap[campKey] = 'Website Conversion';
-      else if (nl.indexOf('demand') !== -1) typeMap[campKey] = 'Demand Gen';
-      else if (nl.indexOf('yt') !== -1 || nl.indexOf('youtube') !== -1) typeMap[campKey] = 'YouTube';
-      else typeMap[campKey] = 'Search';
-    }
-  }
-
-  // ── 2. Aggregate Google spend data ───────────────────────────
-  // Google cols: [0]=Day, [1]=Campaign, [2]=Campaign_type, [3]=Impressions, [4]=Cost, [5]=Clicks, [6]=Conversions
-  var gByC = {};
-  var gDailyRows = [];
-  for (var i = 1; i < googleData.length; i++) {
-    var row  = googleData[i];
-    var camp = String(row[1] || '').trim();
-    var day  = row[0];
-    if (!camp || !day) continue;
-    var cost  = parseFloat(row[4]) || 0;
-    var impr  = parseFloat(row[3]) || 0;
-    var cl    = parseFloat(row[5]) || 0;
-    var cv    = parseFloat(row[6]) || 0;
-    if (!gByC[camp]) gByC[camp] = {sp:0, imp:0, cl:0, cv:0, spendDays:{}};
-    gByC[camp].sp  += cost;
-    gByC[camp].imp += impr;
-    gByC[camp].cl  += cl;
-    gByC[camp].cv  += cv;
-    if (cost > 0) gByC[camp].spendDays[fmtDate(day)] = 1;
-    var dateStr = fmtDate(day);
-    if (dateStr && (cost > 0 || impr > 0)) {
-      gDailyRows.push({Date:dateStr, Campaign:camp, Spends:Math.round(cost*100)/100, Impressions:Math.round(impr), Clicks:Math.round(cl), Conversions:Math.round(cv*100)/100});
-    }
-  }
-
-  // ── 3. Aggregate Facebook spend data ─────────────────────────
-  // Facebook cols: [0]=Day, [1]=Campaign, [2]=Conversions, [3]=Cost, [4]=Impressions, [5]=Clicks(all)
-  var fbByC = {};
-  var fbDailyRows = [];
-  for (var i = 1; i < fbData.length; i++) {
-    var row  = fbData[i];
-    var camp = String(row[1] || '').trim();
-    var day  = row[0];
-    if (!camp || !day) continue;
-    var cost  = parseFloat(row[3]) || 0;
-    var impr  = parseFloat(row[4]) || 0;
-    var cl    = parseFloat(row[5]) || 0;
-    var cv    = parseFloat(row[2]) || 0;
-    if (!fbByC[camp]) fbByC[camp] = {sp:0, imp:0, cl:0, cv:0, spendDays:{}};
-    fbByC[camp].sp  += cost;
-    fbByC[camp].imp += impr;
-    fbByC[camp].cl  += cl;
-    fbByC[camp].cv  += cv;
-    if (cost > 0) fbByC[camp].spendDays[fmtDate(day)] = 1;
-    var dateStr = fmtDate(day);
-    if (dateStr && (cost > 0 || impr > 0)) {
-      fbDailyRows.push({Date:dateStr, Campaign:camp, Spends:Math.round(cost*100)/100, Impressions:Math.round(impr), Clicks:Math.round(cl), Conversions:Math.round(cv*100)/100});
-    }
-  }
-
-  // ── 4. Aggregate Triggers data ───────────────────────────────
-  // Triggers cols: [0]=Date, [1]=utm_campaign, [2]=Listing_Group, [3]=Total_lead, [4]=Unique, [5]=Type
-  var trigByC = {};
-  var trigDailyMap = {};
-  for (var i = 1; i < trigData.length; i++) {
-    var row      = trigData[i];
-    var camp     = String(row[1] || '').trim();
-    var listGrp  = String(row[2] || '').trim().toLowerCase();
-    var unique   = parseInt(row[4]) || 0;
-    var date     = row[0];
-    if (!camp) continue;
-    if (!trigByC[camp]) trigByC[camp] = {total:0, dealer:0, dealerDays:{}};
-    trigByC[camp].total += unique;
-    if (listGrp === 'dealer') {
-      trigByC[camp].dealer += unique;
-      if (date) trigByC[camp].dealerDays[fmtDate(date)] = 1;
-    }
-    // Daily trigger rows
-    var dateStr = date ? fmtDate(date) : '';
-    if (dateStr && unique > 0) {
-      var dkey = dateStr + '||' + camp;
-      if (!trigDailyMap[dkey]) trigDailyMap[dkey] = {Date:dateStr, Campaign:camp, Triggered_Leads:0, Dealer_Triggers:0};
-      trigDailyMap[dkey].Triggered_Leads += unique;
-      if (listGrp === 'dealer') trigDailyMap[dkey].Dealer_Triggers += unique;
-    }
-  }
-  var trigDailyRows = [];
-  for (var dkey in trigDailyMap) trigDailyRows.push(trigDailyMap[dkey]);
-  trigDailyRows.sort(function(a,b){ return a.Date < b.Date ? -1 : 1; });
-
-  // ── 5. Build DATA_RAW rows ───────────────────────────────────
-  var EXP_TYPES = {
-    'Demand Gen':true, 'Performance Max':true, 'LeadForm':true,
-    'Website Conversion':true, 'WhatsApp':true
-  };
-  var today = new Date();
-
-  var rows = [];
-  var campaigns = Object.keys(typeMap);
-
-  for (var ci = 0; ci < campaigns.length; ci++) {
-    var campName = campaigns[ci];
-    var campType = typeMap[campName];
-
-    var isGoogle = !!gByC[campName];
-    var isFb     = !!fbByC[campName];
-    if (!isGoogle && !isFb) continue; // No spend data — skip
-
-    var spend    = isGoogle ? gByC[campName] : fbByC[campName];
-    var platform = isGoogle ? 'Google' : 'Meta';
-
-    // Dates
-    var spendDayKeys = Object.keys(spend.spendDays).sort();
-    var startDate    = spendDayKeys.length ? spendDayKeys[0] : null;
-    var lastDate     = spendDayKeys.length ? spendDayKeys[spendDayKeys.length - 1] : null;
-
-    // EndDate: if last spend was > 5 days ago, campaign is ended
-    var endDate = null;
-    if (lastDate) {
-      var diffDays = (today - new Date(lastDate)) / 86400000;
-      if (diffDays > 5) endDate = lastDate;
-    }
-
-    // Status
-    var isExp    = !!EXP_TYPES[campType];
-    var isActive = !endDate;
-    var status;
-    if (isExp  && isActive)  status = 'Experiment · Ongoing';
-    else if (isExp  && !isActive) status = 'Experiment · Paused';
-    else if (!isExp && isActive)  status = 'Ongoing';
-    else                          status = 'Paused';
-
-    // City
-    var city = 'Unknown';
-    var nameLc = campName.toLowerCase();
-    if (nameLc.indexOf('ahm') !== -1 || nameLc.indexOf('ahmedabad') !== -1) city = 'Ahmedabad';
-    else if (nameLc.indexOf('chd') !== -1 || nameLc.indexOf('chandigarh') !== -1) city = 'Chandigarh';
-    else if (nameLc.indexOf('nashik') !== -1 || nameLc.indexOf('nasik') !== -1) city = 'Nashik';
-    else if (nameLc.indexOf('mohali') !== -1) city = 'Mohali';
-    else if (nameLc.indexOf('gurugram') !== -1 || nameLc.indexOf('gurgaon') !== -1 || nameLc.indexOf('grg') !== -1) city = 'Gurugram';
-
-    // Triggers — exact match, then prefix-based fuzzy match
-    var trig = trigByC[campName];
-    if (!trig) {
-      var prefix = campName.substring(0, Math.min(campName.length, 12));
-      var trigKeys = Object.keys(trigByC);
-      for (var ti = 0; ti < trigKeys.length; ti++) {
-        if (trigKeys[ti].indexOf(prefix) === 0 || campName.indexOf(trigKeys[ti].substring(0, 12)) === 0) {
-          trig = trigByC[trigKeys[ti]];
-          break;
-        }
-      }
-    }
-
-    var triggeredLeads = trig ? trig.total  : 0;
-    var dealerTriggers = trig ? trig.dealer : 0;
-
-    // WhatsApp: no trigger data — set 0 (dashboard makes it editable)
-    if (campType === 'WhatsApp') {
-      triggeredLeads = 0;
-      dealerTriggers = 0;
-    }
-
-    rows.push({
-      Campaign:        campName,
-      Spends:          Math.round(spend.sp  * 100) / 100,
-      Impressions:     Math.round(spend.imp),
-      Clicks:          Math.round(spend.cl),
-      Conversions:     Math.round(spend.cv  * 100) / 100,
-      Platform:        platform,
-      City:            city,
-      Type:            campType,
-      Triggered_Leads: triggeredLeads,
-      Dealer_Triggers: dealerTriggers,
-      Status:          status,
-      StartDate:       startDate,
-      EndDate:         endDate
-    });
-  }
-
-  // Sort: city → campaign name
-  rows.sort(function(a, b) {
-    return a.City.localeCompare(b.City) || a.Campaign.localeCompare(b.Campaign);
-  });
-
-  // ── 6. Serialize to JS ───────────────────────────────────────
-  var lines = rows.map(function(r) {
-    return '  {Campaign:'        + jstr(r.Campaign)
-         + ', Spends:'           + r.Spends
-         + ', Impressions:'      + r.Impressions
-         + ', Clicks:'           + r.Clicks
-         + ', Conversions:'      + r.Conversions
-         + ', Platform:'         + jstr(r.Platform)
-         + ', City:'             + jstr(r.City)
-         + ', Type:'             + jstr(r.Type)
-         + ', Triggered_Leads:'  + r.Triggered_Leads
-         + ', Dealer_Triggers:'  + r.Dealer_Triggers
-         + ', Status:'           + jstr(r.Status)
-         + ', StartDate:'        + (r.StartDate ? jstr(r.StartDate) : 'null')
-         + ', EndDate:'          + (r.EndDate   ? jstr(r.EndDate)   : 'null')
-         + '}';
-  });
-  var newDataRaw = 'var DATA_RAW = [\n' + lines.join(',\n') + '\n];';
-
-  // ── 7. Serialize DATA_DAILY ──────────────────────────────────
-  var allDaily = gDailyRows.concat(fbDailyRows);
-  allDaily.sort(function(a, b) { return a.Date < b.Date ? -1 : a.Date > b.Date ? 1 : 0; });
-  var dailyLines = allDaily.map(function(d) {
-    return '  {Date:' + jstr(d.Date) + ',Campaign:' + jstr(d.Campaign)
-         + ',Spends:' + d.Spends + ',Impressions:' + d.Impressions
-         + ',Clicks:' + d.Clicks + ',Conversions:' + d.Conversions + '}';
-  });
-  var newDataDaily = 'var DATA_DAILY = [\n' + dailyLines.join(',\n') + '\n];';
-
-  // ── 8. Serialize DATA_TRIGGERS ───────────────────────────────
-  var trigLines = trigDailyRows.map(function(d) {
-    return '  {Date:' + jstr(d.Date) + ',Campaign:' + jstr(d.Campaign)
-         + ',Triggered_Leads:' + d.Triggered_Leads + ',Dealer_Triggers:' + d.Dealer_Triggers + '}';
-  });
-  var newDataTriggers = 'var DATA_TRIGGERS = [\n' + trigLines.join(',\n') + '\n];';
-
-  // ── 9. Push to GitHub ────────────────────────────────────────
-  var buildTs = new Date().toISOString(); // e.g. "2026-07-31T09:26:00.000Z"
-  pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers, buildTs);
-  Logger.log('Done. ' + rows.length + ' campaigns, ' + allDaily.length + ' spend rows, ' + trigDailyRows.length + ' trigger rows pushed.');
-}
-
-// ── GITHUB HELPER ─────────────────────────────────────────────
-function pushToGitHub(token, newDataRaw, newDataDaily, newDataTriggers, buildTs) {
-  var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + REPO_NAME + '/contents/' + FILE_PATH;
-
-  // Fetch current file
-  var getResp = UrlFetchApp.fetch(apiUrl, {
-    headers: {
-      'Authorization': 'token ' + token,
-      'Accept': 'application/vnd.github.v3+json'
-    },
-    muteHttpExceptions: true
-  });
-  if (getResp.getResponseCode() !== 200) {
-    throw new Error('GitHub GET failed: ' + getResp.getContentText());
-  }
-
-  var fileInfo = JSON.parse(getResp.getContentText());
-  var sha = fileInfo.sha;
-  // Decode base64 content (GitHub wraps in newlines)
-  var b64 = fileInfo.content.replace(/\n/g, '');
-  var currentContent = Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString();
-
-  // Replace data blocks using indexOf for reliability with large arrays
-  function replaceBlock(content, marker, replacement) {
-    var start = content.indexOf(marker);
-    if (start === -1) { Logger.log('WARN: marker not found: ' + marker); return content; }
-    var end = content.indexOf('];', start + marker.length);
-    if (end === -1) { Logger.log('WARN: closing ]; not found for: ' + marker); return content; }
-    return content.substring(0, start) + replacement + content.substring(end + 2);
-  }
-
-  var newContent = replaceBlock(currentContent, 'var DATA_RAW = [', newDataRaw);
-  if (newDataDaily)    newContent = replaceBlock(newContent, 'var DATA_DAILY = [',    newDataDaily);
-  if (newDataTriggers) newContent = replaceBlock(newContent, 'var DATA_TRIGGERS = [', newDataTriggers);
-  if (buildTs) {
-    newContent = newContent.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + buildTs + "';");
-  }
-
-  // Push updated file
-  var payload = JSON.stringify({
-    message: 'Auto-update DATA_RAW from Google Sheet [' + new Date().toISOString().split('T')[0] + ']',
-    content: Utilities.base64Encode(Utilities.newBlob(newContent).getBytes()),
-    sha:     sha,
-    branch:  'main'
-  });
-
-  var putResp = UrlFetchApp.fetch(apiUrl, {
-    method: 'PUT',
-    headers: {
-      'Authorization':  'token ' + token,
-      'Content-Type':   'application/json',
-      'Accept':         'application/vnd.github.v3+json'
-    },
-    payload: payload,
-    muteHttpExceptions: true
-  });
-
-  if (putResp.getResponseCode() !== 200 && putResp.getResponseCode() !== 201) {
-    throw new Error('GitHub PUT failed (' + putResp.getResponseCode() + '): ' + putResp.getContentText());
-  }
-  Logger.log('Pushed successfully: ' + putResp.getResponseCode());
-}
-
-// ── UTILITIES ─────────────────────────────────────────────────
-function fmtDate(val) {
-  if (!val) return '';
-  var tz = Session.getScriptTimeZone();
-  if (val instanceof Date) return Utilities.formatDate(val, tz, 'yyyy-MM-dd');
-  var s = val.toString().trim();
-  // Already ISO format
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
-  // Try parsing
-  var d = new Date(s);
-  if (!isNaN(d)) return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
-  return s;
-}
-
-function jstr(s) {
-  return JSON.stringify(String(s));
-}
-
-// ── UC_DASHBOARD PUSH ─────────────────────────────────────────
-// Run this function (select "_run" in dropdown, click Run) to push
-// all data including DATA_ORGANIC to the UC_Dashboard repo.
-function _run() {
-  _buildAndPush('UC_Dashboard');
-  _syncToLive();
-}
-
-// After pushing data to UC_Dashboard, copy it wholesale to the live URL repo
-function _syncToLive() {
-  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
-  if (!token) throw new Error('GitHub token not set.');
-
-  // 1. Get metadata for UC_Dashboard/index.html (for download_url)
-  var srcMetaUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/UC_Dashboard/contents/index.html';
-  var srcMetaResp = UrlFetchApp.fetch(srcMetaUrl, {
-    headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'},
-    muteHttpExceptions: true
-  });
-  if (srcMetaResp.getResponseCode() !== 200) throw new Error('Failed to read UC_Dashboard metadata: ' + srcMetaResp.getContentText());
-  var srcMeta = JSON.parse(srcMetaResp.getContentText());
-  Logger.log('UC_Dashboard size: ' + srcMeta.size + ' bytes');
-
-  // Use download_url to get raw content (bypasses base64/1MB API limit)
-  var rawUrl = srcMeta.download_url;
-  var rawResp = UrlFetchApp.fetch(rawUrl, {
-    headers: {'Authorization':'token '+token},
-    muteHttpExceptions: true
-  });
-  if (rawResp.getResponseCode() !== 200) throw new Error('Failed to download raw UC_Dashboard: ' + rawResp.getResponseCode());
-  var rawBytes = rawResp.getContent(); // byte array
-  var b64Content = Utilities.base64Encode(rawBytes);
-
-  // 2. Get sha of marketing-dashboard/used_cars.html
-  var dstUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/marketing-dashboard/contents/used_cars.html';
-  var dstResp = UrlFetchApp.fetch(dstUrl, {
-    headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'},
-    muteHttpExceptions: true
-  });
-  if (dstResp.getResponseCode() !== 200) throw new Error('Failed to read marketing-dashboard/used_cars.html: ' + dstResp.getContentText());
-  var dstSha = JSON.parse(dstResp.getContentText()).sha;
-
-  // 3. Push UC_Dashboard content → marketing-dashboard/used_cars.html
-  var putResp = UrlFetchApp.fetch(dstUrl, {
-    method: 'PUT',
-    headers: {'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
-    payload: JSON.stringify({
-      message: 'Sync UC_Dashboard → used_cars.html [' + new Date().toISOString().split('T')[0] + ']',
-      content: b64Content,
-      sha: dstSha,
-      branch: 'main'
-    }),
-    muteHttpExceptions: true
-  });
-  if (putResp.getResponseCode() !== 200 && putResp.getResponseCode() !== 201) {
-    Logger.log('WARN: sync to marketing-dashboard failed (' + putResp.getResponseCode() + '): ' + putResp.getContentText());
-  } else {
-    Logger.log('Synced to marketing-dashboard/used_cars.html');
-  }
-}
-
-function _buildAndPush(repoName) {
-  var token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
-  if (!token) throw new Error('GitHub token not set. Run setGitHubToken("ghp_...") first.');
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Read all sheets
-  var refData  = ss.getSheetByName('Reference').getDataRange().getValues();
-  var googleData = ss.getSheetByName('Google').getDataRange().getValues();
-  var fbData   = ss.getSheetByName('Facebook').getDataRange().getValues();
-  var trigData = ss.getSheetByName('Triggers').getDataRange().getValues();
-
-  // Read Organic sheet (columns: Date, City, Organic_Leads)
-  var orgSheet = ss.getSheetByName('Triggers_organic') || ss.getSheetByName('Organic_triggers') || ss.getSheetByName('Organic');
-  var orgData  = orgSheet ? orgSheet.getDataRange().getValues() : [];
-
-  // Reuse the same build logic from updateDashboard by calling the shared helpers below
   var built = _buildAllData(refData, googleData, fbData, trigData);
 
-  // Build DATA_ORGANIC
   var orgRows = [];
   for (var i = 1; i < orgData.length; i++) {
-    var r = orgData[i];
-    var dateStr = r[0] ? fmtDate(r[0]) : '';
-    var city    = String(r[1] || '').trim();
-    var leads   = parseInt(r[2]) || 0;
-    if (dateStr && city && leads > 0) {
-      orgRows.push({Date: dateStr, City: city, Organic_Leads: leads});
-    }
+    var r = orgData[i], ds = r[0] ? fmtDate(r[0]) : '', city = String(r[1]||'').trim(), leads = parseInt(r[2])||0;
+    if (ds && city && leads > 0) orgRows.push({Date:ds,City:city,Organic_Leads:leads});
   }
-  orgRows.sort(function(a,b){ return a.Date < b.Date ? -1 : 1; });
-  var orgLines = orgRows.map(function(d) {
-    return '  {Date:' + jstr(d.Date) + ',City:' + jstr(d.City) + ',Organic_Leads:' + d.Organic_Leads + '}';
-  });
-  var newDataOrganic = 'var DATA_ORGANIC = [\n' + orgLines.join(',\n') + '\n];';
+  orgRows.sort(function(a,b){return a.Date<b.Date?-1:1;});
+  var newDataOrganic = 'var DATA_ORGANIC = [\n'+orgRows.map(function(d){
+    return '  {Date:'+jstr(d.Date)+',City:'+jstr(d.City)+',Organic_Leads:'+d.Organic_Leads+'}';
+  }).join(',\n')+'\n];';
 
-  // Push to UC_Dashboard
-  var apiUrl = 'https://api.github.com/repos/' + REPO_OWNER + '/' + repoName + '/contents/index.html';
-  var getResp = UrlFetchApp.fetch(apiUrl, {
-    headers: {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'},
-    muteHttpExceptions: true
-  });
-  if (getResp.getResponseCode() !== 200) throw new Error('GitHub GET failed: ' + getResp.getContentText());
+  var hdr = {'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  var base = 'https://api.github.com/repos/'+REPO_OWNER+'/'+repoName;
 
-  var fileInfo = JSON.parse(getResp.getContentText());
-  var sha = fileInfo.sha;
-  // Use download_url to fetch raw content — avoids GitHub's 1MB base64 limit on large files
-  var rawResp = UrlFetchApp.fetch(fileInfo.download_url, {
-    headers: {'Authorization':'token '+token},
-    muteHttpExceptions: true
-  });
-  if (rawResp.getResponseCode() !== 200) throw new Error('Failed raw download: ' + rawResp.getResponseCode());
-  var currentContent = rawResp.getContentText();
+  // Get current file metadata
+  var fileMeta = JSON.parse(UrlFetchApp.fetch(base+'/contents/index.html',{headers:hdr,muteHttpExceptions:true}).getContentText());
+  if (!fileMeta.size || fileMeta.size < 10000) throw new Error('ABORT: '+repoName+'/index.html is empty. Run _restoreFromHistory first.');
 
-  function replaceBlock(content, marker, replacement) {
-    var start = content.indexOf(marker);
-    if (start === -1) { Logger.log('WARN: marker not found: ' + marker); return content; }
-    var end = content.indexOf('];', start + marker.length);
-    if (end === -1) { Logger.log('WARN: closing ]; not found for: ' + marker); return content; }
-    return content.substring(0, start) + replacement + content.substring(end + 2);
+  // Fetch content via git blobs API (bypasses CDN cache and 1MB limit)
+  var blobData = JSON.parse(UrlFetchApp.fetch(base+'/git/blobs/'+fileMeta.sha,{headers:hdr,muteHttpExceptions:true}).getContentText());
+  var currentContent = Utilities.newBlob(Utilities.base64Decode(blobData.content.replace(/\n/g,''))).getDataAsString();
+  if (currentContent.indexOf('var DATA_RAW = [')===-1) throw new Error('ABORT: DATA markers missing. Run _restoreFromHistory first.');
+
+  function replaceBlock(c, marker, rep) {
+    var s = c.indexOf(marker); if (s===-1) { Logger.log('WARN: marker not found: '+marker); return c; }
+    var e = c.indexOf('];', s+marker.length); if (e===-1) { Logger.log('WARN: no closing ]; for '+marker); return c; }
+    return c.substring(0,s)+rep+c.substring(e+2);
   }
 
   var newContent = replaceBlock(currentContent, 'var DATA_RAW = [',      built.newDataRaw);
   newContent     = replaceBlock(newContent,     'var DATA_DAILY = [',    built.newDataDaily);
   newContent     = replaceBlock(newContent,     'var DATA_TRIGGERS = [', built.newDataTriggers);
   newContent     = replaceBlock(newContent,     'var DATA_ORGANIC = [',  newDataOrganic);
-  newContent     = newContent.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '" + new Date().toISOString() + "';");
+  newContent     = newContent.replace(/var BUILD_TS = '[^']*';/, "var BUILD_TS = '"+new Date().toISOString()+"';");
 
-  var putResp = UrlFetchApp.fetch(apiUrl, {
-    method: 'PUT',
-    headers: {'Authorization':'token '+token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
-    payload: JSON.stringify({
-      message: 'Data refresh: ' + new Date().toISOString().split('T')[0],
-      content: Utilities.base64Encode(Utilities.newBlob(newContent).getBytes()),
-      sha: sha, branch: 'main'
-    }),
-    muteHttpExceptions: true
-  });
-  if (putResp.getResponseCode() !== 200 && putResp.getResponseCode() !== 201) {
-    throw new Error('GitHub PUT failed (' + putResp.getResponseCode() + '): ' + putResp.getContentText());
-  }
-  Logger.log('Pushed to ' + repoName + ': ' + built.campaignCount + ' campaigns, ' +
-    built.dailyCount + ' daily rows, ' + built.trigCount + ' trigger rows, ' + orgRows.length + ' organic rows.');
+  var newBytes = Utilities.newBlob(newContent).getBytes();
+
+  // Create blob
+  var newBlobSha = JSON.parse(UrlFetchApp.fetch(base+'/git/blobs',
+    {method:'POST',headers:hdr,payload:JSON.stringify({content:Utilities.base64Encode(newBytes),encoding:'base64'}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+
+  // Create tree, commit, update ref
+  var headSha = JSON.parse(UrlFetchApp.fetch(base+'/git/ref/heads/main',{headers:hdr,muteHttpExceptions:true}).getContentText()).object.sha;
+  var baseTreeSha = JSON.parse(UrlFetchApp.fetch(base+'/git/commits/'+headSha,{headers:hdr,muteHttpExceptions:true}).getContentText()).tree.sha;
+  var newTreeSha = JSON.parse(UrlFetchApp.fetch(base+'/git/trees',
+    {method:'POST',headers:hdr,payload:JSON.stringify({base_tree:baseTreeSha,tree:[{path:'index.html',mode:'100644',type:'blob',sha:newBlobSha}]}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  var newCommitSha = JSON.parse(UrlFetchApp.fetch(base+'/git/commits',
+    {method:'POST',headers:hdr,payload:JSON.stringify({message:'Data refresh: '+new Date().toISOString().split('T')[0],tree:newTreeSha,parents:[headSha]}),muteHttpExceptions:true}
+  ).getContentText()).sha;
+  UrlFetchApp.fetch(base+'/git/refs/heads/main',
+    {method:'PATCH',headers:hdr,payload:JSON.stringify({sha:newCommitSha}),muteHttpExceptions:true});
+
+  Logger.log('Pushed to '+repoName+': '+built.campaignCount+' campaigns, '+built.dailyCount+' daily rows, '+built.trigCount+' trigger rows, '+orgRows.length+' organic rows.');
+  return newBlobSha;
 }
 
 function _buildAllData(refData, googleData, fbData, trigData) {
-  var KNOWN_TYPES = {
-    'Search':true,'Catalogue':true,'Demand Gen':true,'Performance Max':true,
-    'LeadForm':true,'Website Conversion':true,'WhatsApp':true,'YouTube':true
-  };
+  var KNOWN_TYPES = {'Search':true,'Catalogue':true,'Demand Gen':true,'Performance Max':true,'LeadForm':true,'Website Conversion':true,'WhatsApp':true,'YouTube':true};
   var typeMap = {};
-  for (var i = 1; i < refData.length; i++) {
-    var n = String(refData[i][0]||'').trim(), t = String(refData[i][1]||'').trim();
-    if (n && !typeMap[n]) typeMap[n] = t;
-  }
-  for (var campKey in typeMap) {
-    if (!KNOWN_TYPES[typeMap[campKey]]) {
-      var nl = campKey.toLowerCase();
-      if (nl.indexOf('leadform')!==-1||nl.indexOf('lead-form')!==-1) typeMap[campKey]='LeadForm';
-      else if (nl.indexOf('catalogue')!==-1) typeMap[campKey]='Catalogue';
-      else if (nl.indexOf('whatsup')!==-1||nl.indexOf('whatsapp')!==-1) typeMap[campKey]='WhatsApp';
-      else if (nl.indexOf('pmax')!==-1) typeMap[campKey]='Performance Max';
-      else if (nl.indexOf('static')!==-1||nl.indexOf('website')!==-1) typeMap[campKey]='Website Conversion';
-      else if (nl.indexOf('demand')!==-1) typeMap[campKey]='Demand Gen';
-      else if (nl.indexOf('yt')!==-1||nl.indexOf('youtube')!==-1) typeMap[campKey]='YouTube';
-      else typeMap[campKey]='Search';
-    }
-  }
-  var gByC={}, gDailyRows=[];
-  for (var i=1;i<googleData.length;i++){
-    var row=googleData[i], camp=String(row[1]||'').trim(), day=row[0];
-    if(!camp||!day) continue;
-    var cost=parseFloat(row[4])||0, impr=parseFloat(row[3])||0, cl=parseFloat(row[5])||0, cv=parseFloat(row[6])||0;
-    if(!gByC[camp]) gByC[camp]={sp:0,imp:0,cl:0,cv:0,spendDays:{}};
-    gByC[camp].sp+=cost; gByC[camp].imp+=impr; gByC[camp].cl+=cl; gByC[camp].cv+=cv;
-    if(cost>0) gByC[camp].spendDays[fmtDate(day)]=1;
-    var ds=fmtDate(day);
-    if(ds&&(cost>0||impr>0)) gDailyRows.push({Date:ds,Campaign:camp,Spends:Math.round(cost*100)/100,Impressions:Math.round(impr),Clicks:Math.round(cl),Conversions:Math.round(cv*100)/100});
-  }
-  var fbByC={}, fbDailyRows=[];
-  for (var i=1;i<fbData.length;i++){
-    var row=fbData[i], camp=String(row[1]||'').trim(), day=row[0];
-    if(!camp||!day) continue;
-    var cost=parseFloat(row[3])||0, impr=parseFloat(row[4])||0, cl=parseFloat(row[5])||0, cv=parseFloat(row[2])||0;
-    if(!fbByC[camp]) fbByC[camp]={sp:0,imp:0,cl:0,cv:0,spendDays:{}};
-    fbByC[camp].sp+=cost; fbByC[camp].imp+=impr; fbByC[camp].cl+=cl; fbByC[camp].cv+=cv;
-    if(cost>0) fbByC[camp].spendDays[fmtDate(day)]=1;
-    var ds=fmtDate(day);
-    if(ds&&(cost>0||impr>0)) fbDailyRows.push({Date:ds,Campaign:camp,Spends:Math.round(cost*100)/100,Impressions:Math.round(impr),Clicks:Math.round(cl),Conversions:Math.round(cv*100)/100});
-  }
-  var trigByC={}, trigDailyMap={};
-  for (var i=1;i<trigData.length;i++){
-    var row=trigData[i], camp=String(row[1]||'').trim(), listGrp=String(row[2]||'').trim().toLowerCase();
-    var unique=parseInt(row[4])||0, date=row[0];
-    if(!camp) continue;
-    if(!trigByC[camp]) trigByC[camp]={total:0,dealer:0};
-    trigByC[camp].total+=unique;
-    if(listGrp==='dealer') trigByC[camp].dealer+=unique;
+  for (var i=1;i<refData.length;i++){var n=String(refData[i][0]||'').trim(),t=String(refData[i][1]||'').trim();if(n&&!typeMap[n])typeMap[n]=t;}
+  for (var k in typeMap){if(!KNOWN_TYPES[typeMap[k]]){var nl=k.toLowerCase();
+    if(nl.indexOf('leadform')!==-1||nl.indexOf('lead-form')!==-1)typeMap[k]='LeadForm';
+    else if(nl.indexOf('catalogue')!==-1)typeMap[k]='Catalogue';
+    else if(nl.indexOf('whatsup')!==-1||nl.indexOf('whatsapp')!==-1)typeMap[k]='WhatsApp';
+    else if(nl.indexOf('pmax')!==-1)typeMap[k]='Performance Max';
+    else if(nl.indexOf('static')!==-1||nl.indexOf('website')!==-1)typeMap[k]='Website Conversion';
+    else if(nl.indexOf('demand')!==-1)typeMap[k]='Demand Gen';
+    else if(nl.indexOf('yt')!==-1||nl.indexOf('youtube')!==-1)typeMap[k]='YouTube';
+    else typeMap[k]='Search';}}
+
+  var gByC={},gDailyRows=[];
+  for(var i=1;i<googleData.length;i++){var row=googleData[i],camp=String(row[1]||'').trim(),day=row[0];if(!camp||!day)continue;
+    var cost=parseFloat(row[4])||0,impr=parseFloat(row[3])||0,cl=parseFloat(row[5])||0,cv=parseFloat(row[6])||0;
+    if(!gByC[camp])gByC[camp]={sp:0,imp:0,cl:0,cv:0,spendDays:{}};
+    gByC[camp].sp+=cost;gByC[camp].imp+=impr;gByC[camp].cl+=cl;gByC[camp].cv+=cv;
+    if(cost>0)gByC[camp].spendDays[fmtDate(day)]=1;
+    var ds=fmtDate(day);if(ds&&(cost>0||impr>0))gDailyRows.push({Date:ds,Campaign:camp,Spends:Math.round(cost*100)/100,Impressions:Math.round(impr),Clicks:Math.round(cl),Conversions:Math.round(cv*100)/100});}
+
+  var fbByC={},fbDailyRows=[];
+  for(var i=1;i<fbData.length;i++){var row=fbData[i],camp=String(row[1]||'').trim(),day=row[0];if(!camp||!day)continue;
+    var cost=parseFloat(row[3])||0,impr=parseFloat(row[4])||0,cl=parseFloat(row[5])||0,cv=parseFloat(row[2])||0;
+    if(!fbByC[camp])fbByC[camp]={sp:0,imp:0,cl:0,cv:0,spendDays:{}};
+    fbByC[camp].sp+=cost;fbByC[camp].imp+=impr;fbByC[camp].cl+=cl;fbByC[camp].cv+=cv;
+    if(cost>0)fbByC[camp].spendDays[fmtDate(day)]=1;
+    var ds=fmtDate(day);if(ds&&(cost>0||impr>0))fbDailyRows.push({Date:ds,Campaign:camp,Spends:Math.round(cost*100)/100,Impressions:Math.round(impr),Clicks:Math.round(cl),Conversions:Math.round(cv*100)/100});}
+
+  var trigByC={},trigDailyMap={};
+  for(var i=1;i<trigData.length;i++){
+    var row=trigData[i],camp=String(row[1]||'').trim(),lg=String(row[2]||'').trim().toLowerCase(),uniq=parseInt(row[4])||0,date=row[0];
+    if(!camp)continue;
+    var isDealer=(lg==='dealer');
+    if(!trigByC[camp])trigByC[camp]={total:0,dealer:0};
+    trigByC[camp].total+=uniq;
+    if(isDealer)trigByC[camp].dealer+=uniq;
     var ds=date?fmtDate(date):'';
-    if(ds&&unique>0){
-      var dkey=ds+'||'+camp;
-      if(!trigDailyMap[dkey]) trigDailyMap[dkey]={Date:ds,Campaign:camp,Triggered_Leads:0,Dealer_Triggers:0};
-      trigDailyMap[dkey].Triggered_Leads+=unique;
-      if(listGrp==='dealer') trigDailyMap[dkey].Dealer_Triggers+=unique;
+    if(ds&&uniq>0){
+      var dk=ds+'||'+camp;
+      if(!trigDailyMap[dk])trigDailyMap[dk]={Date:ds,Campaign:camp,Triggered_Leads:0,Dealer_Triggers:0};
+      trigDailyMap[dk].Triggered_Leads+=uniq;
+      if(isDealer)trigDailyMap[dk].Dealer_Triggers+=uniq;
     }
   }
-  var trigDailyRows=[];
-  for(var k in trigDailyMap) trigDailyRows.push(trigDailyMap[k]);
+  var trigDailyRows=[];for(var k in trigDailyMap)trigDailyRows.push(trigDailyMap[k]);
   trigDailyRows.sort(function(a,b){return a.Date<b.Date?-1:1;});
 
   var EXP_TYPES={'Demand Gen':true,'Performance Max':true,'LeadForm':true,'Website Conversion':true,'WhatsApp':true};
-  var today=new Date(), rows=[], campaigns=Object.keys(typeMap);
-  for(var ci=0;ci<campaigns.length;ci++){
-    var campName=campaigns[ci], campType=typeMap[campName];
-    var isGoogle=!!gByC[campName], isFb=!!fbByC[campName];
-    if(!isGoogle&&!isFb) continue;
-    var spend=isGoogle?gByC[campName]:fbByC[campName], platform=isGoogle?'Google':'Meta';
-    var spendDayKeys=Object.keys(spend.spendDays).sort();
-    var startDate=spendDayKeys.length?spendDayKeys[0]:null;
-    var lastDate=spendDayKeys.length?spendDayKeys[spendDayKeys.length-1]:null;
-    var endDate=null;
-    if(lastDate){var diffDays=(today-new Date(lastDate))/86400000; if(diffDays>5) endDate=lastDate;}
-    var isExp=!!EXP_TYPES[campType], isActive=!endDate;
-    var status=isExp&&isActive?'Experiment · Ongoing':isExp&&!isActive?'Experiment · Paused':!isExp&&isActive?'Ongoing':'Paused';
-    var city='Unknown', nameLc=campName.toLowerCase();
-    if(nameLc.indexOf('ahm')!==-1||nameLc.indexOf('ahmedabad')!==-1) city='Ahmedabad';
-    else if(nameLc.indexOf('chd')!==-1||nameLc.indexOf('chandigarh')!==-1) city='Chandigarh';
-    else if(nameLc.indexOf('nashik')!==-1||nameLc.indexOf('nasik')!==-1) city='Nashik';
-    else if(nameLc.indexOf('mohali')!==-1) city='Mohali';
-    else if(nameLc.indexOf('gurugram')!==-1||nameLc.indexOf('gurgaon')!==-1||nameLc.indexOf('grg')!==-1) city='Gurugram';
-    var trig=trigByC[campName];
-    if(!trig){var prefix=campName.substring(0,Math.min(campName.length,12)),trigKeys=Object.keys(trigByC);
-      for(var ti=0;ti<trigKeys.length;ti++){if(trigKeys[ti].indexOf(prefix)===0||campName.indexOf(trigKeys[ti].substring(0,12))===0){trig=trigByC[trigKeys[ti]];break;}}}
-    var triggeredLeads=trig?trig.total:0, dealerTriggers=trig?trig.dealer:0;
-    if(campType==='WhatsApp'){triggeredLeads=0;dealerTriggers=0;}
-    rows.push({Campaign:campName,Spends:Math.round(spend.sp*100)/100,Impressions:Math.round(spend.imp),Clicks:Math.round(spend.cl),Conversions:Math.round(spend.cv*100)/100,Platform:platform,City:city,Type:campType,Triggered_Leads:triggeredLeads,Dealer_Triggers:dealerTriggers,Status:status,StartDate:startDate,EndDate:endDate});
-  }
+  var today=new Date(),rows=[],camps=Object.keys(typeMap);
+  for(var ci=0;ci<camps.length;ci++){var cn=camps[ci],ct=typeMap[cn];
+    var isG=!!gByC[cn],isFb=!!fbByC[cn];if(!isG&&!isFb)continue;
+    var sp=isG?gByC[cn]:fbByC[cn];
+    var nlp=cn.toLowerCase();
+    var plat=isG?'Google':(nlp.indexOf('chatgpt')!==-1||nlp.indexOf('uc_product_feed')!==-1?'ChatGPT':'Meta');
+    if(plat==='ChatGPT')ct='ChatGPT';
+    var sdk=Object.keys(sp.spendDays).sort(),startDate=sdk.length?sdk[0]:null,lastDate=sdk.length?sdk[sdk.length-1]:null;
+    var endDate=null;if(lastDate&&(today-new Date(lastDate))/86400000>5)endDate=lastDate;
+    var isExp=!!EXP_TYPES[ct],isActive=!endDate;
+    var status=isExp&&isActive?'Experiment · Ongoing':isExp?'Experiment · Paused':isActive?'Ongoing':'Paused';
+    var city='Unknown',nl=cn.toLowerCase();
+    if(nl.indexOf('ahm')!==-1||nl.indexOf('ahmedabad')!==-1)city='Ahmedabad';
+    else if(nl.indexOf('chd')!==-1||nl.indexOf('chandigarh')!==-1)city='Chandigarh';
+    else if(nl.indexOf('nashik')!==-1||nl.indexOf('nasik')!==-1)city='Nashik';
+    else if(nl.indexOf('mohali')!==-1)city='Mohali';
+    else if(nl.indexOf('gurugram')!==-1||nl.indexOf('gurgaon')!==-1||nl.indexOf('grg')!==-1||nl.indexOf('ggn')!==-1||nl.indexOf('luxury cart')!==-1||nl.indexOf('luxury-cart')!==-1)city='Gurugram';
+    else if(nl.indexOf('thane')!==-1)city='Thane';
+    else if(nl.indexOf('mumbai')!==-1||nl.indexOf('mum')!==-1||nl.indexOf('bom')!==-1)city='Mumbai';
+    else if(nl.indexOf('chennai')!==-1||nl.indexOf('maa')!==-1||nl.indexOf('madras')!==-1)city='Chennai';
+    else if(nl.indexOf('kolkata')!==-1||nl.indexOf('calcutta')!==-1||nl.indexOf('kkr')!==-1||nl.indexOf('kol')!==-1)city='Kolkata';
+    else if(nl.indexOf('surat')!==-1||nl.indexOf('srt')!==-1)city='Surat';
+    else if(nl.indexOf('bangalore')!==-1||nl.indexOf('bengaluru')!==-1||nl.indexOf('blr')!==-1||nl.indexOf('bang')!==-1)city='Bangalore';
+    else if(nl.indexOf('kochi')!==-1||nl.indexOf('cochin')!==-1||nl.indexOf('cok')!==-1)city='Kochi';
+    else if(nl.indexOf('delhi ncr')!==-1||nl.indexOf('delhi')!==-1||nl.indexOf('ncr')!==-1||nl.indexOf('del')!==-1)city='Delhi NCR';
+    else if(nl.indexOf('hyderabad')!==-1||nl.indexOf('hyd')!==-1)city='Hyderabad';
+    else if(nl.indexOf('faridabad')!==-1||nl.indexOf('fbd')!==-1)city='Faridabad';
+    else if(nl.indexOf('ghaziabad')!==-1||nl.indexOf('gbr')!==-1||nl.indexOf('gzb')!==-1)city='Ghaziabad';
+    else if(nl.indexOf('noida')!==-1)city='Noida';
+    var trig=trigByC[cn];
+    if(!trig){var pfx=cn.substring(0,12),tks=Object.keys(trigByC);for(var ti=0;ti<tks.length;ti++){if(tks[ti].indexOf(pfx)===0||cn.indexOf(tks[ti].substring(0,12))===0){trig=trigByC[tks[ti]];break;}}}
+    var gl=trig?trig.total:0,dt=trig?trig.dealer:0;
+    if(ct==='WhatsApp'){gl=0;dt=0;}
+    rows.push({Campaign:cn,Spends:Math.round(sp.sp*100)/100,Impressions:Math.round(sp.imp),Clicks:Math.round(sp.cl),Conversions:Math.round(sp.cv*100)/100,Platform:plat,City:city,Type:ct,Triggered_Leads:gl,Dealer_Triggers:dt,Status:status,StartDate:startDate,EndDate:endDate});}
   rows.sort(function(a,b){return a.City.localeCompare(b.City)||a.Campaign.localeCompare(b.Campaign);});
-  var lines=rows.map(function(r){return '  {Campaign:'+jstr(r.Campaign)+',Spends:'+r.Spends+',Impressions:'+r.Impressions+',Clicks:'+r.Clicks+',Conversions:'+r.Conversions+',Platform:'+jstr(r.Platform)+',City:'+jstr(r.City)+',Type:'+jstr(r.Type)+',Triggered_Leads:'+r.Triggered_Leads+',Dealer_Triggers:'+r.Dealer_Triggers+',Status:'+jstr(r.Status)+',StartDate:'+(r.StartDate?jstr(r.StartDate):'null')+',EndDate:'+(r.EndDate?jstr(r.EndDate):'null')+'}';});
-  var allDaily=gDailyRows.concat(fbDailyRows);
-  allDaily.sort(function(a,b){return a.Date<b.Date?-1:a.Date>b.Date?1:0;});
-  var dailyLines=allDaily.map(function(d){return '  {Date:'+jstr(d.Date)+',Campaign:'+jstr(d.Campaign)+',Spends:'+d.Spends+',Impressions:'+d.Impressions+',Clicks:'+d.Clicks+',Conversions:'+d.Conversions+'}';});
-  var trigLines=trigDailyRows.map(function(d){return '  {Date:'+jstr(d.Date)+',Campaign:'+jstr(d.Campaign)+',Triggered_Leads:'+d.Triggered_Leads+',Dealer_Triggers:'+d.Dealer_Triggers+'}';});
+
+  var allDaily=gDailyRows.concat(fbDailyRows);allDaily.sort(function(a,b){return a.Date<b.Date?-1:a.Date>b.Date?1:0;});
   return {
-    newDataRaw:      'var DATA_RAW = [\n'      + lines.join(',\n')      + '\n];',
-    newDataDaily:    'var DATA_DAILY = [\n'    + dailyLines.join(',\n') + '\n];',
-    newDataTriggers: 'var DATA_TRIGGERS = [\n' + trigLines.join(',\n')  + '\n];',
-    campaignCount: rows.length, dailyCount: allDaily.length, trigCount: trigDailyRows.length
+    newDataRaw:      'var DATA_RAW = [\n'+rows.map(function(r){return '  {Campaign:'+jstr(r.Campaign)+',Spends:'+r.Spends+',Impressions:'+r.Impressions+',Clicks:'+r.Clicks+',Conversions:'+r.Conversions+',Platform:'+jstr(r.Platform)+',City:'+jstr(r.City)+',Type:'+jstr(r.Type)+',Triggered_Leads:'+r.Triggered_Leads+',Dealer_Triggers:'+r.Dealer_Triggers+',Status:'+jstr(r.Status)+',StartDate:'+(r.StartDate?jstr(r.StartDate):'null')+',EndDate:'+(r.EndDate?jstr(r.EndDate):'null')+'}';}).join(',\n')+'\n];',
+    newDataDaily:    'var DATA_DAILY = [\n'+allDaily.map(function(d){return '  {Date:'+jstr(d.Date)+',Campaign:'+jstr(d.Campaign)+',Spends:'+d.Spends+',Impressions:'+d.Impressions+',Clicks:'+d.Clicks+',Conversions:'+d.Conversions+'}';}).join(',\n')+'\n];',
+    newDataTriggers: 'var DATA_TRIGGERS = [\n'+trigDailyRows.map(function(d){return '  {Date:'+jstr(d.Date)+',Campaign:'+jstr(d.Campaign)+',Triggered_Leads:'+d.Triggered_Leads+',Dealer_Triggers:'+d.Dealer_Triggers+'}';}).join(',\n')+'\n];',
+    campaignCount:rows.length, dailyCount:allDaily.length, trigCount:trigDailyRows.length
   };
 }
 
-// ── TRIGGER SETUP (run once to schedule daily updates) ────────
-function createDailyTrigger() {
-  // Delete existing triggers for updateDashboard
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    if (t.getHandlerFunction() === 'updateDashboard') ScriptApp.deleteTrigger(t);
-  });
-  // Create new daily trigger at 8 AM
-  ScriptApp.newTrigger('updateDashboard')
-    .timeBased()
-    .everyDays(1)
-    .atHour(10)
-    .create();
-  Logger.log('Daily trigger created (8 AM).');
+function fmtDate(val) {
+  if (!val) return '';
+  var tz = Session.getScriptTimeZone();
+  if (val instanceof Date) return Utilities.formatDate(val, tz, 'yyyy-MM-dd');
+  var s = val.toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+  // Handle dd/mm/yyyy or dd-mm-yyyy
+  var dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) return dmy[3]+'-'+('0'+dmy[2]).slice(-2)+'-'+('0'+dmy[1]).slice(-2);
+  // Handle numeric serial date (Google Sheets serial)
+  if (/^\d+$/.test(s)) {
+    var serial = parseInt(s);
+    var d = new Date((serial - 25569) * 86400000);
+    if (!isNaN(d)) return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+  }
+  var d = new Date(s);
+  if (!isNaN(d)) return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+  Logger.log('WARN: Could not parse date: ' + JSON.stringify(val));
+  return '';
 }
+
+function jstr(s) { return JSON.stringify(String(s)); }
