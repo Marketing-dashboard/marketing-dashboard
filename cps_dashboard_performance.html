@@ -167,9 +167,12 @@ td.sep-comb { border-left: 2px solid #E5E7EB; }
 /* Week on Week */
 .wow-week-block { margin-bottom: 28px; }
 .wow-week-title { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; padding: 0 2px; }
+#wow-content .table-card { display: flex; flex-direction: column; }
+#wow-content .table-header { flex-shrink: 0; }
+#wow-content .wow-scroll-wrap { overflow-y: auto; overflow-x: auto; height: 520px; }
 .wow-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.wow-table th { padding: 8px 12px; text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #F9FAFB; border-bottom: 2px solid var(--border); white-space: nowrap; }
-.wow-table th.col-label { text-align: left; min-width: 180px; }
+.wow-table thead th { padding: 8px 12px; text-align: center; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #F9FAFB; border-bottom: 2px solid var(--border); white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+.wow-table thead th.col-label { text-align: left; min-width: 180px; }
 .wow-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
 .wow-table td.col-label { font-weight: 600; }
 .wow-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -943,7 +946,7 @@ function renderWoW() {
         Week B &nbsp;<span style="color:#15803D;font-weight:600">${labelB}</span>
       </div>
     </div>
-    <div class="table-wrap"><table class="wow-table">
+    <div class="wow-scroll-wrap"><table class="wow-table">
       <thead><tr>
         <th class="col-label" style="min-width:200px">Brand / Model</th>
         <th class="col-label" style="min-width:160px">Metric</th>
