@@ -891,14 +891,14 @@ function renderWoW() {
     { key: 'fS',    label: 'FB Spends (₹)',        fmt: fmtINR,         inv: false },
     { key: 'gS',    label: 'Google Spends (₹)',    fmt: fmtINR,         inv: false },
     { key: 'wS',    label: 'WA Spends (₹)',         fmt: fmtINR,         inv: false },
-    { key: 'cL',    label: 'Leads',                 fmt: v=>fmtNum(v,0), inv: true  },
-    { key: 'fL',    label: 'FB Leads',              fmt: v=>fmtNum(v,0), inv: true  },
-    { key: 'gL',    label: 'Google Leads',          fmt: v=>fmtNum(v,0), inv: true  },
-    { key: 'wL',    label: 'WA Leads',              fmt: v=>fmtNum(v,0), inv: true  },
-    { key: 'cT',    label: 'Triggered',             fmt: v=>fmtNum(v,0), inv: true  },
+    { key: 'cL',    label: 'Leads',                 fmt: v=>fmtNum(v,0), inv: false },
+    { key: 'fL',    label: 'FB Leads',              fmt: v=>fmtNum(v,0), inv: false },
+    { key: 'gL',    label: 'Google Leads',          fmt: v=>fmtNum(v,0), inv: false },
+    { key: 'wL',    label: 'WA Leads',              fmt: v=>fmtNum(v,0), inv: false },
+    { key: 'cT',    label: 'Triggered',             fmt: v=>fmtNum(v,0), inv: false },
     { key: 'cCPL',  label: 'CPL (₹)',               fmt: fmtINR,         inv: true  },
     { key: 'cTCPL', label: 'TCPL (₹)',              fmt: fmtINR,         inv: true  },
-    { key: 'cTP',   label: 'Trigger %',             fmt: fmtPct,         inv: true  },
+    { key: 'cTP',   label: 'Trigger %',             fmt: fmtPct,         inv: false },
   ];
 
   // Filter data for each range + brand
