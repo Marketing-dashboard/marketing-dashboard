@@ -26,7 +26,8 @@ function normBrand(brand) {
 // ── MODEL ALIASES: merge variant model names → canonical name ──
 // Key = model name (lowercase) to remap; Value = canonical display name.
 var MODEL_ALIAS = {
-  'hero glamour x 125': 'Hero Glamour'
+  'hero glamour x 125':   'Hero Glamour',
+  'hero xtreme 160r 4v':  'Hero Xtreme 160R'
 };
 function normModel(model) {
   if (!model) return model;
