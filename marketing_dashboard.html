@@ -363,7 +363,7 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
       <div><div class="tbox-title">Campaign Target Tracking</div></div>
     </div>
     <table>
-      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">Fulfillment %</th></tr></thead>
+      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">Fulfillment %</th><th class="num">Expected Delivery</th></tr></thead>
       <tbody id="target-body"></tbody>
     </table>
   </div>
@@ -690,14 +690,29 @@ function renderSummary(){
     var fulfil=t.actualTarget>0?(trig/t.actualTarget*100).toFixed(1)+'%':'—';
     var fulfilNum=t.actualTarget>0?trig/t.actualTarget*100:null;
     var fulfilCls=fulfilNum!==null?(fulfilNum>=100?'cell-good':fulfilNum>=75?'':'cell-bad'):'';
+    var crr=trig/21;
+    var remaining=t.actualTarget-trig;
+    var deliveryStr;
+    if(trig>=t.actualTarget){
+      deliveryStr='<span class="cell-good">Achieved</span>';
+    } else if(crr<=0){
+      deliveryStr='—';
+    } else {
+      var daysNeeded=Math.ceil(remaining/crr);
+      var delivDate=new Date();
+      delivDate.setDate(delivDate.getDate()+daysNeeded);
+      var mo=delivDate.toLocaleString('en-GB',{month:'short'});
+      deliveryStr=delivDate.getDate()+' '+mo+' '+delivDate.getFullYear();
+    }
     var c=BRAND_COLORS[brand]||'#888';
     tRows+='<tr>'+
       '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
       '<td class="num">'+t.actualTarget+'</td>'+
       '<td class="num">'+(trig>0?trig:'—')+'</td>'+
-      '<td class="num '+fulfilCls+'">'+fulfil+'</td></tr>';
+      '<td class="num '+fulfilCls+'">'+fulfil+'</td>'+
+      '<td class="num">'+deliveryStr+'</td></tr>';
   });
-  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="4" class="empty">No data</td></tr>';
+  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="5" class="empty">No data</td></tr>';
 }
 
 /* ── MoM helpers ── */
