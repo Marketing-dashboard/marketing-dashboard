@@ -363,7 +363,7 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
       <div><div class="tbox-title">Campaign Target Tracking</div></div>
     </div>
     <table>
-      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">CRR</th><th class="num">Month-End Expected</th><th class="num">Fulfillment %</th></tr></thead>
+      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">Fulfillment %</th></tr></thead>
       <tbody id="target-body"></tbody>
     </table>
   </div>
@@ -687,21 +687,17 @@ function renderSummary(){
   Object.keys(CAMPAIGN_TARGETS).forEach(function(brand){
     var t=CAMPAIGN_TARGETS[brand];
     var trig=FULFILLMENT_MTD[brand]||0;
-    var crr=trig/21;
-    var projected=Math.round(trig+crr*10);
-    var fulfil=t.actualTarget>0?(projected/t.actualTarget*100).toFixed(1)+'%':'—';
-    var fulfilNum=t.actualTarget>0?projected/t.actualTarget*100:null;
+    var fulfil=t.actualTarget>0?(trig/t.actualTarget*100).toFixed(1)+'%':'—';
+    var fulfilNum=t.actualTarget>0?trig/t.actualTarget*100:null;
     var fulfilCls=fulfilNum!==null?(fulfilNum>=100?'cell-good':fulfilNum>=75?'':'cell-bad'):'';
     var c=BRAND_COLORS[brand]||'#888';
     tRows+='<tr>'+
       '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
       '<td class="num">'+t.actualTarget+'</td>'+
       '<td class="num">'+(trig>0?trig:'—')+'</td>'+
-      '<td class="num">'+crr.toFixed(1)+'</td>'+
-      '<td class="num">'+projected+'</td>'+
       '<td class="num '+fulfilCls+'">'+fulfil+'</td></tr>';
   });
-  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="6" class="empty">No data</td></tr>';
+  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="4" class="empty">No data</td></tr>';
 }
 
 /* ── MoM helpers ── */
