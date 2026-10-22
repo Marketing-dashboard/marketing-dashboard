@@ -363,7 +363,7 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
       <div><div class="tbox-title">Campaign Target Tracking</div><div class="tbox-sub">TikTok campaign targets vs triggered leads delivered</div></div>
     </div>
     <table>
-      <thead><tr><th>Brand</th><th class="num">Total Target</th><th class="num">Actual Target</th><th class="num">Qualification %</th><th class="num">Triggered (MTD)</th><th class="num">Fulfillment %</th></tr></thead>
+      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">Fulfillment %</th></tr></thead>
       <tbody id="target-body"></tbody>
     </table>
   </div>
@@ -690,13 +690,11 @@ function renderSummary(){
     var c=BRAND_COLORS[brand]||'#888';
     tRows+='<tr>'+
       '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
-      '<td class="num">'+t.totalTarget+'</td>'+
       '<td class="num">'+t.actualTarget+'</td>'+
-      '<td class="num">'+t.qualPct+'</td>'+
       '<td class="num">'+(trig>0?trig:'—')+'</td>'+
       '<td class="num '+fulfilCls+'">'+fulfil+'</td></tr>';
   });
-  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="6" class="empty">No data</td></tr>';
+  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="4" class="empty">No data</td></tr>';
 }
 
 /* ── MoM helpers ── */
