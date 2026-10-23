@@ -310,7 +310,16 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
   <div class="fbar">
     <div class="fg">
       <label>Month</label>
-      <select class="f-select" id="f-month" onchange="applyFilters()"><option value="">All Months</option></select>
+      <div class="ms-wrap" id="ms-wrap-sum-mo">
+        <button class="ms-btn" id="ms-btn-sum-mo" onclick="toggleMS('sum-mo',event)">All Months</button>
+        <div class="ms-dropdown" id="ms-dropdown-sum-mo">
+          <div class="ms-actions">
+            <button class="ms-act" onclick="msAll('sum-mo')">Select All</button>
+            <button class="ms-act" onclick="msClear('sum-mo')">Clear</button>
+          </div>
+          <div class="ms-list" id="ms-list-sum-mo"></div>
+        </div>
+      </div>
     </div>
     <div class="fg">
       <label>Brand</label>
@@ -546,27 +555,28 @@ function onMsChange(key){
     if(cb.checked)msState[key].add(cb.value);
   });
   updateMsLabel(key,document.querySelectorAll('#ms-list-'+key+' input').length);
-  if(key==='sum')applyFilters();
+  if(key==='sum'||key==='sum-mo')applyFilters();
   else if(key==='mom')renderMoM();
 }
 function updateMsLabel(key,total){
   var btn=document.getElementById('ms-btn-'+key);if(!btn)return;
   var sel=msState[key];
+  var isMo=key.indexOf('mo')>=0;
   if(sel.size===0)btn.textContent='None';
-  else if(sel.size===total)btn.textContent='All';
-  else if(sel.size===1)btn.textContent=Array.from(sel)[0];
+  else if(sel.size===total)btn.textContent=isMo?'All Months':'All';
+  else if(sel.size===1){var v=Array.from(sel)[0];btn.textContent=(v.match(/^\d{4}-\d{2}$/)?fmtMo(v):v);}
   else btn.textContent=sel.size+' selected';
 }
 function msAll(key){
   document.querySelectorAll('#ms-list-'+key+' input[type=checkbox]').forEach(function(cb){cb.checked=true;msState[key].add(cb.value);});
   updateMsLabel(key,document.querySelectorAll('#ms-list-'+key+' input').length);
-  if(key==='sum')applyFilters();else if(key==='mom')renderMoM();
+  if(key==='sum'||key==='sum-mo')applyFilters();else if(key==='mom')renderMoM();
 }
 function msClear(key){
   document.querySelectorAll('#ms-list-'+key+' input[type=checkbox]').forEach(function(cb){cb.checked=false;});
   msState[key].clear();
   updateMsLabel(key,document.querySelectorAll('#ms-list-'+key+' input').length);
-  if(key==='sum')applyFilters();else if(key==='mom')renderMoM();
+  if(key==='sum'||key==='sum-mo')applyFilters();else if(key==='mom')renderMoM();
 }
 
 /* ── Trigger helpers ── */
@@ -592,29 +602,31 @@ function computeBrandTriggers(filteredRows){
 /* ── Summary filter ── */
 var filtered=[],filteredCT=[];
 function applyFilters(){
-  var selMonth=document.getElementById('f-month').value;
+  var allMonths=getMonths();
+  var selMos=msState['sum-mo'],allMoSel=selMos&&selMos.size===allMonths.length;
   var selBrands=msState['sum'],allSel=selBrands&&selBrands.size===DATA.brands.length;
   filtered=DATA.daily.filter(function(r){
     if(DISPLAY_BRANDS.has(r.brand))return false;
     if(!allSel&&selBrands&&!selBrands.has(r.brand))return false;
-    if(selMonth&&r.date.slice(0,7)!==selMonth)return false;
+    if(!allMoSel&&selMos&&!selMos.has(r.date.slice(0,7)))return false;
     return true;
   });
   filteredCT=DATA.camptype.filter(function(r){
     if(DISPLAY_BRANDS.has(r.brand))return false;
     if(!allSel&&selBrands&&!selBrands.has(r.brand))return false;
-    if(selMonth&&r.date.slice(0,7)!==selMonth)return false;
+    if(!allMoSel&&selMos&&!selMos.has(r.date.slice(0,7)))return false;
     return true;
   });
   document.getElementById('finfo').textContent=filtered.length+' rows';
   var rng=document.getElementById('hdr-range');
   if(rng){
-    if(selMonth)rng.textContent=fmtMo(selMonth);
-    else rng.textContent=fmtMo(DATA.dates[0].slice(0,7))+' \u2013 '+fmtMo(DATA.dates[DATA.dates.length-1].slice(0,7));
+    var activeMos=selMos?Array.from(selMos).sort():allMonths;
+    if(activeMos.length===1)rng.textContent=fmtMo(activeMos[0]);
+    else rng.textContent=fmtMo(activeMos[0])+' \u2013 '+fmtMo(activeMos[activeMos.length-1]);
   }
   renderSummary();
 }
-function resetFilters(){document.getElementById('f-month').value='';msAll('sum');}
+function resetFilters(){msAll('sum-mo');msAll('sum');}
 function resetMoM(){msAll('mom');}
 function switchTab(tab){
   document.querySelectorAll('.tnav').forEach(function(b,i){
@@ -1019,8 +1031,7 @@ function init(){
   var months=[],seen={};
   DATA.dates.forEach(function(d){var mo=d.slice(0,7);if(!seen[mo]){seen[mo]=true;months.push(mo);}});
   months.sort();
-  var sel=document.getElementById('f-month');
-  months.forEach(function(mo){var o=document.createElement('option');o.value=mo;o.textContent=fmtMo(mo);sel.appendChild(o);});
+  initMS('sum-mo',months,function(mo){return fmtMo(mo);},null);
 
   var mainBrands=DATA.brands.filter(function(b){return !DISPLAY_BRANDS.has(b);});
   initMS('sum',mainBrands,null,function(b){return BRAND_COLORS[b]||'#888';});
