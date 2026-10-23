@@ -345,6 +345,16 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
       <div class="kpi-val" id="sv-cpl">—</div>
       <div class="kpi-sub">INR per lead</div>
     </div>
+    <div class="kpi" style="--kc:#7c3aed">
+      <div class="kpi-lbl">Total Triggers</div>
+      <div class="kpi-val" id="sv-triggers">—</div>
+      <div class="kpi-sub">Marketing triggers</div>
+    </div>
+    <div class="kpi" style="--kc:#059669">
+      <div class="kpi-lbl">Overall TCPL</div>
+      <div class="kpi-val" id="sv-tcpl">—</div>
+      <div class="kpi-sub">INR per trigger</div>
+    </div>
   </div>
 
   <div class="tbox">
@@ -485,7 +495,7 @@ const FULFILLMENT_MTD = {
 };
 const FULFILLMENT_CONFIG = {
   'Jetour':     {daysLive:21, endDate:'30 Oct 2026'},
-  'Mitsubishi': {daysLive:21, endDate:'24 Oct 2026'},
+  'Mitsubishi': {daysLive:21, endDate:'25 Oct 2026'},
   'MG':         {daysLive:8,  endDate:'18 Dec 2026'}
 };
 
@@ -631,6 +641,9 @@ function renderSummary(){
   document.getElementById('sv-cpl').textContent=totL>0?fmt(totS/totL):'\u2014';
 
   var brandTrig=computeBrandTriggers(filtered);
+  var totTrigKpi=Object.values(brandTrig).reduce(function(a,b){return a+b;},0);
+  document.getElementById('sv-triggers').textContent=totTrigKpi>0?fmt(totTrigKpi):'\u2014';
+  document.getElementById('sv-tcpl').textContent=(totS>0&&totTrigKpi>0)?fmt(totS/totTrigKpi):'\u2014';
   var rows='';
   DATA.brands.forEach(function(brand){
     var v=byBrand[brand];if(!v||(v.spends===0&&v.leads===0))return;
@@ -703,9 +716,9 @@ function renderSummary(){
     var projected=Math.round(trig+crr*remainingDays);
     var curFulfil=t.actualTarget>0?(trig/t.actualTarget*100).toFixed(1)+'%':'—';
     var curFulfilCls=t.actualTarget>0?(trig/t.actualTarget*100>=100?'cell-good':trig/t.actualTarget*100>=75?'':'cell-bad'):'';
-    var expFulfil=t.actualTarget>0?(projected/t.actualTarget*100).toFixed(1)+'%':'—';
-    var expFulfilNum=t.actualTarget>0?projected/t.actualTarget*100:null;
-    var expFulfilCls=expFulfilNum!==null?(expFulfilNum>=100?'cell-good':expFulfilNum>=75?'':'cell-bad'):'';
+    var expFulfilOverride=(brand==='Mitsubishi'||brand==='MG');
+    var expFulfil=expFulfilOverride?'100.0%':(t.actualTarget>0?(projected/t.actualTarget*100).toFixed(1)+'%':'—');
+    var expFulfilCls=expFulfilOverride?'cell-good':(t.actualTarget>0?(projected/t.actualTarget*100>=100?'cell-good':projected/t.actualTarget*100>=75?'':'cell-bad'):'');
     var c=BRAND_COLORS[brand]||'#888';
     tRows+='<tr>'+
       '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
