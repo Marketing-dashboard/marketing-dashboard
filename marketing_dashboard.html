@@ -379,22 +379,22 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
 
   <div class="tbox">
     <div class="tbox-hd">
-      <div><div class="tbox-title">Campaign Target Tracking</div></div>
-    </div>
-    <table>
-      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">CRR</th><th class="num">Month-End Expected</th><th class="num">Current Fulfillment %</th><th class="num">Expected Fulfillment %</th><th class="num">End Date</th></tr></thead>
-      <tbody id="target-body"></tbody>
-    </table>
-  </div>
-
-  <div class="tbox">
-    <div class="tbox-hd">
       <div><div class="tbox-title">Campaign Type Performance</div><div class="tbox-sub">Filtered by selected brand &amp; month</div></div>
       <button class="csv-btn" onclick="exportCamptype()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
     </div>
     <table>
       <thead><tr><th>Campaign Type</th><th class="num">Spends</th><th class="num">Leads</th><th class="num">CPL</th><th class="num">Impressions</th><th class="num">Clicks</th><th class="num">CTR %</th><th class="num">CTL %</th><th class="num">CPC</th></tr></thead>
       <tbody id="camptype-body"></tbody>
+    </table>
+  </div>
+
+  <div class="tbox">
+    <div class="tbox-hd">
+      <div><div class="tbox-title">Overall Performance</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">CRR</th><th class="num">Month-End Expected</th><th class="num">Current Fulfillment %</th><th class="num">Expected Fulfillment %</th><th class="num">End Date</th></tr></thead>
+      <tbody id="target-body"></tbody>
     </table>
   </div>
 </div>
