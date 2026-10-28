@@ -102,7 +102,7 @@ body {
 }
 .table-title { font-size: 13px; font-weight: 700; }
 .record-count { font-size: 12px; color: var(--text-muted); }
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; overflow-y: auto; max-height: 620px; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 
 /* ── Group header row ── */
@@ -110,6 +110,7 @@ thead tr.grp-row th {
   padding: 8px 10px; text-align: center;
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
   border-bottom: none; white-space: nowrap;
+  position: sticky; top: 0; z-index: 3;
 }
 thead tr.grp-row th.grp-dim  { background: var(--tbl-head); }
 thead tr.grp-row th.grp-fb   { background: #EFF6FF; color: #1D4ED8; border-left: 2px solid #93C5FD; }
@@ -123,6 +124,7 @@ thead tr.sub-row th {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
   color: var(--text-muted); border-bottom: 1px solid var(--border);
   white-space: nowrap; cursor: pointer; user-select: none;
+  position: sticky; top: 37px; z-index: 3;
 }
 thead tr.sub-row th.sub-dim  { background: var(--tbl-head); text-align: left; }
 thead tr.sub-row th.sub-fb   { background: #F5F9FF; border-left: 2px solid #BFDBFE; }
@@ -132,6 +134,15 @@ thead tr.sub-row th.sub-comb { background: var(--tbl-head); border-left: 2px sol
 thead tr.sub-row th:hover { color: var(--primary); }
 thead tr.sub-row th.sorted-asc::after  { content: ' ↑'; color: var(--primary); }
 thead tr.sub-row th.sorted-desc::after { content: ' ↓'; color: var(--primary); }
+
+/* ── Sticky left dim columns ── */
+th.col-date  { position: sticky; left: 0;     min-width: 75px;  z-index: 5 !important; background: var(--tbl-head); }
+th.col-brand { position: sticky; left: 75px;  min-width: 105px; z-index: 5 !important; background: var(--tbl-head); }
+th.col-model { position: sticky; left: 180px; min-width: 130px; z-index: 5 !important; background: var(--tbl-head); }
+td.col-date  { position: sticky; left: 0;     z-index: 2; background: var(--surface); }
+td.col-brand { position: sticky; left: 75px;  z-index: 2; background: var(--surface); }
+td.col-model { position: sticky; left: 180px; z-index: 2; background: var(--surface); }
+tbody tr:hover td.col-date, tbody tr:hover td.col-brand, tbody tr:hover td.col-model { background: var(--row-hover, #f8fafc); }
 
 tbody tr { border-bottom: 1px solid var(--border-light); transition: background .1s; }
 tbody tr:last-child { border-bottom: none; }
@@ -295,9 +306,9 @@ table.tracker-tbl tbody tr:hover td { background: var(--tbl-hover); }
         <table>
           <thead>
             <tr class="grp-row">
-              <th class="grp-dim" rowspan="2" style="text-align:left">Date</th>
-              <th class="grp-dim" rowspan="2" style="text-align:left">Brand</th>
-              <th class="grp-dim" rowspan="2" style="text-align:left">Model</th>
+              <th class="grp-dim col-date"  rowspan="2" style="text-align:left">Date</th>
+              <th class="grp-dim col-brand" rowspan="2" style="text-align:left">Brand</th>
+              <th class="grp-dim col-model" rowspan="2" style="text-align:left">Model</th>
               <th class="grp-fb"   colspan="6">Facebook</th>
               <th class="grp-ga"   colspan="6">Google / Adwords</th>
               <th class="grp-wa"   colspan="6">WhatsApp</th>
@@ -644,7 +655,7 @@ function renderDaywise() {
     const sm = model.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
     html += `<tr class="brand-row" onclick="toggleDaywiseModel('${sm}')">
-      <td colspan="3"><div class="brand-row-inner">
+      <td class="col-date" colspan="3"><div class="brand-row-inner">
         <span class="expand-icon">${isExp ? '▼' : '▶'}</span>
         <span>${model}</span>
         <span class="model-count">${mRows.length} day${mRows.length!==1?'s':''}</span>
@@ -663,8 +674,8 @@ function renderDaywise() {
       // Date rows sorted newest → oldest
       [...mRows].sort((a, b) => b.date.localeCompare(a.date)).forEach(r => {
         html += `<tr class="model-row">
-          <td class="model-indent" style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
-          <td></td><td></td>
+          <td class="col-date model-indent" style="white-space:nowrap;font-weight:500">${fmtDate(r.date)}</td>
+          <td class="col-brand"></td><td class="col-model"></td>
           <td class="num sep-fb">${fmtINR(r.fb_spends)}</td><td class="num">${fmtNum(r.fb_leads,0)}</td><td class="num">${fmtNum(r.fb_triggered,0)}</td>
           <td class="num">${fmtINR(r.fb_cpl)}</td><td class="num">${fmtINR(r.fb_tcpl)}</td><td class="num ${trigClass(r.fb_trigger_pct)}">${fmtPct(r.fb_trigger_pct)}</td>
           <td class="num sep-ga">${fmtINR(r.ga_spends)}</td><td class="num">${fmtNum(r.ga_leads,0)}</td><td class="num">${fmtNum(r.ga_triggered,0)}</td>
