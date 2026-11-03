@@ -393,7 +393,7 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
       <div><div class="tbox-title">Overall Performance</div></div>
     </div>
     <table>
-      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">CRR</th><th class="num">Month-End Expected</th><th class="num">Current Fulfillment %</th><th class="num">Expected Fulfillment %</th><th class="num">End Date</th></tr></thead>
+      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">CRR</th><th class="num">Month-End Expected</th><th class="num">Current Fulfillment %</th><th class="num">Expected Fulfillment %</th><th class="num">End Date</th><th class="num">Spend (INR)</th><th class="num">Revenue (INR)</th><th class="num">Margin %</th></tr></thead>
       <tbody id="target-body"></tbody>
     </table>
   </div>
@@ -727,6 +727,8 @@ function renderSummary(){
   document.getElementById('camptype-body').innerHTML=ctRows||'<tr><td colspan="9" class="empty">No data</td></tr>';
 
   // Target tracking table
+  var brandSpends={};
+  DATA.daily.forEach(function(r){if(!brandSpends[r.brand])brandSpends[r.brand]=0;brandSpends[r.brand]+=r.spends;});
   var tRows='';
   Object.keys(CAMPAIGN_TARGETS).forEach(function(brand){
     var t=CAMPAIGN_TARGETS[brand];
@@ -746,6 +748,10 @@ function renderSummary(){
     var expFulfil=expFulfilOverride?'100.0%':(t.actualTarget>0?(projected/t.actualTarget*100).toFixed(1)+'%':'—');
     var expFulfilCls=expFulfilOverride?'cell-good':(t.actualTarget>0?(projected/t.actualTarget*100>=100?'cell-good':projected/t.actualTarget*100>=75?'':'cell-bad'):'');
     var c=BRAND_COLORS[brand]||'#888';
+    var spend=brandSpends[brand]||0;
+    var sc=SOLD_CPL[brand]||null;
+    var tRev=(sc&&trig>0)?sc*trig:null;
+    var tMargin=(tRev&&tRev>0&&spend>0)?(1-spend/tRev)*100:null;
     tRows+='<tr>'+
       '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
       '<td class="num">'+t.actualTarget+'</td>'+
@@ -754,9 +760,12 @@ function renderSummary(){
       '<td class="num">'+projected+'</td>'+
       '<td class="num '+curFulfilCls+'">'+curFulfil+'</td>'+
       '<td class="num '+expFulfilCls+'">'+expFulfil+'</td>'+
-      '<td class="num">'+(cfg.endDate||'—')+'</td></tr>';
+      '<td class="num">'+(cfg.endDate||'—')+'</td>'+
+      '<td class="num">'+(spend>0?fmt(spend):'<span class="na">—</span>')+'</td>'+
+      '<td class="num">'+(tRev?fmt(tRev):'<span class="na">—</span>')+'</td>'+
+      '<td class="num">'+(tMargin!==null?tMargin.toFixed(1)+'%':'<span class="na">—</span>')+'</td></tr>';
   });
-  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="8" class="empty">No data</td></tr>';
+  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="11" class="empty">No data</td></tr>';
 }
 
 /* ── MoM helpers ── */
