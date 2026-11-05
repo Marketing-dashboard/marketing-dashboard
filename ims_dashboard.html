@@ -1235,7 +1235,13 @@ async function renderTracker() {
   document.getElementById('trackerMeta').textContent =
     `Last data: ${latestDate ? F.dateL(latestDate) : '—'} · Default days remaining: ${defaultRemaining} · Projection = last-day × remaining + delivered`;
 
-  const entities = buildEntities(saved);
+  const currentMonth = latestDateStr ? latestDateStr.substring(0, 7) : null;
+  const brandsThisMonth  = currentMonth ? new Set(RAW.filter(r => r.dateStr.startsWith(currentMonth)).map(r => r.brand)) : null;
+
+  const allEntities = buildEntities(saved);
+  const entities = brandsThisMonth
+    ? allEntities.filter(e => brandsThisMonth.has(e.brand))
+    : allEntities;
   const hasLeads = RAW.some(r => r.leads > 0);
 
   function prog(pct, cls) {
