@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NCBD Requirement vs Generation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+
+.header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 55%,#0f3460 100%);color:#fff;padding:20px 28px 16px}
+.header h1{font-size:20px;font-weight:700;letter-spacing:.5px}
+.header p{font-size:11px;color:#94a3b8;margin-top:3px}
+.build-ts{font-size:10px;color:#64748b;margin-top:6px}
+
+.tab-bar{display:flex;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 28px;overflow-x:auto}
+.tab-btn{padding:11px 22px;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+.tab-btn:hover{color:#0f3460}
+.tab-btn.active{color:#0f3460;border-bottom-color:#0f3460}
+
+.filters{display:flex;gap:14px;flex-wrap:wrap;padding:12px 28px;background:#fff;border-bottom:1px solid #e2e8f0;align-items:center}
+.fg{display:flex;align-items:center;gap:6px}
+.fg label{font-size:11px;font-weight:600;color:#64748b;white-space:nowrap}
+.fg select{border:1.5px solid #e2e8f0;border-radius:7px;padding:6px 10px;font-size:12px;background:#fff;color:#1a1a2e;outline:none;cursor:pointer}
+.fg select:focus{border-color:#0f3460}
+.seg-pills{display:flex;gap:6px;flex-wrap:wrap}
+.seg-pill{border:1.5px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:12px;background:#fff;color:#475569;cursor:pointer;font-weight:600}
+.seg-pill:hover{border-color:#0f3460}
+.seg-pill.on{background:#0f3460;border-color:#0f3460;color:#fff}
+
+.summary{padding:14px 28px 0;font-size:13px;color:#334155;line-height:1.6}
+.summary b{color:#0f3460}
+
+.tiles{display:flex;gap:10px;flex-wrap:wrap;padding:14px 28px 0}
+.tile{background:#fff;border-radius:10px;padding:12px 16px;flex:1;min-width:140px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.tile-lbl{font-size:10px;font-weight:600;color:#64748b;letter-spacing:.4px;text-transform:uppercase}
+.tile-val{font-size:20px;font-weight:700;margin-top:3px;color:#0f3460}
+.tile-sub{font-size:10px;color:#94a3b8;margin-top:2px}
+
+.panel{display:none;padding:18px 28px 28px}
+.panel.active{display:block}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.07);padding:16px 18px;margin-bottom:18px}
+.card h2{font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px}
+.card .sub{font-size:11px;color:#94a3b8;margin-bottom:12px}
+
+.mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.mcard{border:1.5px solid #e2e8f0;border-radius:10px;padding:14px}
+.mcard-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px}
+.badge{font-size:10px;font-weight:600;text-transform:none;letter-spacing:0;background:#eff6ff;color:#1d4ed8;border-radius:10px;padding:2px 8px}
+.mcard-pct{font-size:28px;font-weight:700;margin:6px 0}
+.bar{height:7px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.mcard-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.5}
+.mcard-line.muted{color:#94a3b8;margin-top:2px}
+
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid #e2e8f0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#0f3460;color:#fff;padding:9px 12px;text-align:right;font-weight:600;white-space:nowrap;position:sticky;top:0}
+thead th:first-child{text-align:left}
+tbody td{padding:8px 12px;border-bottom:1px solid #eef2f7;text-align:right;white-space:nowrap}
+tbody td:first-child{text-align:left;font-weight:600}
+tbody tr:nth-child(even){background:#fafbfd}
+tbody tr.sel td{background:#eff6ff}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:#f1f5f9}
+.sub-num{display:block;font-size:10px;color:#94a3b8;font-weight:400}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:0}
+.day-table{max-height:460px;overflow:auto}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#64748b;margin-bottom:8px;align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%}
+.chart text{font-family:Arial,sans-serif;font-size:10px;fill:#64748b}
+.tip{position:absolute;pointer-events:none;background:#1a1a2e;color:#fff;border-radius:7px;padding:8px 10px;font-size:11px;line-height:1.6;min-width:160px;display:none;z-index:5;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.tip b{float:right;margin-left:12px}
+.tip .th{font-weight:700;border-bottom:1px solid #334155;margin-bottom:3px;padding-bottom:2px}
+
+.notes{font-size:11px;color:#64748b;line-height:1.7}
+.notes li{margin-left:16px}
+
+.good{color:#059669}.warn{color:#d97706}.bad{color:#dc2626}
+
+@media (max-width:600px){
+  .header,.filters,.tiles,.summary,.panel{padding-left:16px;padding-right:16px}
+  .tab-bar{padding:0 8px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>NCBD Requirement vs Generation</h1>
+  <p>Lead requirement vs generation &middot; NCBD overall, Meta (NCD Facebook) and Google (NCD Google Ads) &middot; month-wise and day-wise</p>
+  <div class="build-ts" id="build-ts"></div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="monthly" type="button">Month-wise</button>
+  <button class="tab-btn" data-tab="daily" type="button">Day-wise</button>
+</div>
+
+<div class="filters">
+  <div class="fg">
+    <label>Segment</label>
+    <div class="seg-pills" id="seg-pills"></div>
+  </div>
+  <div class="fg">
+    <label for="month-sel">Month</label>
+    <select id="month-sel"></select>
+  </div>
+</div>
+
+<div class="summary" id="summary"></div>
+<div class="tiles" id="tiles"></div>
+
+<div class="panel active" id="panel-monthly">
+  <div class="card">
+    <h2>Month-wise completion &middot; <span class="seg-name"></span></h2>
+    <div class="sub">Generation as % of requirement for each month. The current month counts only days with generation reported.</div>
+    <div class="legend" id="status-legend"></div>
+    <div class="mcards" id="mcards"></div>
+  </div>
+  <div class="card">
+    <h2>Completion by channel and month</h2>
+    <div class="sub">Click a row to switch the page to that segment.</div>
+    <div class="table-wrap"><table id="matrix"></table></div>
+  </div>
+  <div class="card">
+    <h2>Month-wise detail &middot; <span class="seg-name"></span></h2>
+    <div class="table-wrap"><table id="month-table"></table></div>
+  </div>
+</div>
+
+<div class="panel" id="panel-daily">
+  <div class="card">
+    <h2>Day-wise requirement vs generation &middot; <span class="seg-name"></span></h2>
+    <div class="legend">
+      <span><span class="sw" style="background:#cbd5e1"></span>Requirement</span>
+      <span><span class="sw" style="background:#0f3460"></span>Generation</span>
+    </div>
+    <div class="chart" id="bar-chart"></div>
+  </div>
+  <div class="card">
+    <h2>Completion % by day &middot; <span class="seg-name"></span></h2>
+    <div class="legend" id="status-legend-2"></div>
+    <div class="chart" id="pct-chart"></div>
+  </div>
+  <div class="card">
+    <h2>Day-wise table &middot; <span class="seg-name"></span></h2>
+    <div class="table-wrap day-table"><table id="day-table"></table></div>
+  </div>
+</div>
+
+<div class="panel active" style="padding-top:0">
+  <div class="card notes">
+    <h2>How it is worked out</h2>
+    <ul>
+      <li>Completion = Generation &divide; Requirement for the same days. Gap = Generation &minus; Requirement (negative means short).</li>
+      <li>The last day with NCBD generation above zero is the last reported day. Requirement for later days is left out, so the current month compares like with like. The sheet's own month column includes those days, so its current-month % reads lower.</li>
+      <li>Month figures are summed from the sheet's daily columns. Where the sheet's month-total column disagrees with its own days, this page follows the days.</li>
+      <li>NCBD overall includes some leads outside the NCD Meta + Google split. The NBD Facebook block in the sheet is empty, so it isn't shown.</li>
+      <li>Source: Google Sheet "NCBD Requirement VS Generation", tab "Req VS Gen".</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+var BUILD_TS = '2026-11-13T09:46:46.000Z';
+var DATA_RAW = [
+{s:"NCBD",d:"2026-08-01",r:3948,g:2596},
+{s:"NCBD",d:"2026-08-02",r:3948,g:3047},
+{s:"NCBD",d:"2026-08-03",r:3037,g:2576},
+{s:"NCBD",d:"2026-08-04",r:3037,g:1911},
+{s:"NCBD",d:"2026-08-05",r:3037,g:2319},
+{s:"NCBD",d:"2026-08-06",r:3181,g:1926},
+{s:"NCBD",d:"2026-08-07",r:3181,g:2102},
+{s:"NCBD",d:"2026-08-08",r:3181,g:2143},
+{s:"NCBD",d:"2026-08-09",r:3181,g:2724},
+{s:"NCBD",d:"2026-08-10",r:4346,g:2625},
+{s:"NCBD",d:"2026-08-11",r:4346,g:2832},
+{s:"NCBD",d:"2026-08-12",r:4346,g:2970},
+{s:"NCBD",d:"2026-08-13",r:5011,g:2961},
+{s:"NCBD",d:"2026-08-14",r:5011,g:3589},
+{s:"NCBD",d:"2026-08-15",r:5011,g:3309},
+{s:"NCBD",d:"2026-08-16",r:5011,g:3647},
+{s:"NCBD",d:"2026-08-17",r:4302,g:2691},
+{s:"NCBD",d:"2026-08-18",r:4302,g:3162},
+{s:"NCBD",d:"2026-08-19",r:4846,g:2962},
+{s:"NCBD",d:"2026-08-20",r:4846,g:2408},
+{s:"NCBD",d:"2026-08-21",r:4846,g:3460},
+{s:"NCBD",d:"2026-08-22",r:4846,g:3110},
+{s:"NCBD",d:"2026-08-23",r:4846,g:4196},
+{s:"NCBD",d:"2026-08-24",r:4541,g:3058},
+{s:"NCBD",d:"2026-08-25",r:4541,g:2842},
+{s:"NCBD",d:"2026-08-26",r:4541,g:3122},
+{s:"NCBD",d:"2026-08-27",r:4273,g:2348},
+{s:"NCBD",d:"2026-08-28",r:4273,g:3285},
+{s:"NCBD",d:"2026-08-29",r:4273,g:2507},
+{s:"NCBD",d:"2026-08-30",r:4273,g:3487},
+{s:"NCBD",d:"2026-08-31",r:3151,g:3226},
+{s:"NCBD",d:"2026-09-01",r:3151,g:2811},
+{s:"NCBD",d:"2026-09-02",r:3151,g:2597},
+{s:"NCBD",d:"2026-09-03",r:2635,g:2404},
+{s:"NCBD",d:"2026-09-04",r:2635,g:1598},
+{s:"NCBD",d:"2026-09-05",r:2635,g:1938},
+{s:"NCBD",d:"2026-09-06",r:2635,g:2131},
+{s:"NCBD",d:"2026-09-07",r:2478,g:2296},
+{s:"NCBD",d:"2026-09-08",r:2478,g:2536},
+{s:"NCBD",d:"2026-09-09",r:2478,g:2385},
+{s:"NCBD",d:"2026-09-10",r:2962,g:1598},
+{s:"NCBD",d:"2026-09-11",r:2962,g:1879},
+{s:"NCBD",d:"2026-09-12",r:2962,g:1614},
+{s:"NCBD",d:"2026-09-13",r:2962,g:2048},
+{s:"NCBD",d:"2026-09-14",r:3108,g:2111},
+{s:"NCBD",d:"2026-09-15",r:3108,g:3721},
+{s:"NCBD",d:"2026-09-16",r:3108,g:3446},
+{s:"NCBD",d:"2026-09-17",r:3751,g:2281},
+{s:"NCBD",d:"2026-09-18",r:3751,g:2299},
+{s:"NCBD",d:"2026-09-19",r:3751,g:2335},
+{s:"NCBD",d:"2026-09-20",r:3751,g:2844},
+{s:"NCBD",d:"2026-09-21",r:2533,g:2378},
+{s:"NCBD",d:"2026-09-22",r:2533,g:2414},
+{s:"NCBD",d:"2026-09-23",r:2533,g:2087},
+{s:"NCBD",d:"2026-09-24",r:2923,g:2277},
+{s:"NCBD",d:"2026-09-25",r:2923,g:2202},
+{s:"NCBD",d:"2026-09-26",r:2923,g:1760},
+{s:"NCBD",d:"2026-09-27",r:2923,g:1679},
+{s:"NCBD",d:"2026-09-28",r:2492,g:1601},
+{s:"NCBD",d:"2026-09-29",r:2492,g:2784},
+{s:"NCBD",d:"2026-09-30",r:2492,g:2259},
+{s:"NCBD",d:"2026-10-01",r:2498,g:2538},
+{s:"NCBD",d:"2026-10-02",r:2498,g:1379},
+{s:"NCBD",d:"2026-10-03",r:2498,g:1325},
+{s:"NCBD",d:"2026-10-04",r:2498,g:2033},
+{s:"NCBD",d:"2026-10-05",r:2556,g:2201},
+{s:"NCBD",d:"2026-10-06",r:2556,g:2601},
+{s:"NCBD",d:"2026-10-07",r:2556,g:2128},
+{s:"NCBD",d:"2026-10-08",r:3117,g:2658},
+{s:"NCBD",d:"2026-10-09",r:3117,g:2715},
+{s:"NCBD",d:"2026-10-10",r:3117,g:2325},
+{s:"NCBD",d:"2026-10-11",r:3117,g:2819},
+{s:"NCBD",d:"2026-10-12",r:4328,g:2930},
+{s:"NCBD",d:"2026-10-13",r:4328,g:4338},
+{s:"NCBD",d:"2026-10-14",r:4328,g:4184},
+{s:"NCBD",d:"2026-10-15",r:4781,g:4322},
+{s:"NCBD",d:"2026-10-16",r:4781,g:4347},
+{s:"NCBD",d:"2026-10-17",r:4781,g:3561},
+{s:"NCBD",d:"2026-10-18",r:4781,g:4648},
+{s:"NCBD",d:"2026-10-19",r:4918,g:4020},
+{s:"NCBD",d:"2026-10-20",r:4918,g:4095},
+{s:"NCBD",d:"2026-10-21",r:4918,g:3792},
+{s:"NCBD",d:"2026-10-22",r:5173,g:4181},
+{s:"NCBD",d:"2026-10-23",r:5173,g:4084},
+{s:"NCBD",d:"2026-10-24",r:5173,g:3953},
+{s:"NCBD",d:"2026-10-25",r:5173,g:4238},
+{s:"NCBD",d:"2026-10-26",r:3579,g:3899},
+{s:"NCBD",d:"2026-10-27",r:3579,g:3767},
+{s:"NCBD",d:"2026-10-28",r:3579,g:3901},
+{s:"NCBD",d:"2026-10-29",r:3906,g:3347},
+{s:"NCBD",d:"2026-10-30",r:3906,g:4205},
+{s:"NCBD",d:"2026-10-31",r:3906,g:3632},
+{s:"NCBD",d:"2026-11-01",r:3573,g:4017},
+{s:"NCBD",d:"2026-11-02",r:3191,g:3008},
+{s:"NCBD",d:"2026-11-03",r:3191,g:3029},
+{s:"NCBD",d:"2026-11-04",r:3191,g:2289},
+{s:"NCBD",d:"2026-11-05",r:3982,g:3435},
+{s:"NCBD",d:"2026-11-06",r:3982,g:3821},
+{s:"NCBD",d:"2026-11-07",r:3982,g:3185},
+{s:"NCBD",d:"2026-11-08",r:3982,g:4098},
+{s:"NCBD",d:"2026-11-09",r:4088,g:3997},
+{s:"NCBD",d:"2026-11-10",r:4088,g:3698},
+{s:"NCBD",d:"2026-11-11",r:4088,g:3899},
+{s:"NCBD",d:"2026-11-12",r:4788,g:0},
+{s:"NCBD",d:"2026-11-13",r:0,g:0},
+{s:"NCBD",d:"2026-11-14",r:0,g:0},
+{s:"NCBD",d:"2026-11-15",r:0,g:0},
+{s:"NCBD",d:"2026-11-16",r:0,g:0},
+{s:"NCBD",d:"2026-11-17",r:0,g:0},
+{s:"NCBD",d:"2026-11-18",r:0,g:0},
+{s:"NCBD",d:"2026-11-19",r:0,g:0},
+{s:"NCBD",d:"2026-11-20",r:0,g:0},
+{s:"NCBD",d:"2026-11-21",r:0,g:0},
+{s:"NCBD",d:"2026-11-22",r:0,g:0},
+{s:"NCBD",d:"2026-11-23",r:0,g:0},
+{s:"NCBD",d:"2026-11-24",r:0,g:0},
+{s:"NCBD",d:"2026-11-25",r:0,g:0},
+{s:"NCBD",d:"2026-11-26",r:0,g:0},
+{s:"NCBD",d:"2026-11-27",r:0,g:0},
+{s:"NCBD",d:"2026-11-28",r:0,g:0},
+{s:"NCBD",d:"2026-11-29",r:0,g:0},
+{s:"NCBD",d:"2026-11-30",r:0,g:0},
+{s:"Overall NCD",d:"2026-08-01",r:3948,g:2589},
+{s:"Overall NCD",d:"2026-08-02",r:3948,g:3044},
+{s:"Overall NCD",d:"2026-08-03",r:3037,g:2576},
+{s:"Overall NCD",d:"2026-08-04",r:3037,g:1911},
+{s:"Overall NCD",d:"2026-08-05",r:3037,g:2319},
+{s:"Overall NCD",d:"2026-08-06",r:3181,g:1926},
+{s:"Overall NCD",d:"2026-08-07",r:3181,g:2102},
+{s:"Overall NCD",d:"2026-08-08",r:3181,g:2143},
+{s:"Overall NCD",d:"2026-08-09",r:3181,g:2724},
+{s:"Overall NCD",d:"2026-08-10",r:4346,g:2625},
+{s:"Overall NCD",d:"2026-08-11",r:4346,g:2832},
+{s:"Overall NCD",d:"2026-08-12",r:4346,g:2970},
+{s:"Overall NCD",d:"2026-08-13",r:5011,g:2961},
+{s:"Overall NCD",d:"2026-08-14",r:5011,g:3589},
+{s:"Overall NCD",d:"2026-08-15",r:5011,g:3309},
+{s:"Overall NCD",d:"2026-08-16",r:5011,g:3647},
+{s:"Overall NCD",d:"2026-08-17",r:4302,g:2677},
+{s:"Overall NCD",d:"2026-08-18",r:4302,g:3051},
+{s:"Overall NCD",d:"2026-08-19",r:4846,g:2819},
+{s:"Overall NCD",d:"2026-08-20",r:4846,g:2322},
+{s:"Overall NCD",d:"2026-08-21",r:4846,g:3364},
+{s:"Overall NCD",d:"2026-08-22",r:4846,g:3038},
+{s:"Overall NCD",d:"2026-08-23",r:4846,g:4087},
+{s:"Overall NCD",d:"2026-08-24",r:4541,g:2950},
+{s:"Overall NCD",d:"2026-08-25",r:4541,g:2727},
+{s:"Overall NCD",d:"2026-08-26",r:4541,g:2977},
+{s:"Overall NCD",d:"2026-08-27",r:4273,g:2191},
+{s:"Overall NCD",d:"2026-08-28",r:4273,g:3117},
+{s:"Overall NCD",d:"2026-08-29",r:4273,g:2283},
+{s:"Overall NCD",d:"2026-08-30",r:4273,g:3375},
+{s:"Overall NCD",d:"2026-08-31",r:3151,g:3059},
+{s:"Overall NCD",d:"2026-09-01",r:3151,g:2611},
+{s:"Overall NCD",d:"2026-09-02",r:3151,g:2596},
+{s:"Overall NCD",d:"2026-09-03",r:2635,g:2404},
+{s:"Overall NCD",d:"2026-09-04",r:2635,g:1598},
+{s:"Overall NCD",d:"2026-09-05",r:2635,g:1938},
+{s:"Overall NCD",d:"2026-09-06",r:2635,g:2131},
+{s:"Overall NCD",d:"2026-09-07",r:2478,g:2296},
+{s:"Overall NCD",d:"2026-09-08",r:2478,g:2536},
+{s:"Overall NCD",d:"2026-09-09",r:2478,g:2385},
+{s:"Overall NCD",d:"2026-09-10",r:2962,g:1598},
+{s:"Overall NCD",d:"2026-09-11",r:2962,g:1879},
+{s:"Overall NCD",d:"2026-09-12",r:2962,g:1614},
+{s:"Overall NCD",d:"2026-09-13",r:2962,g:2048},
+{s:"Overall NCD",d:"2026-09-14",r:3108,g:2102},
+{s:"Overall NCD",d:"2026-09-15",r:3108,g:3566},
+{s:"Overall NCD",d:"2026-09-16",r:3108,g:3226},
+{s:"Overall NCD",d:"2026-09-17",r:3751,g:2069},
+{s:"Overall NCD",d:"2026-09-18",r:3751,g:2240},
+{s:"Overall NCD",d:"2026-09-19",r:3751,g:2270},
+{s:"Overall NCD",d:"2026-09-20",r:3751,g:2782},
+{s:"Overall NCD",d:"2026-09-21",r:2533,g:2288},
+{s:"Overall NCD",d:"2026-09-22",r:2533,g:2351},
+{s:"Overall NCD",d:"2026-09-23",r:2533,g:2028},
+{s:"Overall NCD",d:"2026-09-24",r:2923,g:2225},
+{s:"Overall NCD",d:"2026-09-25",r:2923,g:2128},
+{s:"Overall NCD",d:"2026-09-26",r:2923,g:1734},
+{s:"Overall NCD",d:"2026-09-27",r:2923,g:1654},
+{s:"Overall NCD",d:"2026-09-28",r:2492,g:1569},
+{s:"Overall NCD",d:"2026-09-29",r:2492,g:2672},
+{s:"Overall NCD",d:"2026-09-30",r:2492,g:2190},
+{s:"Overall NCD",d:"2026-10-01",r:2498,g:2538},
+{s:"Overall NCD",d:"2026-10-02",r:2498,g:1379},
+{s:"Overall NCD",d:"2026-10-03",r:2498,g:1325},
+{s:"Overall NCD",d:"2026-10-04",r:2498,g:2033},
+{s:"Overall NCD",d:"2026-10-05",r:2556,g:2201},
+{s:"Overall NCD",d:"2026-10-06",r:2556,g:2601},
+{s:"Overall NCD",d:"2026-10-07",r:2556,g:2128},
+{s:"Overall NCD",d:"2026-10-08",r:3117,g:2658},
+{s:"Overall NCD",d:"2026-10-09",r:3117,g:2715},
+{s:"Overall NCD",d:"2026-10-10",r:3117,g:2325},
+{s:"Overall NCD",d:"2026-10-11",r:3117,g:2819},
+{s:"Overall NCD",d:"2026-10-12",r:4328,g:2930},
+{s:"Overall NCD",d:"2026-10-13",r:4328,g:4338},
+{s:"Overall NCD",d:"2026-10-14",r:4328,g:4184},
+{s:"Overall NCD",d:"2026-10-15",r:4781,g:4322},
+{s:"Overall NCD",d:"2026-10-16",r:4781,g:4347},
+{s:"Overall NCD",d:"2026-10-17",r:4781,g:3561},
+{s:"Overall NCD",d:"2026-10-18",r:4781,g:4648},
+{s:"Overall NCD",d:"2026-10-19",r:4918,g:4020},
+{s:"Overall NCD",d:"2026-10-20",r:4918,g:4095},
+{s:"Overall NCD",d:"2026-10-21",r:4918,g:3792},
+{s:"Overall NCD",d:"2026-10-22",r:5173,g:4181},
+{s:"Overall NCD",d:"2026-10-23",r:5173,g:4084},
+{s:"Overall NCD",d:"2026-10-24",r:5173,g:3953},
+{s:"Overall NCD",d:"2026-10-25",r:5173,g:4238},
+{s:"Overall NCD",d:"2026-10-26",r:3579,g:3899},
+{s:"Overall NCD",d:"2026-10-27",r:3579,g:3767},
+{s:"Overall NCD",d:"2026-10-28",r:3579,g:3901},
+{s:"Overall NCD",d:"2026-10-29",r:3906,g:3347},
+{s:"Overall NCD",d:"2026-10-30",r:3906,g:4205},
+{s:"Overall NCD",d:"2026-10-31",r:3906,g:3632},
+{s:"Overall NCD",d:"2026-11-01",r:3573,g:4017},
+{s:"Overall NCD",d:"2026-11-02",r:3191,g:3008},
+{s:"Overall NCD",d:"2026-11-03",r:3191,g:3029},
+{s:"Overall NCD",d:"2026-11-04",r:3191,g:2289},
+{s:"Overall NCD",d:"2026-11-05",r:3982,g:3435},
+{s:"Overall NCD",d:"2026-11-06",r:3982,g:3821},
+{s:"Overall NCD",d:"2026-11-07",r:3982,g:3185},
+{s:"Overall NCD",d:"2026-11-08",r:3982,g:4098},
+{s:"Overall NCD",d:"2026-11-09",r:4088,g:3997},
+{s:"Overall NCD",d:"2026-11-10",r:4088,g:3698},
+{s:"Overall NCD",d:"2026-11-11",r:4088,g:3899},
+{s:"Overall NCD",d:"2026-11-12",r:4788,g:0},
+{s:"Overall NCD",d:"2026-11-13",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-14",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-15",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-16",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-17",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-18",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-19",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-20",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-21",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-22",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-23",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-24",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-25",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-26",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-27",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-28",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-29",r:0,g:0},
+{s:"Overall NCD",d:"2026-11-30",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-08-01",r:2731,g:2282},
+{s:"NCD_DCB-Facebook",d:"2026-08-02",r:2731,g:2796},
+{s:"NCD_DCB-Facebook",d:"2026-08-03",r:2260,g:2378},
+{s:"NCD_DCB-Facebook",d:"2026-08-04",r:2260,g:1725},
+{s:"NCD_DCB-Facebook",d:"2026-08-05",r:2260,g:2143},
+{s:"NCD_DCB-Facebook",d:"2026-08-06",r:2398,g:1770},
+{s:"NCD_DCB-Facebook",d:"2026-08-07",r:2398,g:1953},
+{s:"NCD_DCB-Facebook",d:"2026-08-08",r:2398,g:1978},
+{s:"NCD_DCB-Facebook",d:"2026-08-09",r:2398,g:2579},
+{s:"NCD_DCB-Facebook",d:"2026-08-10",r:3622,g:2429},
+{s:"NCD_DCB-Facebook",d:"2026-08-11",r:3622,g:2642},
+{s:"NCD_DCB-Facebook",d:"2026-08-12",r:3622,g:2815},
+{s:"NCD_DCB-Facebook",d:"2026-08-13",r:4207,g:2803},
+{s:"NCD_DCB-Facebook",d:"2026-08-14",r:4207,g:3431},
+{s:"NCD_DCB-Facebook",d:"2026-08-15",r:4207,g:3159},
+{s:"NCD_DCB-Facebook",d:"2026-08-16",r:4207,g:3463},
+{s:"NCD_DCB-Facebook",d:"2026-08-17",r:3307,g:2503},
+{s:"NCD_DCB-Facebook",d:"2026-08-18",r:3307,g:2903},
+{s:"NCD_DCB-Facebook",d:"2026-08-19",r:3670,g:2666},
+{s:"NCD_DCB-Facebook",d:"2026-08-20",r:3670,g:2172},
+{s:"NCD_DCB-Facebook",d:"2026-08-21",r:3670,g:3234},
+{s:"NCD_DCB-Facebook",d:"2026-08-22",r:3670,g:2887},
+{s:"NCD_DCB-Facebook",d:"2026-08-23",r:3670,g:3902},
+{s:"NCD_DCB-Facebook",d:"2026-08-24",r:3202,g:2761},
+{s:"NCD_DCB-Facebook",d:"2026-08-25",r:3202,g:2579},
+{s:"NCD_DCB-Facebook",d:"2026-08-26",r:3202,g:2821},
+{s:"NCD_DCB-Facebook",d:"2026-08-27",r:3085,g:2014},
+{s:"NCD_DCB-Facebook",d:"2026-08-28",r:3085,g:3001},
+{s:"NCD_DCB-Facebook",d:"2026-08-29",r:3085,g:2165},
+{s:"NCD_DCB-Facebook",d:"2026-08-30",r:3085,g:3220},
+{s:"NCD_DCB-Facebook",d:"2026-08-31",r:2231,g:2931},
+{s:"NCD_DCB-Facebook",d:"2026-09-01",r:2231,g:2473},
+{s:"NCD_DCB-Facebook",d:"2026-09-02",r:2231,g:2469},
+{s:"NCD_DCB-Facebook",d:"2026-09-03",r:1874,g:2277},
+{s:"NCD_DCB-Facebook",d:"2026-09-04",r:1874,g:1449},
+{s:"NCD_DCB-Facebook",d:"2026-09-05",r:1874,g:1819},
+{s:"NCD_DCB-Facebook",d:"2026-09-06",r:1874,g:2000},
+{s:"NCD_DCB-Facebook",d:"2026-09-07",r:1893,g:2223},
+{s:"NCD_DCB-Facebook",d:"2026-09-08",r:1893,g:2484},
+{s:"NCD_DCB-Facebook",d:"2026-09-09",r:1893,g:2335},
+{s:"NCD_DCB-Facebook",d:"2026-09-10",r:2338,g:1530},
+{s:"NCD_DCB-Facebook",d:"2026-09-11",r:2338,g:1769},
+{s:"NCD_DCB-Facebook",d:"2026-09-12",r:2338,g:1545},
+{s:"NCD_DCB-Facebook",d:"2026-09-13",r:2338,g:1971},
+{s:"NCD_DCB-Facebook",d:"2026-09-14",r:2448,g:2016},
+{s:"NCD_DCB-Facebook",d:"2026-09-15",r:2448,g:3415},
+{s:"NCD_DCB-Facebook",d:"2026-09-16",r:2448,g:3104},
+{s:"NCD_DCB-Facebook",d:"2026-09-17",r:3022,g:1944},
+{s:"NCD_DCB-Facebook",d:"2026-09-18",r:3022,g:2093},
+{s:"NCD_DCB-Facebook",d:"2026-09-19",r:3022,g:2138},
+{s:"NCD_DCB-Facebook",d:"2026-09-20",r:3022,g:2625},
+{s:"NCD_DCB-Facebook",d:"2026-09-21",r:1994,g:2127},
+{s:"NCD_DCB-Facebook",d:"2026-09-22",r:1994,g:2203},
+{s:"NCD_DCB-Facebook",d:"2026-09-23",r:1994,g:1907},
+{s:"NCD_DCB-Facebook",d:"2026-09-24",r:2252,g:2089},
+{s:"NCD_DCB-Facebook",d:"2026-09-25",r:2252,g:2000},
+{s:"NCD_DCB-Facebook",d:"2026-09-26",r:2252,g:1578},
+{s:"NCD_DCB-Facebook",d:"2026-09-27",r:2252,g:1532},
+{s:"NCD_DCB-Facebook",d:"2026-09-28",r:1833,g:1454},
+{s:"NCD_DCB-Facebook",d:"2026-09-29",r:1833,g:2558},
+{s:"NCD_DCB-Facebook",d:"2026-09-30",r:1833,g:2069},
+{s:"NCD_DCB-Facebook",d:"2026-10-01",r:1821,g:2391},
+{s:"NCD_DCB-Facebook",d:"2026-10-02",r:1821,g:1229},
+{s:"NCD_DCB-Facebook",d:"2026-10-03",r:1821,g:1191},
+{s:"NCD_DCB-Facebook",d:"2026-10-04",r:1821,g:1905},
+{s:"NCD_DCB-Facebook",d:"2026-10-05",r:1879,g:2017},
+{s:"NCD_DCB-Facebook",d:"2026-10-06",r:1879,g:2487},
+{s:"NCD_DCB-Facebook",d:"2026-10-07",r:1879,g:2033},
+{s:"NCD_DCB-Facebook",d:"2026-10-08",r:2306,g:2530},
+{s:"NCD_DCB-Facebook",d:"2026-10-09",r:2306,g:2610},
+{s:"NCD_DCB-Facebook",d:"2026-10-10",r:2306,g:2205},
+{s:"NCD_DCB-Facebook",d:"2026-10-11",r:2306,g:2676},
+{s:"NCD_DCB-Facebook",d:"2026-10-12",r:3211,g:2750},
+{s:"NCD_DCB-Facebook",d:"2026-10-13",r:3211,g:4195},
+{s:"NCD_DCB-Facebook",d:"2026-10-14",r:3211,g:4018},
+{s:"NCD_DCB-Facebook",d:"2026-10-15",r:3529,g:4123},
+{s:"NCD_DCB-Facebook",d:"2026-10-16",r:3529,g:4173},
+{s:"NCD_DCB-Facebook",d:"2026-10-17",r:3529,g:3365},
+{s:"NCD_DCB-Facebook",d:"2026-10-18",r:3529,g:4412},
+{s:"NCD_DCB-Facebook",d:"2026-10-19",r:3523,g:3856},
+{s:"NCD_DCB-Facebook",d:"2026-10-20",r:3523,g:3945},
+{s:"NCD_DCB-Facebook",d:"2026-10-21",r:3523,g:3614},
+{s:"NCD_DCB-Facebook",d:"2026-10-22",r:3739,g:3994},
+{s:"NCD_DCB-Facebook",d:"2026-10-23",r:3739,g:3835},
+{s:"NCD_DCB-Facebook",d:"2026-10-24",r:3739,g:3737},
+{s:"NCD_DCB-Facebook",d:"2026-10-25",r:3739,g:4051},
+{s:"NCD_DCB-Facebook",d:"2026-10-26",r:2637,g:3662},
+{s:"NCD_DCB-Facebook",d:"2026-10-27",r:2637,g:3554},
+{s:"NCD_DCB-Facebook",d:"2026-10-28",r:2637,g:3685},
+{s:"NCD_DCB-Facebook",d:"2026-10-29",r:2896,g:3107},
+{s:"NCD_DCB-Facebook",d:"2026-10-30",r:2896,g:3997},
+{s:"NCD_DCB-Facebook",d:"2026-10-31",r:2896,g:3378},
+{s:"NCD_DCB-Facebook",d:"2026-11-01",r:2896,g:3814},
+{s:"NCD_DCB-Facebook",d:"2026-11-02",r:2308,g:2819},
+{s:"NCD_DCB-Facebook",d:"2026-11-03",r:2308,g:2868},
+{s:"NCD_DCB-Facebook",d:"2026-11-04",r:2308,g:2125},
+{s:"NCD_DCB-Facebook",d:"2026-11-05",r:3077,g:3249},
+{s:"NCD_DCB-Facebook",d:"2026-11-06",r:3077,g:3605},
+{s:"NCD_DCB-Facebook",d:"2026-11-07",r:3077,g:3003},
+{s:"NCD_DCB-Facebook",d:"2026-11-08",r:3077,g:3885},
+{s:"NCD_DCB-Facebook",d:"2026-11-09",r:3246,g:3795},
+{s:"NCD_DCB-Facebook",d:"2026-11-10",r:3246,g:3527},
+{s:"NCD_DCB-Facebook",d:"2026-11-11",r:3246,g:3745},
+{s:"NCD_DCB-Facebook",d:"2026-11-12",r:3905,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-13",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-14",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-15",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-16",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-17",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-18",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-19",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-20",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-21",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-22",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-23",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-24",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-25",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-26",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-27",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-28",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-29",r:0,g:0},
+{s:"NCD_DCB-Facebook",d:"2026-11-30",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-01",r:1217,g:307},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-02",r:1217,g:248},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-03",r:777,g:198},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-04",r:777,g:186},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-05",r:777,g:176},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-06",r:783,g:156},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-07",r:783,g:149},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-08",r:783,g:165},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-09",r:783,g:145},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-10",r:724,g:196},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-11",r:724,g:190},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-12",r:724,g:155},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-13",r:804,g:158},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-14",r:804,g:158},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-15",r:804,g:150},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-16",r:804,g:184},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-17",r:995,g:174},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-18",r:995,g:148},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-19",r:1176,g:153},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-20",r:1176,g:150},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-21",r:1176,g:130},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-22",r:1176,g:151},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-23",r:1176,g:185},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-24",r:1339,g:189},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-25",r:1339,g:148},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-26",r:1339,g:156},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-27",r:1188,g:177},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-28",r:1188,g:116},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-29",r:1188,g:118},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-30",r:1188,g:155},
+{s:"NCD_DCB-Google-Ads",d:"2026-08-31",r:920,g:128},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-01",r:920,g:138},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-02",r:920,g:127},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-03",r:761,g:127},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-04",r:761,g:149},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-05",r:761,g:119},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-06",r:761,g:131},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-07",r:585,g:73},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-08",r:585,g:52},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-09",r:585,g:50},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-10",r:624,g:68},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-11",r:624,g:110},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-12",r:624,g:69},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-13",r:624,g:77},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-14",r:660,g:86},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-15",r:660,g:151},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-16",r:660,g:122},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-17",r:729,g:125},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-18",r:729,g:147},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-19",r:729,g:132},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-20",r:729,g:157},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-21",r:539,g:161},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-22",r:539,g:148},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-23",r:539,g:121},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-24",r:671,g:136},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-25",r:671,g:128},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-26",r:671,g:156},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-27",r:671,g:122},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-28",r:659,g:115},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-29",r:659,g:114},
+{s:"NCD_DCB-Google-Ads",d:"2026-09-30",r:659,g:121},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-01",r:677,g:112},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-02",r:677,g:132},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-03",r:677,g:117},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-04",r:677,g:128},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-05",r:677,g:138},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-06",r:677,g:96},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-07",r:677,g:88},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-08",r:811,g:128},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-09",r:811,g:115},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-10",r:811,g:129},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-11",r:811,g:127},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-12",r:1117,g:150},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-13",r:1117,g:134},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-14",r:1117,g:130},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-15",r:1252,g:137},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-16",r:1252,g:115},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-17",r:1252,g:127},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-18",r:1252,g:138},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-19",r:1395,g:129},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-20",r:1395,g:114},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-21",r:1395,g:137},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-22",r:1434,g:147},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-23",r:1434,g:157},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-24",r:1434,g:214},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-25",r:1434,g:153},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-26",r:942,g:181},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-27",r:942,g:181},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-28",r:942,g:177},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-29",r:1010,g:209},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-30",r:1010,g:177},
+{s:"NCD_DCB-Google-Ads",d:"2026-10-31",r:1010,g:236},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-01",r:677,g:203},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-02",r:883,g:189},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-03",r:883,g:161},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-04",r:883,g:164},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-05",r:905,g:186},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-06",r:905,g:216},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-07",r:905,g:182},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-08",r:905,g:213},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-09",r:842,g:202},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-10",r:842,g:171},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-11",r:842,g:154},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-12",r:883,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-13",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-14",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-15",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-16",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-17",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-18",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-19",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-20",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-21",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-22",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-23",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-24",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-25",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-26",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-27",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-28",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-29",r:0,g:0},
+{s:"NCD_DCB-Google-Ads",d:"2026-11-30",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-01",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-02",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-03",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-04",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-05",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-06",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-07",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-08",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-09",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-10",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-11",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-12",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-13",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-14",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-15",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-16",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-17",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-18",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-19",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-20",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-21",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-22",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-23",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-24",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-25",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-26",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-27",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-28",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-29",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-30",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-08-31",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-01",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-02",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-03",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-04",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-05",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-06",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-07",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-08",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-09",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-10",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-11",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-12",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-13",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-14",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-15",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-16",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-17",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-18",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-19",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-20",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-21",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-22",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-23",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-24",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-25",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-26",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-27",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-28",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-29",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-09-30",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-01",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-02",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-03",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-04",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-05",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-06",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-07",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-08",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-09",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-10",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-11",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-12",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-13",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-14",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-15",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-16",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-17",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-18",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-19",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-20",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-21",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-22",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-23",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-24",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-25",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-26",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-27",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-28",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-29",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-30",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-10-31",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-01",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-02",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-03",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-04",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-05",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-06",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-07",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-08",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-09",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-10",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-11",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-12",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-13",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-14",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-15",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-16",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-17",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-18",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-19",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-20",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-21",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-22",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-23",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-24",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-25",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-26",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-27",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-28",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-29",r:0,g:0},
+{s:"NBD_DCB-Facebook",d:"2026-11-30",r:0,g:0}
+];
+</script>
+
+<script>
+(function(){
+var GOOD = 95, WARN = 80;
+var SEGS = [
+  {k:'NCBD', l:'NCBD overall'},
+  {k:'NCD_DCB-Facebook', l:'Meta (NCD Facebook)'},
+  {k:'NCD_DCB-Google-Ads', l:'Google (NCD Google Ads)'},
+  {k:'Overall NCD', l:'Overall NCD'},
+  {k:'NBD_DCB-Facebook', l:'NBD Facebook'}
+];
+var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var state = {seg:'NCBD', month:'', tab:'monthly'};
+
+function label(k){ for (var i=0;i<SEGS.length;i++) if (SEGS[i].k===k) return SEGS[i].l; return k; }
+function fmt(n){ return Math.round(n).toLocaleString('en-IN'); }
+function sgn(n){ n=Math.round(n); return (n>0?'+':'')+n.toLocaleString('en-IN'); }
+function pctf(p){ return p==null?'—':p.toFixed(1)+'%'; }
+function cls(p){ return p==null?'':p>=GOOD?'good':p>=WARN?'warn':'bad'; }
+function col(p){ return p==null?'#94a3b8':p>=GOOD?'#059669':p>=WARN?'#d97706':'#dc2626'; }
+function pd(s){ var a=s.split('-'); return new Date(Date.UTC(+a[0],+a[1]-1,+a[2])); }
+function dShort(s){ var d=pd(s); return ('0'+d.getUTCDate()).slice(-2)+' '+MON[d.getUTCMonth()]; }
+function dRow(s){ var d=pd(s); return DOW[d.getUTCDay()]+' '+dShort(s); }
+function dLong(s){ var d=pd(s); return DOW[d.getUTCDay()]+', '+dShort(s)+' '+d.getUTCFullYear(); }
+function mName(m){ var a=m.split('-'); return MON[+a[1]-1]+' '+a[0]; }
+function mFull(m){ var a=m.split('-'); return ['January','February','March','April','May','June','July','August','September','October','November','December'][+a[1]-1]; }
+function pct(g,r){ return r>0?Math.round(g/r*1000)/10:null; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Data prep ──
+var cutoff = null;
+DATA_RAW.forEach(function(r){ if (r.s==='NCBD' && r.g>0 && (!cutoff || r.d>cutoff)) cutoff = r.d; });
+var DAILY = DATA_RAW.filter(function(r){ return cutoff && r.d<=cutoff; }).map(function(r){
+  return {s:r.s, d:r.d, m:r.d.slice(0,7), r:Math.round(r.r), g:Math.round(r.g), p:pct(r.g,r.r), gap:Math.round(r.g-r.r)};
+});
+var MONTHS = [];
+DAILY.forEach(function(r){ if (MONTHS.indexOf(r.m)===-1) MONTHS.push(r.m); });
+MONTHS.sort();
+var MONTHLY = {};
+DAILY.forEach(function(r){
+  var k = r.s+'|'+r.m;
+  if (!MONTHLY[k]) MONTHLY[k] = {s:r.s, m:r.m, r:0, g:0, days:0};
+  MONTHLY[k].r += r.r; MONTHLY[k].g += r.g; MONTHLY[k].days++;
+});
+Object.keys(MONTHLY).forEach(function(k){ var o=MONTHLY[k]; o.p=pct(o.g,o.r); o.gap=o.g-o.r; });
+function mrow(s,m){ return MONTHLY[s+'|'+m]||null; }
+var ACTIVE_SEGS = SEGS.filter(function(sg){ return MONTHS.some(function(m){ var o=mrow(sg.k,m); return o && o.r>0; }); });
+function isPartial(m){
+  if (!cutoff || cutoff.slice(0,7)!==m) return false;
+  var d = pd(cutoff); var next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()+1));
+  return next.getUTCMonth()===d.getUTCMonth();
+}
+function dayRows(){ return DAILY.filter(function(r){ return r.s===state.seg && (!state.month || r.m===state.month); }); }
+
+// ── Controls ──
+function buildControls(){
+  var pills = document.getElementById('seg-pills');
+  pills.innerHTML = ACTIVE_SEGS.map(function(sg){
+    return '<button type="button" class="seg-pill'+(sg.k===state.seg?' on':'')+'" data-seg="'+esc(sg.k)+'">'+esc(sg.l)+'</button>';
+  }).join('');
+  pills.querySelectorAll('.seg-pill').forEach(function(b){
+    b.onclick = function(){ setSeg(b.getAttribute('data-seg')); };
+  });
+  var sel = document.getElementById('month-sel');
+  sel.innerHTML = '<option value="">All months</option>' + MONTHS.map(function(m){
+    return '<option value="'+m+'">'+mName(m)+(isPartial(m)?' (MTD)':'')+'</option>';
+  }).join('');
+  sel.value = state.month;
+  sel.onchange = function(){ state.month = sel.value; render(); };
+  document.querySelectorAll('.tab-btn').forEach(function(b){
+    b.onclick = function(){
+      state.tab = b.getAttribute('data-tab');
+      document.querySelectorAll('.tab-btn').forEach(function(x){ x.classList.toggle('active', x===b); });
+      document.getElementById('panel-monthly').classList.toggle('active', state.tab==='monthly');
+      document.getElementById('panel-daily').classList.toggle('active', state.tab==='daily');
+      render();
+    };
+  });
+  var lg = '<span><span class="sw" style="background:#059669"></span>'+GOOD+'% or more</span>'+
+    '<span><span class="sw" style="background:#d97706"></span>'+WARN+'–'+GOOD+'%</span>'+
+    '<span><span class="sw" style="background:#dc2626"></span>Below '+WARN+'%</span>';
+  document.getElementById('status-legend').innerHTML = lg;
+  document.getElementById('status-legend-2').innerHTML = lg +
+    '<span><span class="sw" style="background:none;border-top:2px dashed #94a3b8;height:0;width:14px"></span>100% of requirement</span>';
+}
+function setSeg(k){
+  state.seg = k;
+  document.querySelectorAll('.seg-pill').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-seg')===k); });
+  render();
+}
+
+// ── Summary + tiles ──
+function renderSummary(){
+  var el = document.getElementById('summary');
+  if (!cutoff){ el.textContent = 'No generation data found in the sheet.'; return; }
+  var m = cutoff.slice(0,7);
+  function sp(seg){ var o=mrow(seg,m); return o?'<b class="'+cls(o.p)+'">'+pctf(o.p)+'</b>':'—'; }
+  el.innerHTML = 'Through <b>'+dShort(cutoff)+'</b>, '+mFull(m)+' completion for NCBD overall is '+sp('NCBD')+
+    ' of requirement. Meta (NCD Facebook) is at '+sp('NCD_DCB-Facebook')+' and Google (NCD Google Ads) at '+sp('NCD_DCB-Google-Ads')+'.';
+}
+function renderTiles(){
+  var rows = dayRows();
+  var R=0,G=0; rows.forEach(function(r){ R+=r.r; G+=r.g; });
+  var p = pct(G,R);
+  var met = rows.filter(function(r){ return r.p!=null && r.p>=100; }).length;
+  var period = state.month ? mName(state.month)+(isPartial(state.month)?' (through '+dShort(cutoff)+')':'') : 'All months'+(cutoff?' (through '+dShort(cutoff)+')':'');
+  var prevTxt = '';
+  if (state.month){
+    var i = MONTHS.indexOf(state.month);
+    if (i>0){ var pr = mrow(state.seg, MONTHS[i-1]); if (pr && pr.p!=null && p!=null){ var dlt=p-pr.p; prevTxt = '<span class="'+(dlt>=0?'good':'bad')+'">'+(dlt>=0?'+':'')+dlt.toFixed(1)+' pts</span> vs '+mName(MONTHS[i-1]); } }
+  }
+  var t = [
+    ['Requirement', fmt(R), period],
+    ['Generation', fmt(G), period],
+    ['% Completion', '<span class="'+cls(p)+'">'+pctf(p)+'</span>', prevTxt || label(state.seg)],
+    ['Gap', '<span class="'+(G-R>=0?'good':'bad')+'">'+sgn(G-R)+'</span>', G-R<0?'leads short of requirement':'leads over requirement'],
+    ['Days at 100%+', met+' / '+rows.length, 'days generation met requirement']
+  ];
+  document.getElementById('tiles').innerHTML = t.map(function(x){
+    return '<div class="tile"><div class="tile-lbl">'+x[0]+'</div><div class="tile-val">'+x[1]+'</div><div class="tile-sub">'+x[2]+'</div></div>';
+  }).join('');
+}
+
+// ── Month-wise ──
+function renderMonthly(){
+  document.getElementById('mcards').innerHTML = MONTHS.map(function(m, i){
+    var o = mrow(state.seg, m); if (!o) return '';
+    var prev = i>0 ? mrow(state.seg, MONTHS[i-1]) : null;
+    var ch = prev && prev.p!=null && o.p!=null ? o.p-prev.p : null;
+    return '<div class="mcard'+(m===state.month?'" style="border-color:#0f3460':'')+'">'+
+      '<div class="mcard-head"><span>'+mName(m)+'</span>'+(isPartial(m)?'<span class="badge">Through '+dShort(cutoff)+'</span>':'')+'</div>'+
+      '<div class="mcard-pct '+cls(o.p)+'">'+pctf(o.p)+'</div>'+
+      '<div class="bar"><div class="bar-fill" style="width:'+Math.min(o.p||0,100)+'%;background:'+col(o.p)+'"></div></div>'+
+      '<div class="mcard-line"><b>'+fmt(o.g)+'</b> generated of <b>'+fmt(o.r)+'</b> required</div>'+
+      '<div class="mcard-line muted">Gap '+sgn(o.gap)+(ch!=null?' &middot; <span class="'+(ch>=0?'good':'bad')+'">'+(ch>=0?'+':'')+ch.toFixed(1)+' pts</span> vs '+mName(MONTHS[i-1]).split(' ')[0]:'')+'</div>'+
+      '</div>';
+  }).join('');
+
+  var h = '<thead><tr><th>Segment</th>'+MONTHS.map(function(m){ return '<th>'+mName(m)+(isPartial(m)?' (MTD)':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
+  ACTIVE_SEGS.forEach(function(sg){
+    h += '<tr class="click'+(sg.k===state.seg?' sel':'')+'" data-seg="'+esc(sg.k)+'"><td>'+esc(sg.l)+'</td>';
+    MONTHS.forEach(function(m){
+      var o = mrow(sg.k, m);
+      h += o ? '<td><span class="dot" style="background:'+col(o.p)+'"></span><b>'+pctf(o.p)+'</b><span class="sub-num">'+fmt(o.g)+' / '+fmt(o.r)+'</span></td>' : '<td>—</td>';
+    });
+    h += '</tr>';
+  });
+  var mt = document.getElementById('matrix');
+  mt.innerHTML = h + '</tbody>';
+  mt.querySelectorAll('tr.click').forEach(function(tr){ tr.onclick = function(){ setSeg(tr.getAttribute('data-seg')); }; });
+
+  var t = '<thead><tr><th>Month</th><th>Days</th><th>Requirement</th><th>Generation</th><th>Completion</th><th>Gap</th><th>Avg req / day</th><th>Avg gen / day</th><th>vs prev month</th></tr></thead><tbody>';
+  MONTHS.forEach(function(m, i){
+    var o = mrow(state.seg, m); if (!o) return;
+    var prev = i>0 ? mrow(state.seg, MONTHS[i-1]) : null;
+    var ch = prev && prev.p!=null && o.p!=null ? o.p-prev.p : null;
+    t += '<tr'+(m===state.month?' class="sel"':'')+'><td>'+mName(m)+(isPartial(m)?' (MTD)':'')+'</td><td>'+o.days+'</td><td>'+fmt(o.r)+'</td><td>'+fmt(o.g)+'</td>'+
+      '<td class="'+cls(o.p)+'"><b>'+pctf(o.p)+'</b></td><td class="'+(o.gap>=0?'good':'bad')+'">'+sgn(o.gap)+'</td>'+
+      '<td>'+fmt(o.r/o.days)+'</td><td>'+fmt(o.g/o.days)+'</td>'+
+      '<td>'+(ch==null?'—':'<span class="'+(ch>=0?'good':'bad')+'">'+(ch>=0?'+':'')+ch.toFixed(1)+' pts</span>')+'</td></tr>';
+  });
+  document.getElementById('month-table').innerHTML = t + '</tbody>';
+}
+
+// ── Day-wise charts ──
+var NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent){ var e=document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function niceMax(v){ if (v<=0) return 1; var p=Math.pow(10, Math.floor(Math.log10(v))); var n=v/p; return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p; }
+function kfmt(v){ return v>=1000 ? (v/1000).toFixed(v%1000===0?0:1)+'k' : String(v); }
+
+function chartFrame(el, rows, H, yMax, yFmt){
+  el.innerHTML = '';
+  var W = Math.max(300, el.clientWidth);
+  var svg = svgEl('svg', {viewBox:'0 0 '+W+' '+H, role:'img'}, el);
+  var ticks = [0, yMax/4, yMax/2, yMax*3/4, yMax];
+  var probe = svgEl('text', {x:0, y:0}, svg);
+  var ml = 0; ticks.forEach(function(t){ probe.textContent = yFmt(t); ml = Math.max(ml, probe.getComputedTextLength()); });
+  svg.removeChild(probe);
+  ml = Math.ceil(ml) + 12;
+  var mt = 12, mb = 26, mr = 8;
+  var ih = H-mt-mb, iw = W-ml-mr;
+  var y = function(v){ return mt + ih - v/yMax*ih; };
+  ticks.forEach(function(t){
+    svgEl('line', {x1:ml, x2:W-mr, y1:y(t), y2:y(t), stroke:'#eef2f7'}, svg);
+    var tx = svgEl('text', {x:ml-6, y:y(t)+3, 'text-anchor':'end'}, svg); tx.textContent = yFmt(t);
+  });
+  var n = rows.length, step = iw/n, bw = step*0.82;
+  var x = function(i){ return ml + i*step + (step-bw)/2; };
+  var every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw/58))));
+  rows.forEach(function(r, i){
+    if (i % every) return;
+    var tx = svgEl('text', {x:x(i)+bw/2, y:H-8, 'text-anchor':'middle'}, svg); tx.textContent = dShort(r.d);
+  });
+  svgEl('line', {x1:ml, x2:W-mr, y1:y(0), y2:y(0), stroke:'#94a3b8'}, svg);
+  return {svg:svg, W:W, H:H, x:x, y:y, bw:bw, step:step, ml:ml, mt:mt, mb:mb, ih:ih};
+}
+function addTip(el, f, rows){
+  var tip = document.createElement('div'); tip.className = 'tip'; el.appendChild(tip);
+  rows.forEach(function(r, i){
+    var hit = svgEl('rect', {x:f.ml+i*f.step, y:f.mt, width:f.step, height:f.ih, fill:'transparent'}, f.svg);
+    function show(ev){
+      tip.innerHTML = '<div class="th">'+dLong(r.d)+'</div>Requirement <b>'+fmt(r.r)+'</b><br>Generation <b>'+fmt(r.g)+'</b><br>Completion <b style="color:'+(r.p==null?'#fff':r.p>=GOOD?'#34d399':r.p>=WARN?'#fbbf24':'#f87171')+'">'+pctf(r.p)+'</b><br>Gap <b>'+sgn(r.gap)+'</b>';
+      tip.style.display = 'block';
+      var box = el.getBoundingClientRect();
+      var px = ev.clientX - box.left, py = ev.clientY - box.top;
+      var left = px + 14; if (left + tip.offsetWidth > box.width) left = px - tip.offsetWidth - 14;
+      tip.style.left = Math.max(0, left) + 'px';
+      tip.style.top = Math.max(0, py - tip.offsetHeight - 10) + 'px';
+    }
+    hit.addEventListener('mousemove', show);
+    hit.addEventListener('mouseenter', show);
+    hit.addEventListener('touchstart', function(ev){ show(ev.touches[0]); }, {passive:true});
+    hit.addEventListener('mouseleave', function(){ tip.style.display = 'none'; });
+  });
+}
+function renderBarChart(rows){
+  var el = document.getElementById('bar-chart');
+  if (!rows.length){ el.textContent = 'No days to show.'; return; }
+  var mx = 0; rows.forEach(function(r){ mx = Math.max(mx, r.r, r.g); });
+  var f = chartFrame(el, rows, 280, niceMax(mx*1.05), kfmt);
+  f.svg.setAttribute('aria-label', 'Daily requirement and generation for '+label(state.seg));
+  var inner = Math.max(1, f.bw*0.55);
+  rows.forEach(function(r, i){
+    svgEl('rect', {x:f.x(i), width:f.bw, y:f.y(r.r), height:f.y(0)-f.y(r.r), fill:'#cbd5e1'}, f.svg);
+    svgEl('rect', {x:f.x(i)+(f.bw-inner)/2, width:inner, y:f.y(r.g), height:f.y(0)-f.y(r.g), fill:'#0f3460'}, f.svg);
+  });
+  addTip(el, f, rows);
+}
+function renderPctChart(rows){
+  var el = document.getElementById('pct-chart');
+  if (!rows.length){ el.textContent = 'No days to show.'; return; }
+  var mx = 110; rows.forEach(function(r){ if (r.p!=null) mx = Math.max(mx, r.p); });
+  var f = chartFrame(el, rows, 220, niceMax(mx*1.05), function(v){ return Math.round(v)+'%'; });
+  f.svg.setAttribute('aria-label', 'Daily completion percent for '+label(state.seg));
+  svgEl('line', {x1:f.ml, x2:f.W-8, y1:f.y(100), y2:f.y(100), stroke:'#94a3b8', 'stroke-dasharray':'4 3'}, f.svg);
+  var pts = [];
+  rows.forEach(function(r, i){ if (r.p!=null) pts.push([f.x(i)+f.bw/2, f.y(r.p), r.p]); });
+  if (pts.length > 1) svgEl('polyline', {points:pts.map(function(p){ return p[0].toFixed(1)+','+p[1].toFixed(1); }).join(' '), fill:'none', stroke:'#0f3460', 'stroke-width':1.5}, f.svg);
+  var rad = Math.max(1.8, Math.min(3.5, f.step/3));
+  pts.forEach(function(p){ svgEl('circle', {cx:p[0], cy:p[1], r:rad, fill:col(p[2])}, f.svg); });
+  addTip(el, f, rows);
+}
+function renderDayTable(rows){
+  var t = '<thead><tr><th>Date</th><th>Requirement</th><th>Generation</th><th>Completion</th><th>Gap</th></tr></thead><tbody>';
+  rows.slice().reverse().forEach(function(r){
+    t += '<tr><td>'+dRow(r.d)+'</td><td>'+fmt(r.r)+'</td><td>'+fmt(r.g)+'</td><td class="'+cls(r.p)+'"><b>'+pctf(r.p)+'</b></td><td class="'+(r.gap>=0?'good':'bad')+'">'+sgn(r.gap)+'</td></tr>';
+  });
+  document.getElementById('day-table').innerHTML = t + '</tbody>';
+}
+
+function render(){
+  document.querySelectorAll('.seg-name').forEach(function(e){ e.textContent = label(state.seg); });
+  renderSummary();
+  renderTiles();
+  renderMonthly();
+  if (state.tab === 'daily'){
+    var rows = dayRows();
+    renderBarChart(rows); renderPctChart(rows); renderDayTable(rows);
+  }
+}
+
+if (BUILD_TS){
+  document.getElementById('build-ts').textContent = 'Data refreshed: ' + new Date(BUILD_TS).toLocaleString('en-IN', {timeZone:'Asia/Kolkata'}) + ' IST' + (cutoff ? ' · generation reported through ' + dShort(cutoff) : '');
+}
+buildControls();
+render();
+var rz; window.addEventListener('resize', function(){ clearTimeout(rz); rz = setTimeout(function(){ if (state.tab==='daily') render(); }, 150); });
+})();
+</script>
+</body>
+</html>
