@@ -24,6 +24,7 @@ var ENTERPRISE_SS_ID  = '1c5mtbsRiA6axOKMA87KIPiCUvnjAXZGSELW2-jLt-Fk';
 var SEP_TRIGGERS_ID   = '1KXaUoUsEIrMHajuMGegVSYCnfeVmCLEfQFX9eujavp0';
 var AUG_TRIGGERS_ID   = '1kD6z8CpeaII8Ls545_ZSLv4hqQrwUeWoPWgegtzyka8';
 var OCT_TRIGGERS_ID   = '1-zfVWep63EUMuedKEAcXAEV4gawJ1R3zYzvuadb8QLk';
+var NOV_TRIGGERS_ID   = '127wAiu04aIeV8V7RicOwlutE5ALv0KyKwPBfhnZi1ZU';
 
 // Sheet / tab names
 var SHEET_RAW     = 'Raw';
@@ -156,7 +157,10 @@ function buildRows() {
   var octSS   = SpreadsheetApp.openById(OCT_TRIGGERS_ID);
   var octData = octSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
 
-  Logger.log('Raw:'+rawData.length+' CPL:'+cplData.length+' Sep:'+sepData.length+' Aug:'+augData.length+' Oct:'+octData.length);
+  var novSS   = SpreadsheetApp.openById(NOV_TRIGGERS_ID);
+  var novData = novSS.getSheetByName(SHEET_TRIG).getDataRange().getValues();
+
+  Logger.log('Raw:'+rawData.length+' CPL:'+cplData.length+' Sep:'+sepData.length+' Aug:'+augData.length+' Oct:'+octData.length+' Nov:'+novData.length);
 
   // Build Sold_CPL_Val lookup
   // key: normStr(brand)||normStr(model)||channel_norm||month_label  →  {seg, vp, sc}
@@ -177,7 +181,8 @@ function buildRows() {
   var sepTrigMap = buildTrigMap(sepData);
   var augTrigMap = buildTrigMap(augData);
   var octTrigMap = buildTrigMap(octData);
-  Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length+' Oct trig:'+Object.keys(octTrigMap).length);
+  var novTrigMap = buildTrigMap(novData);
+  Logger.log('CPL map:'+Object.keys(cplMap).length+' Sep trig:'+Object.keys(sepTrigMap).length+' Aug trig:'+Object.keys(augTrigMap).length+' Oct trig:'+Object.keys(octTrigMap).length+' Nov trig:'+Object.keys(novTrigMap).length);
 
   // Aggregate Raw spends by date + normStr(brand) + normStr(model) + channel
   // brandCanon / modelCanon: pick the first-seen display name for each normalized key
@@ -214,14 +219,15 @@ function buildRows() {
   var claimedSepKeys = {};
   var claimedAugKeys = {};
   var claimedOctKeys = {};
+  var claimedNovKeys = {};
 
   Object.keys(rawMap).forEach(function(key) {
     var r = rawMap[key];
     var brk = r.brk, mdk = r.mdk;
     var br = brandCanon[brk] || brk;
     var md = modelCanon[mdk] || mdk;
-    var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : (r.mo === 'Oct' ? octTrigMap : {}));
-    var claimed = r.mo === 'Sep' ? claimedSepKeys : (r.mo === 'Aug' ? claimedAugKeys : (r.mo === 'Oct' ? claimedOctKeys : {}));
+    var trigMap = r.mo === 'Sep' ? sepTrigMap : (r.mo === 'Aug' ? augTrigMap : (r.mo === 'Oct' ? octTrigMap : (r.mo === 'Nov' ? novTrigMap : {})));
+    var claimed = r.mo === 'Sep' ? claimedSepKeys : (r.mo === 'Aug' ? claimedAugKeys : (r.mo === 'Oct' ? claimedOctKeys : (r.mo === 'Nov' ? claimedNovKeys : {})));
 
     var triggers = 0;
     var tKey = r.dt+'||'+brk+'||'+mdk+'||'+r.ch;
@@ -297,6 +303,7 @@ function buildRows() {
   addUnclaimedRows(sepTrigMap, claimedSepKeys, 'Sep');
   addUnclaimedRows(augTrigMap, claimedAugKeys, 'Aug');
   addUnclaimedRows(octTrigMap, claimedOctKeys, 'Oct');
+  addUnclaimedRows(novTrigMap, claimedNovKeys, 'Nov');
 
   rows.sort(function(a,b){
     return a.dt.localeCompare(b.dt)||a.br.localeCompare(b.br)||a.md.localeCompare(b.md)||a.ch.localeCompare(b.ch);
@@ -371,6 +378,7 @@ function normMo(s) {
   if (m.indexOf('aug')!==-1) return 'Aug';
   if (m.indexOf('sep')!==-1) return 'Sep';
   if (m.indexOf('oct')!==-1) return 'Oct';
+  if (m.indexOf('nov')!==-1) return 'Nov';
   if (m.indexOf('jul')!==-1) return 'Jul';
   if (m.indexOf('jun')!==-1) return 'Jun';
   return s;
