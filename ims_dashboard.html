@@ -812,7 +812,7 @@ function parseDate(v) {
 }
 
 function num(v) {
-  const n = parseFloat(v);
+  const n = parseFloat(String(v ?? '').replace(/,/g, ''));
   return isNaN(n) ? 0 : n;
 }
 
