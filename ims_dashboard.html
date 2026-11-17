@@ -1271,14 +1271,6 @@ async function renderTracker() {
     let total = sumRows(eRows);
     let yest  = sumRows(yRows);
 
-    if (e.brand === 'Taigun-Imp' || e.brand === 'Taigun-Leads') {
-      const allTRows = RAW.filter(r => (r.brand === 'Taigun-Imp' || r.brand === 'Taigun-Leads') && (!entityStartDate || r.dateStr >= entityStartDate));
-      const yTRows   = allTRows.filter(r => r.dateStr === latestDateStr);
-      const tAll = sumRows(allTRows), tYest = sumRows(yTRows);
-      if (e.brand === 'Taigun-Imp')   { total = {...total, impressions: tAll.impressions};  yest = {...yest, impressions: tYest.impressions}; }
-      else                             { total = {...total, leads: tAll.leads};               yest = {...yest, leads: tYest.leads}; }
-    }
-
     const tImpr  = isBudgetOnly ? null : (t.targetImpr  || null);
     const tLeads = isBudgetOnly ? null : (t.targetLeads || null);
     const budget = (t.budgetImpr || 0) + (t.budgetLeads || 0);
