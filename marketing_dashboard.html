@@ -297,7 +297,7 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
 	c0.2-0.7,0.4-1.5,0.6-2.2c0.1-0.4,0.3-0.6,0.6-0.9c2.7-2.3,5.5-4.7,8.2-7.1C9.7,3.7,9.8,3.6,10,3.5c-2.2,0-4.3,0-6.4,0
 	c0-0.1,0.1-0.2,0.1-0.3C3.9,2.5,4.1,1.8,4.3,1c0-0.1,0.1-0.2,0.2-0.2c3.2,0,6.3,0,9.5,0c0.1,0,0.1,0,0.2,0c0,0.1,0,0.1,0,0.2
 	C13.9,2.1,13.6,3.1,13.3,4.1z"/>
-</svg><div style="width:1px;height:32px;background:#e0e0e0;"></div><div><div style="font-size:12px;font-weight:700;color:#231F20;letter-spacing:.2px;">UAE Campaign Dashboard</div><div style="font-size:10px;color:#888;margin-top:2px;letter-spacing:.3px;" id="hdr-range">Loading...</div></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="hdr-brands"></div></header>
+</svg><div style="width:1px;height:32px;background:#e0e0e0;"></div><div><div style="font-size:12px;font-weight:700;color:#231F20;letter-spacing:.2px;">UAE Campaign Dashboard</div><div style="font-size:10px;color:#888;margin-top:2px;letter-spacing:.3px;" id="hdr-range">Loading...</div><div style="font-size:10px;color:#aaa;margin-top:1px;letter-spacing:.3px;" id="hdr-refresh"></div></div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" id="hdr-brands"></div></header>
 
 <div class="tab-nav">
   <button class="tnav active" onclick="switchTab('summary')">Summary</button>
@@ -1177,6 +1177,8 @@ function init(){
   });
   var hr=document.getElementById('hdr-range');
   if(hr)hr.textContent=fmtMo(DATA.dates[0].slice(0,7))+' \u2013 '+fmtMo(DATA.dates[DATA.dates.length-1].slice(0,7));
+  var hrf=document.getElementById('hdr-refresh');
+  if(hrf){var ld=new Date(DATA.dates[DATA.dates.length-1]);var mo=ld.toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric'});hrf.textContent='Data updated till '+mo;}
 
   applyFilters();
 }
