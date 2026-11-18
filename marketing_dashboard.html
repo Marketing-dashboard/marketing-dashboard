@@ -389,15 +389,6 @@ td.cell-bad  .mono,td.cell-bad  .chg{color:var(--red-txt)!important;}
     </table>
   </div>
 
-  <div class="tbox">
-    <div class="tbox-hd">
-      <div><div class="tbox-title">Overall Performance</div></div>
-    </div>
-    <table>
-      <thead><tr><th>Brand</th><th class="num">Actual Target</th><th class="num">Triggered (MTD)</th><th class="num">CRR</th><th class="num">Month-End Expected</th><th class="num">Current Fulfillment %</th><th class="num">Expected Fulfillment %</th><th class="num">End Date</th><th class="num">Spend (INR)</th><th class="num">Revenue (INR)</th><th class="num">Margin %</th></tr></thead>
-      <tbody id="target-body"></tbody>
-    </table>
-  </div>
 </div>
 
 <!-- ═══ MONTH ON MONTH ═══ -->
@@ -775,46 +766,6 @@ function renderSummary(){
   }
   document.getElementById('camptype-body').innerHTML=ctRows||'<tr><td colspan="9" class="empty">No data</td></tr>';
 
-  // Target tracking table
-  var brandSpends={};
-  DATA.daily.forEach(function(r){if(!brandSpends[r.brand])brandSpends[r.brand]=0;brandSpends[r.brand]+=r.spends;});
-  var tRows='';
-  Object.keys(CAMPAIGN_TARGETS).forEach(function(brand){
-    var t=CAMPAIGN_TARGETS[brand];
-    var trig=FULFILLMENT_MTD[brand]||0;
-    var cfg=FULFILLMENT_CONFIG[brand]||{daysLive:21,endDate:null};
-    var crr=trig/cfg.daysLive;
-    var remainingDays=0;
-    if(cfg.endDate){
-      var ed=new Date(cfg.endDate);var today=new Date();
-      today.setHours(0,0,0,0);ed.setHours(0,0,0,0);
-      remainingDays=Math.max(0,Math.round((ed-today)/(1000*60*60*24)));
-    }
-    var projected=Math.round(trig+crr*remainingDays);
-    var curFulfil=t.actualTarget>0?(trig/t.actualTarget*100).toFixed(1)+'%':'—';
-    var curFulfilCls=t.actualTarget>0?(trig/t.actualTarget*100>=100?'cell-good':trig/t.actualTarget*100>=75?'':'cell-bad'):'';
-    var expFulfilOverride=(brand==='Mitsubishi'||brand==='MG');
-    var expFulfil=expFulfilOverride?'100.0%':(t.actualTarget>0?(projected/t.actualTarget*100).toFixed(1)+'%':'—');
-    var expFulfilCls=expFulfilOverride?'cell-good':(t.actualTarget>0?(projected/t.actualTarget*100>=100?'cell-good':projected/t.actualTarget*100>=75?'':'cell-bad'):'');
-    var c=BRAND_COLORS[brand]||'#888';
-    var spend=brandSpends[brand]||0;
-    var sc=SOLD_CPL[brand]||null;
-    var tRev=(sc&&trig>0)?sc*trig:null;
-    var tMargin=(tRev&&tRev>0&&spend>0)?(1-spend/tRev)*100:null;
-    tRows+='<tr>'+
-      '<td><span class="bdot" style="background:'+c+'"></span><strong>'+brand+'</strong></td>'+
-      '<td class="num">'+t.actualTarget+'</td>'+
-      '<td class="num">'+(trig>0?trig:'—')+'</td>'+
-      '<td class="num">'+crr.toFixed(1)+'</td>'+
-      '<td class="num">'+projected+'</td>'+
-      '<td class="num '+curFulfilCls+'">'+curFulfil+'</td>'+
-      '<td class="num '+expFulfilCls+'">'+expFulfil+'</td>'+
-      '<td class="num">'+(cfg.endDate||'—')+'</td>'+
-      '<td class="num">'+(spend>0?fmt(spend):'<span class="na">—</span>')+'</td>'+
-      '<td class="num">'+(tRev?fmt(tRev):'<span class="na">—</span>')+'</td>'+
-      '<td class="num">'+(tMargin!==null?tMargin.toFixed(1)+'%':'<span class="na">—</span>')+'</td></tr>';
-  });
-  document.getElementById('target-body').innerHTML=tRows||'<tr><td colspan="11" class="empty">No data</td></tr>';
 }
 
 /* ── MoM helpers ── */
